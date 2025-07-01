@@ -1,6 +1,6 @@
 const baseurl = "http://localhost:5000/"
 
-async function createRoom(roomName) {
+async function createRoomReq(roomName) {
   try{
     const response = await fetch(baseurl + "createRoom",{
       "method": "POST",
@@ -18,7 +18,7 @@ async function createRoom(roomName) {
   }
 }
 
-async function validateRoom(roomID) {
+async function validateRoomReq(roomID) {
   try{
     const response = await fetch(baseurl + "validateRoom",{
       "method": "POST",
@@ -36,7 +36,7 @@ async function validateRoom(roomID) {
   }
 }
 
-async function storeMessage(messageInfo) {
+async function storeMessageReq(messageInfo) {
   try{
     const response = await fetch(baseurl + "storeMessage",{
       "method": "POST",
@@ -54,5 +54,23 @@ async function storeMessage(messageInfo) {
   }
 }
 
+async function getMessagesReq(roomID, messageID=null) {
+  try{
+    const response = await fetch(baseurl + "getMessages",{
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"messageID":messageID, "roomID":roomID})
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message ||"req failed")
+    }
+    return data.data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
 
-export {createRoom, validateRoom, storeMessage}
+
+export {createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq}

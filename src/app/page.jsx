@@ -9,9 +9,9 @@ function Home(){
   const [password, setPassword] = useState("")
   const router = useRouter()
 
-  // useEffect(()=>{
-  //   router.push("/platform")
-  // },[])
+  useEffect(()=>{
+    router.push("/platform")
+  },[])
 
   return(
   <div className={styles.homepage}>

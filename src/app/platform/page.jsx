@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 import useWebSocket from "react-use-websocket"
 
-import { createRoom, validateRoom } from "../../../backend/requests"
+import { createRoomReq, validateRoomReq } from "../../../backend/requests"
 import styles from "../../../styles/pages/Platform.module.css"
 
 function Platform(){
@@ -27,30 +27,40 @@ function Platform(){
         case "chat":
           setMessages(prev=>[...prev, data.data])
           break
+        case "chatHistory":
+          console.log(data)
+          const newMessages = data.data.map(item => item[2])
+          setMessages(prev=>[...newMessages, ...prev])
+          break
       }
     }
   })
 
   async function handleRoomCreation(){
-    const res = await createRoom(newRoomName)
+    const res = await createRoomReq(newRoomName)
     if (res){
       setNewRoomName("")
+      setMessages([])
       setRoomID(res)
       setIsCreatingRoom(false)
     }
   }
   async function handleRoomLoad(){
-    const res = await validateRoom(joinRoomID)
+    const res = await validateRoomReq(joinRoomID)
     if(res){
+      setMessages([])
       setRoomID(joinRoomID);
       setIsLoadingRoom(false)
+
     }
   }
 
   function handleMessage(e) {
     sendJsonMessage({
       "type": "chat",
-      "data": newMessage
+      "data": newMessage,
+      "timestamp": Date.now(),
+      "messageID":crypto.randomUUID() 
     })
     setNewMessage("")
     setMessages(prev=>[...prev, newMessage])
@@ -105,10 +115,12 @@ function Platform(){
             })
           }
         </section>
+        {roomID &&
         <section className={styles.newChat}>
           Send Message <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
           <button onClick={handleMessage}>Send</button>
         </section>
+          }
       </div>
     </div>
   )

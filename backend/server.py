@@ -53,7 +53,9 @@ with AccessDatabase() as cursor:
       id INT AUTO_INCREMENT PRIMARY KEY,
       roomID VARCHAR(10),
       username VARCHAR(70),
-      message TEXT
+      timestamp BIGINT,
+      message TEXT,
+      messageID VARCHAR(50)
     )
     '''
   )
@@ -73,26 +75,33 @@ def storeMessage():
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
-      cursor.execute("INSERT INTO messages (username, roomID, message) VALUES (%s, %s, %s)", (data["username"], data["roomID"], data["message"]))
+      cursor.execute("INSERT INTO messages (username, roomID, message, timestamp, messageID) VALUES (%s, %s, %s, %s, %s)", (data["username"], data["roomID"], data["message"], data["timestamp"], data["messageID"]))
       
-    return jsonify({"success":True,"code": 200})
+    return jsonify({"success":True}),200
   except Exception as e:
     print(e)
-    return jsonify({"success":False,"code": 500,"message": "Failed to upadte messages."})
+    return jsonify({"success":False,"message": "Failed to update messages."}), 500
 
 
 #Returns all chats from a room provided its roomID
-@app.route("/getRoomMessages", methods=["POST"])
-def getRoomMessages():
+@app.route("/getMessages", methods=["POST"])
+def getMessages():
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
-      cursor.execute("SELECT username, message FROM messages WHERE roomID = %s", (data["roomID"],))
-      messages = cursor.fetchall()
-    return jsonify({"success": True, "data": messages, "code": 200, })
+      messages = []
+      if (not data["messageID"]):
+        cursor.execute("SELECT username, timestamp, message, messageID FROM messages WHERE roomID = %s", (data["roomID"],))
+        messages = cursor.fetchall()
+      else:
+        cursor.execute("SELECT id FROM messages WHERE messageID = %s", (data["messageID"],))
+        lastSentID = cursor.fetchone()[0]
+        cursor.execute("SELECT username, timestamp, message, messageID FROM messages WHERE roomID = %s AND id <= %s", (data["roomID"], lastSentID))
+        messages = cursor.fetchall()
+    return jsonify({"success": True, "data": messages }), 200
   except Exception as e:
     print(e)
-    return jsonify({"success": False, "code": 500, "message": "Failed to get room messages"})
+    return jsonify({"success": False, "message": "Failed to get room messages"}), 500
 
 # Creates room with name and unique 6 char code
 @app.route("/createRoom", methods=["POST"])
@@ -107,10 +116,10 @@ def createRoom():
         exists = cursor.fetchone() is not None
       cursor.execute("INSERT INTO rooms (roomID, roomName) VALUES (%s, %s)",(roomID, data["roomName"]))
 
-    return jsonify({"success": True, "data": roomID, "code": 200})
+    return jsonify({"success": True, "data": roomID}), 200
   except Exception as e:
     print(e)
-    return jsonify({"success": False, "code": 500,"message": "failed to create room"})
+    return jsonify({"success": False,"message": "failed to create room"}), 500
 
 # checks if roomID exists
 @app.route("/validateRoom", methods=["POST"])
@@ -121,10 +130,10 @@ def validateRoom():
       cursor.execute("SELECT * FROM rooms where roomID=%s",(data["roomID"],))
       exists = cursor.fetchone() is not None
 
-    return jsonify({"success":True,"data": exists ,"code":200})
+    return jsonify({"success":True,"data": exists}), 200
   except Exception as e:
     print(e)
-    return jsonify({"success":False, "code": 500, "message": "failed to valdiate room"})
+    return jsonify({"success":False, "message": "failed to valdiate room"}), 500
 
 #-----------------AUTH0 STUFF------------------
 
