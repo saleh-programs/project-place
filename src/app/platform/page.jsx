@@ -16,6 +16,9 @@ function Platform(){
   const [newMessage, setNewMessage] = useState("")
   const lazyUsername = useRef(Math.floor(Math.random()*500))
 
+  const batchedStrokes = useRef([])
+  const canvasRef = useRef(null)
+
   const {sendJsonMessage} = useWebSocket("ws://10.0.0.110:8000",{
     queryParams:{
       "username": lazyUsername.current,
@@ -63,6 +66,27 @@ function Platform(){
     })
     setNewMessage("")
     setMessages(prev=>[...prev, newMessage])
+  }
+
+  function startDrawing(event){
+
+    const whiteboard = canvasRef.current.getContext("2d")
+    const whiteboardRect = canvasRef.current.getBoundingClientRect()
+
+    whiteboard.fillStyle = "black"
+    whiteboard.beginPath()
+    whiteboard.moveTo(event.clientX - whiteboardRect.left,event.clientY - whiteboardRect.top)
+    const onMove = (e) => {
+      whiteboard.lineTo(e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top)
+      whiteboard.stroke()
+      // whiteboard.fillRect(e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top,5,5)
+    }
+    const onLeave = (e) => {
+      canvasRef.current.removeEventListener("mousemove", onMove)
+      canvasRef.current.removeEventListener("mouseup", onLeave) 
+    }
+    canvasRef.current.addEventListener("mousemove", onMove)
+    canvasRef.current.addEventListener("mouseup", onLeave)
   }
 
   return(
@@ -113,6 +137,9 @@ function Platform(){
               )
             })
           }
+          <div>
+            <canvas ref={canvasRef} width={200} height={200} onMouseDown={startDrawing} style={{backgroundColor:'white'}}/>
+          </div>
         </section>
         {roomID &&
         <section className={styles.newChat}>
