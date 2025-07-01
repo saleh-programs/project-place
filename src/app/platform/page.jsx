@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 import useWebSocket from "react-use-websocket"
 
-import { createRoomReq, validateRoomReq } from "../../../backend/requests"
+import { getUniqueMessageID,createRoomReq, validateRoomReq } from "../../../backend/requests"
 import styles from "../../../styles/pages/Platform.module.css"
 
 function Platform(){
@@ -16,7 +16,7 @@ function Platform(){
   const [newMessage, setNewMessage] = useState("")
   const lazyUsername = useRef(Math.floor(Math.random()*500))
 
-  const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
+  const {sendJsonMessage} = useWebSocket("ws://10.0.0.110:8000",{
     queryParams:{
       "username": lazyUsername.current,
       "roomID": roomID
@@ -28,7 +28,6 @@ function Platform(){
           setMessages(prev=>[...prev, data.data])
           break
         case "chatHistory":
-          console.log(data)
           const newMessages = data.data.map(item => item[2])
           setMessages(prev=>[...newMessages, ...prev])
           break
@@ -60,7 +59,7 @@ function Platform(){
       "type": "chat",
       "data": newMessage,
       "timestamp": Date.now(),
-      "messageID":crypto.randomUUID() 
+      "messageID": getUniqueMessageID()
     })
     setNewMessage("")
     setMessages(prev=>[...prev, newMessage])

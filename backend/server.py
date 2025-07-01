@@ -2,6 +2,7 @@ import mysql.connector
 import json, os
 from os import environ as env
 from urllib.parse import quote_plus, urlencode
+from random import randint, choice
 
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, request, jsonify, redirect, render_template, session, url_for
@@ -170,10 +171,11 @@ def logout():
 
 # returns random 6 digit string. [A-Z]or [0-9]. Letters more likely
 def generateRoomCode():
-  from random import randint, choice
   code = []
   for _ in range(6):
-    value = choice([randint(65,90),randint(65,90), randint(65,90),randint(48,57)])
+    letterRand = randint(65, 90)
+    numberRand = randint(48, 57)
+    value = choice([letterRand, letterRand, letterRand, numberRand])
     code.append(chr(value))
   
   return "".join(code)
@@ -181,4 +183,4 @@ def generateRoomCode():
 
 
 if __name__ == "__main__":
-  app.run(port=env.get("port", 5000),debug=True)
+  app.run(host="0.0.0.0",port=5000,debug=True)

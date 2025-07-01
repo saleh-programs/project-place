@@ -1,4 +1,4 @@
-const baseurl = "http://localhost:5000/"
+const baseurl = "http://10.0.0.110:5000/"
 
 async function createRoomReq(roomName) {
   try{
@@ -72,5 +72,13 @@ async function getMessagesReq(roomID, messageID=null) {
   }
 }
 
-
-export {createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq}
+function getUniqueMessageID(){
+  const options = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  const messageID = []
+  for (let i=0;i< 35;i++){
+    messageID.push(options[Math.floor(Math.random() * 36)])
+  }
+  return messageID.join("")
+}
+export {getUniqueMessageID,
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq}
