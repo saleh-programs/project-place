@@ -68,6 +68,39 @@ function Platform(){
     setMessages(prev=>[...prev, newMessage])
   }
 
+  function sendStrokes(){
+    sendJsonMessage({
+      "type": "whiteboard",
+      "data": batchedStrokes.current
+    })
+    batchedStrokes.current = []
+  }
+
+  function throttle(func){
+    let timerID = null
+    let lastFunc = null
+
+    function restartTimer(){
+      timerID = setTimeout(()=>{
+        timerID = null
+        if (lastFunc){
+          func(...lastFunc)
+          lastFunc = null
+          restartTimer()
+        }
+      },50)
+    }
+
+    return (...args) => {
+      lastFunc = args
+      if (timerID === null){
+        restartTimer()
+        func(...args)
+        lastFunc = null
+      }
+    }
+  }
+
   function startDrawing(event){
 
     const whiteboard = canvasRef.current.getContext("2d")
@@ -76,10 +109,14 @@ function Platform(){
     whiteboard.fillStyle = "black"
     whiteboard.beginPath()
     whiteboard.moveTo(event.clientX - whiteboardRect.left,event.clientY - whiteboardRect.top)
+    // batchedStrokes.current.push([event.clientX - whiteboardRect.left,event.clientY - whiteboardRect.top])
+    const sendStrokesThrottled = throttle(sendStrokes)
+
     const onMove = (e) => {
       whiteboard.lineTo(e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top)
       whiteboard.stroke()
-      // whiteboard.fillRect(e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top,5,5)
+      batchedStrokes.current.push([e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top])
+      sendStrokesThrottled()
     }
     const onLeave = (e) => {
       canvasRef.current.removeEventListener("mousemove", onMove)
