@@ -16,8 +16,13 @@ function Platform(){
   const [newMessage, setNewMessage] = useState("")
   const lazyUsername = useRef(Math.floor(Math.random()*500))
 
-  const batchedStrokes = useRef([])
+  const batchedStrokes = useRef({
+    "fullStroke": [],
+    "batchStroke": []
+  })
+  const startStrokePoint = useRef(null)
   const canvasRef = useRef(null)
+  const hiddenCanvasRef = useRef(null)
 
   const {sendJsonMessage} = useWebSocket("ws://10.0.0.110:8000",{
     queryParams:{
@@ -34,9 +39,21 @@ function Platform(){
           const newMessages = data.data.map(item => item[2])
           setMessages(prev=>[...newMessages, ...prev])
           break
+        case "isDrawing":
+          externalDraw(data.data, data.type)
+          break
+        case "doneDrawing":
+          externalDraw(data.data, data.type)
+          break
       }
     }
   })
+
+  useEffect(()=>{
+    hiddenCanvasRef.current = document.createElement("canvas")
+    hiddenCanvasRef.current.width = 200
+    hiddenCanvasRef.current.height = 200
+  },[])
 
   async function handleRoomCreation(){
     const res = await createRoomReq(newRoomName)
@@ -68,12 +85,22 @@ function Platform(){
     setMessages(prev=>[...prev, newMessage])
   }
 
-  function sendStrokes(){
+  function sendBatchStrokes(){
+    batchedStrokes.current.batchStroke.unshift(startStrokePoint.current)
+    startStrokePoint.current = batchedStrokes.current.batchStroke[batchedStrokes.current.batchStroke.length-1]
     sendJsonMessage({
-      "type": "whiteboard",
-      "data": batchedStrokes.current
+      "type": "isDrawing",
+      "data": batchedStrokes.current.batchStroke
     })
-    batchedStrokes.current = []
+    batchedStrokes.current.batchStroke = []
+  }
+
+  function sendStroke(){
+    sendJsonMessage({
+      "type": "doneDrawing",
+      "data": batchedStrokes.current.fullStroke
+    })
+    batchedStrokes.current.fullStroke = []
   }
 
   function throttle(func){
@@ -102,29 +129,90 @@ function Platform(){
   }
 
   function startDrawing(event){
-
     const whiteboard = canvasRef.current.getContext("2d")
     const whiteboardRect = canvasRef.current.getBoundingClientRect()
+    startStrokePoint.current = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
 
     whiteboard.fillStyle = "black"
     whiteboard.beginPath()
-    whiteboard.moveTo(event.clientX - whiteboardRect.left,event.clientY - whiteboardRect.top)
-    // batchedStrokes.current.push([event.clientX - whiteboardRect.left,event.clientY - whiteboardRect.top])
-    const sendStrokesThrottled = throttle(sendStrokes)
+    whiteboard.moveTo(...startStrokePoint.current)
+
+    batchedStrokes.current.fullStroke.push(startStrokePoint.current)
+    const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
     const onMove = (e) => {
-      whiteboard.lineTo(e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top)
+      const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
+      whiteboard.lineTo(...whiteboardPos)
       whiteboard.stroke()
-      batchedStrokes.current.push([e.clientX - whiteboardRect.left,e.clientY - whiteboardRect.top])
-      sendStrokesThrottled()
+      batchedStrokes.current.batchStroke.push(whiteboardPos)
+      batchedStrokes.current.fullStroke.push(whiteboardPos)
+      sendBatchStrokesThrottled()
     }
-    const onLeave = (e) => {
+
+    const onRelease = (e) => {
+      sendStroke()
       canvasRef.current.removeEventListener("mousemove", onMove)
-      canvasRef.current.removeEventListener("mouseup", onLeave) 
+      document.removeEventListener("mouseup", onRelease) 
     }
     canvasRef.current.addEventListener("mousemove", onMove)
-    canvasRef.current.addEventListener("mouseup", onLeave)
+    document.addEventListener("mouseup", onRelease)
   }
+  function startDrawingMobile(event){
+    event.preventDefault()
+    const whiteboard = canvasRef.current.getContext("2d")
+    const whiteboardRect = canvasRef.current.getBoundingClientRect()
+    startStrokePoint.current = [Math.round(event.touches[0].clientX - whiteboardRect.left), Math.round(event.touches[0].clientY - whiteboardRect.top)]
+
+    whiteboard.fillStyle = "black"
+    whiteboard.beginPath()
+    whiteboard.moveTo(...startStrokePoint.current)
+
+    batchedStrokes.current.fullStroke.push(startStrokePoint.current)
+    const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
+
+    const onMove = (e) => {
+      e.preventDefault()
+      const whiteboardPos = [Math.round(e.touches[0].clientX - whiteboardRect.left), Math.round(e.touches[0].clientY - whiteboardRect.top)]
+      whiteboard.lineTo(...whiteboardPos)
+      whiteboard.stroke()
+      batchedStrokes.current.batchStroke.push(whiteboardPos)
+      batchedStrokes.current.fullStroke.push(whiteboardPos)
+      sendBatchStrokesThrottled()
+    }
+
+    const onRelease = (e) => {
+      sendStroke()
+      canvasRef.current.removeEventListener("touchmove", onMove)
+      document.removeEventListener("touchend", onRelease) 
+    }
+    canvasRef.current.addEventListener("touchmove", onMove)
+    document.addEventListener("touchend", onRelease)
+  }
+
+  function externalDraw(commands, type){
+    const whiteboard = hiddenCanvasRef.current.getContext("2d")
+    whiteboard.clearRect(0,0,200,200)
+    whiteboard.fillStyle = "black"
+    whiteboard.beginPath()
+    whiteboard.moveTo(...commands[0])
+
+    switch (type){
+      case "isDrawing":
+        for (let i = 1; i < commands.length; i++){
+          whiteboard.lineTo(...commands[i])
+        }
+        whiteboard.stroke()
+        break
+      case "doneDrawing":
+        for (let i = 1; i < commands.length; i++){
+          whiteboard.lineTo(...commands[i])
+          whiteboard.stroke()
+        }
+        break
+    }
+    canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
+  }
+    
 
   return(
     <div className={styles.platformpage}>
@@ -174,16 +262,18 @@ function Platform(){
               )
             })
           }
+          {roomID &&
           <div>
-            <canvas ref={canvasRef} width={200} height={200} onMouseDown={startDrawing} style={{backgroundColor:'white'}}/>
+            <canvas ref={canvasRef} width={200} height={200} onMouseDown={startDrawing} onTouchStart={startDrawingMobile} style={{backgroundColor:'white'}}/>
           </div>
+          }
         </section>
         {roomID &&
         <section className={styles.newChat}>
           Send Message <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
           <button onClick={handleMessage}>Send</button>
         </section>
-          }
+        }
       </div>
     </div>
   )

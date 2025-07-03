@@ -28,6 +28,12 @@ async function handleMessage(data, uuid){
       roomsLatest[users[uuid].roomID] = parsedData.messageID
       broadcastMessage(parsedData, uuid)
       break
+    case "isDrawing":
+      broadcastWhiteboard(parsedData, uuid)
+      break
+    case "doneDrawing":
+      broadcastWhiteboard(parsedData, uuid)
+      break
   }
 }
 function handleClose(uuid){
@@ -71,6 +77,18 @@ function broadcastMessage(data, uuid){
      }
   })
 }
+function broadcastWhiteboard(data, uuid){
+  rooms[users[uuid].roomID].forEach(conn=>{
+    if (conn !== connections[uuid]){
+      conn.send(JSON.stringify({
+        "type": data.type,
+        "user": data.username,
+        "data": data.data,
+      }))
+     }
+  })
+}
+
 async function getMessages(connection, roomID) {
   connection.send(JSON.stringify({
     "type": "chatHistory",
