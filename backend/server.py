@@ -68,6 +68,15 @@ with AccessDatabase() as cursor:
       roomName VARCHAR(70)
     )
     '''
+  ),
+  cursor.execute(
+    '''
+    CREATE TABLE IF NOT EXISTS canvasInstructions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      instruction TEXT,
+      roomID VARCHAR(10)
+    )
+    '''
   )
 
 # Adds message from any room to messages table
@@ -82,7 +91,6 @@ def storeMessage():
   except Exception as e:
     print(e)
     return jsonify({"success":False,"message": "Failed to update messages."}), 500
-
 
 #Returns all chats from a room provided its roomID
 @app.route("/getMessages", methods=["POST"])
@@ -135,6 +143,31 @@ def validateRoom():
   except Exception as e:
     print(e)
     return jsonify({"success":False, "message": "failed to valdiate room"}), 500
+
+# Adds an instruction to the canvas 
+@app.route("/addInstruction", methods=["POST"])
+def addInstruction():
+  try:
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      cursor.execute("INSERT INTO canvasInstructions (instruction, roomID) VALUES (%s, %s)", (json.dumps(data["instruction"]), data["roomID"]))
+    return {"success": True}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to add instruction to canvas"}, 500
+  
+# Retrieves all instructions for canvas (for reconstruction)
+@app.route("/getInstructions", methods=["POST"])
+def getInstructions():
+  try:
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT instruction from canvasInstructions WHERE roomID = %s", (data["roomID"],))
+      instructions = [json.loads(each[0]) for each in cursor.fetchall()]
+    return {"success": True, "data": instructions}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to get instructions for canvas"}, 500
 
 #-----------------AUTH0 STUFF------------------
 

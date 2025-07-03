@@ -4,7 +4,7 @@ const url = require("url")
 const { json } = require("stream/consumers")
 const uuidv4 = require("uuid").v4
 
-const { storeMessageReq, getMessagesReq } = require("../requests.js")
+const { storeMessageReq, getMessagesReq, addInstruction } = require("../requests.js")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -32,6 +32,7 @@ async function handleMessage(data, uuid){
       broadcastWhiteboard(parsedData, uuid)
       break
     case "doneDrawing":
+      await addInstruction(parsedData.data, users[uuid].roomID)
       broadcastWhiteboard(parsedData, uuid)
       break
   }

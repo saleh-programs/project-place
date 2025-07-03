@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 import useWebSocket from "react-use-websocket"
 
-import { getUniqueMessageID,createRoomReq, validateRoomReq } from "../../../backend/requests"
+import { getUniqueMessageID,createRoomReq, validateRoomReq, getInstructions } from "../../../backend/requests"
 import styles from "../../../styles/pages/Platform.module.css"
 
 function Platform(){
@@ -54,6 +54,29 @@ function Platform(){
     hiddenCanvasRef.current.width = 200
     hiddenCanvasRef.current.height = 200
   },[])
+
+  useEffect(()=>{
+    if (roomID){
+      reconstructCanvas(roomID)
+    }
+  },[roomID])
+  async function reconstructCanvas(roomID) {
+    const response = await getInstructions(roomID)
+    if (response){
+      const whiteboard = hiddenCanvasRef.current.getContext("2d")
+      const mainCanvas = canvasRef.current.getContext("2d")
+      response.forEach(instruction => {
+        whiteboard.clearRect(0,0,200,200)
+        whiteboard.beginPath()
+        whiteboard.moveTo(...instruction[0])
+        for (let i = 0; i < instruction.length; i++){
+          whiteboard.lineTo(...instruction[i])
+          whiteboard.stroke()
+        }
+        mainCanvas.drawImage(hiddenCanvasRef.current,0,0)
+      })
+    }
+  }
 
   async function handleRoomCreation(){
     const res = await createRoomReq(newRoomName)
