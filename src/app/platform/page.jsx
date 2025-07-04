@@ -16,6 +16,9 @@ function Platform(){
   const [newMessage, setNewMessage] = useState("")
   const lazyUsername = useRef(Math.floor(Math.random()*500))
 
+  const fileSelectRef = useRef(null)
+  const [files, setFiles] = useState([])
+
   const batchedStrokes = useRef({
     "fullStroke": [],
     "batchStroke": []
@@ -126,6 +129,23 @@ function Platform(){
     batchedStrokes.current.fullStroke = []
   }
 
+  function handleFileChange(e){
+    const reader = new FileReader()
+    const file = e.target.files[0]
+    reader.onload = (doneEvent) => {
+      const data = doneEvent.target.result
+      setFiles(prev => [...prev, {
+        "name": file.name,
+        "extension": file.name.split(".").pop(),
+        "type": file.type, 
+        "roomid": roomID,
+        "contents": data
+      }])
+    }
+
+    reader.readAsArrayBuffer(file)
+    e.target.value = ""
+  }
   function throttle(func){
     let timerID = null
     let lastFunc = null
@@ -275,7 +295,7 @@ function Platform(){
       </div>
       <div className={styles.mainContent}>
         <section>
-          Chat
+          <input type="file" ref={fileSelectRef} onChange={handleFileChange}/>
         </section>
         <section className={styles.chat}>
           {
@@ -283,6 +303,20 @@ function Platform(){
               return (
                 <div key={i}>{item}</div>
               )
+            })
+          }
+          {
+            files.map((item, i) => {
+              return (
+                <button key={i} onClick={()=>{
+                  
+                  const openURL = URL.createObjectURL(new Blob([item.contents], { type: item.type}))
+                  window.open(openURL)
+                  }}>
+                  <pre>
+                    {JSON.stringify(item, null, 2)}
+                  </pre>
+                </button>)
             })
           }
           {roomID &&
