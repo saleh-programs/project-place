@@ -14,14 +14,15 @@ load_dotenv(dotenv_path="../.env")
 # create flask app and register with the Auth0 service
 app = Flask(__name__)
 app.secret_key = env.get("APP_SECRET_KEY")
-CORS(app)
+CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+
 
 oauth = OAuth(app)
 oauth.register(
   "auth0",
   client_id = env.get("AUTH0_CLIENT_ID"),
   client_secret = env.get("AUTH0_CLIENT_SECRET"),
-  client_kwards = {
+  client_kwargs = {
     "scope": "openid profile email",
   },
   server_metadata_url = f'https://{env.get("AUTH0_DOMAIN")}/.well-known/openid-configuration'
@@ -48,6 +49,15 @@ class AccessDatabase:
 
 
 with AccessDatabase() as cursor:
+  cursor.execute(
+    '''
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(70),
+      email VARCHAR(350)
+    )
+    '''
+  ),
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS messages (
@@ -169,11 +179,38 @@ def getInstructions():
     print(e)
     return {"success": False, "message": "failed to get instructions for canvas"}, 500
 
+# getUsername. Like what else would it mean
+@app.route("/getUsername", methods=["POST"])
+def getUsername():
+  data = request.get_json()
+  try:
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT username FROM users WHERE email = %s", (data["email"],))
+      username = cursor.fetchone()[0]
+    return jsonify({"success": True, "data": {"username":username}}), 200
+  except Exception as e:
+    print(e)
+    return jsonify({"success": False, "message": "checking if user has username failed"}), 500
+
+# adds user to db if they don't exist (NOT ENDPOINT)
+def addUser(email):
+  try:
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT email FROM users WHERE email = %s", (email,))
+      exists = cursor.fetchone() is not None
+      if not exists:
+        cursor.execute("INSERT INTO users (email, username) VALUES (%s, %s)", (email, None))
+  except Exception as e:
+    print(e)
+
+
+
 #-----------------AUTH0 STUFF------------------
 
 # Redirects user to auth0 login page
 @app.route("/login")
 def login():
+  # HARDCODE THE URL FOR REDIRECT_URI IF YOU WANT TO TEST MOBILE MURAD
   return oauth.auth0.authorize_redirect(
     redirect_uri = url_for("callback",_external=True)
   )
@@ -183,6 +220,7 @@ def login():
 def callback():
   token = oauth.auth0.authorize_access_token()
   session["user"] = token
+  addUser(token["userinfo"]["email"])
   return redirect("http://localhost:3000/platform")
 
 # Ends the user's session, and redirects them to home page.
@@ -202,6 +240,15 @@ def logout():
     )
   )
 
+# Used to get user information (email mainly)
+@app.route("/getUserInfo")
+def getUserInfo():
+  user = session.get("user")
+  print(session, "appleseed")
+  if not user:
+    return jsonify({"success": False}), 400
+  return jsonify({"success": True, "data": user["userinfo"]}), 200
+
 # returns random 6 digit string. [A-Z]or [0-9]. Letters more likely
 def generateRoomCode():
   code = []
@@ -212,7 +259,6 @@ def generateRoomCode():
     code.append(chr(value))
   
   return "".join(code)
-
 
 
 if __name__ == "__main__":

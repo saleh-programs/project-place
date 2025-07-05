@@ -1,4 +1,4 @@
-const baseurl = "http://10.0.0.110:5000/"
+const baseurl = "http://localhost:5000/"
 
 async function createRoomReq(roomName) {
   try{
@@ -108,6 +108,40 @@ async function getInstructions(roomID) {
   }
 }
 
+async function getUserInfoReq() {
+  try{
+    const response = await fetch(baseurl + "getUserInfo",{
+      "method": "GET",
+      "credentials": "include",
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message ||"req failed")
+    }
+    return data.data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
+
+async function getUsernameReq(email) {
+  try{
+    const response = await fetch(baseurl + "getUsername",{
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"email": email})
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message ||"req failed")
+    }
+    return data.data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
 
 function getUniqueMessageID(){
   const options = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -118,4 +152,4 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions}
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getUserInfoReq, getUsernameReq}

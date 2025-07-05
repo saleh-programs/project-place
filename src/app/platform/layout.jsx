@@ -5,7 +5,7 @@ import Sidebar from "../../components/Sidebar"
 import useWebSocket from "react-use-websocket"
 
 export default function Platform({ children }) {
-  // const {sendJsonMessage} = useWebSocket("ws://10.0.0.110:8000",{
+  // const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
   //   queryParams:{
   //     "username": "123",
   //     "roomID": roomID

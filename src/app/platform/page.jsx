@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 import useWebSocket from "react-use-websocket"
 
-import { getUniqueMessageID,createRoomReq, validateRoomReq, getInstructions } from "../../../backend/requests"
+import { getUniqueMessageID,createRoomReq, validateRoomReq, getInstructions, getUserInfoReq, getUsernameReq } from "../../../backend/requests"
 import styles from "../../../styles/pages/Platform.module.css"
 
 function Platform(){
@@ -12,6 +12,23 @@ function Platform(){
   const [joinRoomID, setJoinRoomID]= useState("")
   const [roomID, setRoomID] = useState("")
 
+  useEffect(()=>{
+    getUsername()
+  },[])
+
+  async function getUsername() {
+    const infoRes = await getUserInfoReq()
+    if (!infoRes){
+      return
+    }
+    console.log(infoRes)
+    const usernameRes = await getUsernameReq(infoRes["email"])
+    if (!usernameRes){
+      return
+    }
+    const username = usernameRes["username"]
+    console.log(username)
+  }
 
   async function handleRoomCreation(){
     const res = await createRoomReq(newRoomName)
@@ -32,12 +49,9 @@ function Platform(){
     }
   }
 
-
-    
-
   return(
     <div className={styles.platformpage}>
-      hiwdym
+      BIG LOADING SCREEN (conditionally rendered against username prompt)
     </div>
   )
 }
