@@ -192,6 +192,21 @@ def getUsername():
     print(e)
     return jsonify({"success": False, "message": "checking if user has username failed"}), 500
 
+# updates usermame. Usually after new account is made.
+@app.route("/updateUsername", methods=["POST"])
+def updateUsername():
+  data = request.get_json()
+  try:
+    print(data)
+    with AccessDatabase() as cursor:
+      cursor.execute("UPDATE users SET username = %s WHERE email = %s", (data["username"],data["email"]))
+    return jsonify({"success": True}), 200
+  except Exception as e:
+    print(e)
+    return jsonify({"success": False, "message": "updating username failed"}), 500
+
+
+
 # adds user to db if they don't exist (NOT ENDPOINT)
 def addUser(email):
   try:
@@ -244,7 +259,7 @@ def logout():
 @app.route("/getUserInfo")
 def getUserInfo():
   user = session.get("user")
-  print(session, "appleseed")
+  print(session)
   if not user:
     return jsonify({"success": False}), 400
   return jsonify({"success": True, "data": user["userinfo"]}), 200

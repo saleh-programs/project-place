@@ -1,21 +1,21 @@
 
 function Chat(){
-  const [messages, setMessages] = useState([])
-  const [newMessage, setNewMessage] = useState("")
+  // const [messages, setMessages] = useState([])
+  // const [newMessage, setNewMessage] = useState("")
 
-  function handleMessage(e) {
-    sendJsonMessage({
-      "type": "chat",
-      "data": newMessage,
-      "timestamp": Date.now(),
-      "messageID": getUniqueMessageID()
-    })
-    setNewMessage("")
-    setMessages(prev=>[...prev, newMessage])
-  }
+  // function handleMessage(e) {
+  //   sendJsonMessage({
+  //     "type": "chat",
+  //     "data": newMessage,
+  //     "timestamp": Date.now(),
+  //     "messageID": getUniqueMessageID()
+  //   })
+  //   setNewMessage("")
+  //   setMessages(prev=>[...prev, newMessage])
+  // }
   return(
     <div>
-      <section className={styles.chat}>
+      {/* <section className={styles.chat}>
         {
           messages.map((item,i)=>{
             return (
@@ -29,7 +29,8 @@ function Chat(){
           <button onClick={handleMessage}>Send</button>
         </section>
         }
-      </section>
+      </section> */}
+      in chat
     </div>
   )
 }

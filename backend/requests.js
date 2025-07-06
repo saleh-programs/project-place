@@ -108,14 +108,23 @@ async function getInstructions(roomID) {
   }
 }
 
-async function getUserInfoReq() {
+async function getUserInfoReq(sessionToken=null) {
   try{
-    const response = await fetch(baseurl + "getUserInfo",{
-      "method": "GET",
-      "credentials": "include",
-    })
+    let options;
+    if (sessionToken){
+      options = {
+        "method": "GET",
+        "headers": {"Cookie": `session=${sessionToken}`}
+      }
+    }else{
+      options = {
+        "method": "GET",
+        "credentials": "include"
+      }
+    }
+    const response = await fetch(baseurl + "getUserInfo", options)
     const data = await response.json()
-    if (!data.success){
+    if (!data.success){ 
       throw new Error(data.message ||"req failed")
     }
     return data.data
@@ -143,6 +152,24 @@ async function getUsernameReq(email) {
   }
 }
 
+async function updateUsernameReq(email, username){
+  try{
+    const response = await fetch(baseurl + "updateUsername",{
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"email": email,"username": username})
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data
+  }catch (err){
+    console.err(err)
+    return null
+  }
+}
+
 function getUniqueMessageID(){
   const options = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   const messageID = []
@@ -152,4 +179,4 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getUserInfoReq, getUsernameReq}
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getUserInfoReq, getUsernameReq, updateUsernameReq}
