@@ -1,28 +1,34 @@
+"use client"
+import ThemeContext from "../../../assets/ThemeContext"
+import { useRef, useState, useContext } from "react"
 
 function Documents(){
-  // const fileSelectRef = useRef(null)
-  // const [files, setFiles] = useState([])
-  // function handleFileChange(e){
-  //   const reader = new FileReader()
-  //   const file = e.target.files[0]
-  //   reader.onload = (doneEvent) => {
-  //     const data = doneEvent.target.result
-  //     setFiles(prev => [...prev, {
-  //       "name": file.name,
-  //       "extension": file.name.split(".").pop(),
-  //       "type": file.type, 
-  //       "roomid": roomID,
-  //       "contents": data
-  //     }])
-  //   }
+  const { roomID } = useContext(ThemeContext)
+  const fileSelectRef = useRef(null)
+  const [files, setFiles] = useState([])
 
-  //   reader.readAsArrayBuffer(file)
-  //   e.target.value = ""
-  // }
+  function handleFileChange(e){
+    const reader = new FileReader()
+    const file = e.target.files[0]
+    reader.onload = (doneEvent) => {
+      const data = doneEvent.target.result
+      setFiles(prev => [...prev, {
+        "name": file.name,
+        "extension": file.name.split(".").pop(),
+        "type": file.type, 
+        "roomid": roomID,
+        "contents": data
+      }])
+    }
+
+    reader.readAsArrayBuffer(file)
+    e.target.value = ""
+  }
+
   return (
     <div>
       documents
-        {/* <section>
+        <section>
           <input type="file" ref={fileSelectRef} onChange={handleFileChange}/>
         </section>
         {
@@ -38,7 +44,7 @@ function Documents(){
                 </pre>
               </button>)
           })
-        } */}
+        }
     </div>
   )
 }

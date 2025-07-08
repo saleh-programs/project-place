@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import ThemeContext from "../assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -8,6 +8,7 @@ import Sidebar from "../components/Sidebar"
 function MainDisplay({children, username}){
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
+  const externalDrawRef = useRef((param1, param2)=>{})
 
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
@@ -24,18 +25,19 @@ function MainDisplay({children, username}){
           const newMessages = data.data.map(item => item[2])
           setMessages(prev=>[...newMessages, ...prev])
           break
-        // case "isDrawing":
-        //   externalDraw(data.data, data.type)
-        //   break
-        // case "doneDrawing":
-        //   externalDraw(data.data, data.type)
-        //   break
+        case "isDrawing":
+          externalDrawRef.current(data.data, data.type)
+          break
+        case "doneDrawing":
+          externalDrawRef.current(data.data, data.type)
+          break
       }
     }
   },roomID !== "")
 
   const shared = {
     sendJsonMessage,
+    externalDrawRef,
     roomID, setRoomID,
     messages, setMessages
   }
