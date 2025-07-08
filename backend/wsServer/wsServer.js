@@ -44,6 +44,7 @@ function handleClose(uuid){
 
 
 wsServer.on("connection", (connection, request)=>{
+  console.log("made connection")
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
   const uuid = uuidv4()

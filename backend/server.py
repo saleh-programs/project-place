@@ -259,7 +259,6 @@ def logout():
 @app.route("/getUserInfo")
 def getUserInfo():
   user = session.get("user")
-  print(session)
   if not user:
     return jsonify({"success": False}), 400
   return jsonify({"success": True, "data": user["userinfo"]}), 200

@@ -1,15 +1,21 @@
+// "use client"
 import styles from "../../styles/components/Sidebar.module.css"
+import { useRouter } from "next/navigation"
+
+import AccountHub from "../components/AccountHub"
 
 function Sidebar(){
+  const router = useRouter()
   return(
     <div className={styles.sidePanel}>
         <section className={styles.features}>
-          <button>Chat</button>
-          <button>Documents</button>
-          <button>Whiteboard</button>
-          <button>Video Chat</button>
+          <button onClick={()=>router.push("/platform/chat")}>Chat</button>
+          <button onClick={()=>router.push("/platform/documents")}>Documents</button>
+          <button onClick={()=>router.push("/platform/whiteboard")}>Whiteboard</button>
+          <button onClick={()=>router.push("/platform/videochat")}>Video Chat</button>
         </section>
         <section className={styles.accountHub}>
+          <AccountHub/>
           <div>Account is: </div>
           {/* <section>
             Would you like to create a room or join a room?

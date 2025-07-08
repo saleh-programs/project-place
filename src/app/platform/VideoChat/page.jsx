@@ -2,7 +2,7 @@
 function VideoChat(){
   return(
     <div>
-      
+        videochat
     </div>
   )
 }

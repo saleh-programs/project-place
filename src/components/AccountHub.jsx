@@ -1,28 +1,25 @@
 "use client"
-import { useEffect, useRef, useState } from "react"
-import useWebSocket from "react-use-websocket"
+import { useEffect, useRef, useState, useContext } from "react"
 
-import { getUniqueMessageID,createRoomReq, validateRoomReq, getInstructions, getUserInfoReq, getUsernameReq } from "../../../backend/requests"
-import { useContext } from "react"
-import ThemeContext from "../../assets/ThemeContext"
+import ThemeContext from "../assets/ThemeContext"
+import { createRoomReq, validateRoomReq } from "../../backend/requests"
 
-import styles from "../../../styles/pages/Platform.module.css"
+import styles from "../../styles/components/Sidebar.module.css"
+
 
 function Platform(){
-  const {username, setUsername} = useContext(ThemeContext)
+  const {roomID, setRoomID} = useContext(ThemeContext)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
   const [newRoomName, setNewRoomName] = useState("")
   const [joinRoomID, setJoinRoomID]= useState("")
-  const [roomID, setRoomID] = useState("")
 
-  const usernameInput = useRef(null)
 
   async function handleRoomCreation(){
     const res = await createRoomReq(newRoomName)
     if (res){
       setNewRoomName("")
-      setMessages([])
+      // setMessages([])
       setRoomID(res)
       setIsCreatingRoom(false)
     }
@@ -30,7 +27,7 @@ function Platform(){
   async function handleRoomLoad(){
     const res = await validateRoomReq(joinRoomID)
     if(res){
-      setMessages([])
+      // setMessages([])
       setRoomID(joinRoomID);
       setIsLoadingRoom(false)
 
@@ -39,10 +36,21 @@ function Platform(){
 
   return(
     <div className={styles.platformpage}>
-      {/* <input ref={usernameInput} type="text" />
-      <button onClick={()=>{setUsername(usernameInput.current.value)}}>set username</button>
-      BIG LOADING SCREEN (conditionally rendered against username prompt) */}
-      ignore this
+      {roomID}
+      <button onClick={()=>{setIsCreatingRoom(true);setIsLoadingRoom(false)}}>Create Room</button>
+      {isCreatingRoom && 
+      <>
+        <input type="text" value={newRoomName} onChange={(e)=>setNewRoomName(e.target.value)}/>
+        <button onClick={handleRoomCreation}>Submit</button>
+      </>
+      }
+      <button onClick={()=>{setIsLoadingRoom(true); setIsCreatingRoom(false)}}>Join Room</button>
+      {isLoadingRoom && 
+      <>
+        <input type="text" value={joinRoomID} onChange={(e)=>setJoinRoomID(e.target.value)}/>
+        <button onClick={handleRoomLoad}>Submit</button>
+      </>
+      }
     </div>
   )
 }
