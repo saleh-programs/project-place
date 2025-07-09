@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react";
-import { updateUsernameReq, getUserInfoReq } from "../../../backend/requests";
+import { updateUsernameReq, getUserInfoReq } from "backend/requests";
 import { useRouter } from "next/navigation";
+
+import styles from "styles/accountsetup/AccountSetup.module.css"
 
 function AccountSetup(){
   const router = useRouter()

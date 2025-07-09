@@ -1,8 +1,8 @@
 "use client"
 import { useRef, useEffect, useContext } from "react"
-import ThemeContext from "../../../assets/ThemeContext"
+import ThemeContext from "src/assets/ThemeContext"
 
-import { getInstructions } from "../../../../backend/requests"
+import { getInstructions } from "backend/requests"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef } = useContext(ThemeContext)

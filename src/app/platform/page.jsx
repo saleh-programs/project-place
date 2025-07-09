@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 
-function Loading(){
+import styles from "styles/platform/PlatformHome.module.css"
+
+function PlatformHome(){
   redirect("/platform/chat")
 
   return(
@@ -10,4 +12,4 @@ function Loading(){
   )
 }
 
-export default Loading
+export default PlatformHome

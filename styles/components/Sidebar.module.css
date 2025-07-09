@@ -4,8 +4,7 @@
 }
 .sidePanel{
   border: 1px solid;
-  flex: 1;
-
+  flex: 0 0 200px;
   display: flex;
   flex-direction: column;
 }
@@ -19,5 +18,5 @@
   font-size: 1.2rem;
 }
 .accountHub{
-  flex: 1;
+  flex: 0 0 300px;
 }

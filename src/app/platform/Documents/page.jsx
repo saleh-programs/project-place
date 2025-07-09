@@ -1,6 +1,8 @@
 "use client"
-import ThemeContext from "../../../assets/ThemeContext"
+import ThemeContext from "src/assets/ThemeContext"
 import { useRef, useState, useContext } from "react"
+
+import "styles/platform/Documents.module.css"
 
 function Documents(){
   const { roomID } = useContext(ThemeContext)

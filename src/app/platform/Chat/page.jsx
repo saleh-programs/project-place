@@ -1,9 +1,9 @@
 "use client"
 import { useState, useContext } from "react"
-import ThemeContext from "../../../assets/ThemeContext"
+import ThemeContext from "src/assets/ThemeContext"
 
-import { getUniqueMessageID } from "../../../../backend/requests"
-import styles from "../../../../styles/platform/Chat.module.css"
+import { getUniqueMessageID } from "backend/requests"
+import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
   const {sendJsonMessage, roomID, messages, setMessages} = useContext(ThemeContext)
@@ -20,23 +20,27 @@ function Chat(){
     setMessages(prev=>[...prev, newMessage])
   }
   return(
-    <div>
-      <section className={styles.chat}>
+    <div className={styles.chatPage}>
+      <section className={styles.chatTitle}>
+        Chat
+      </section>
+      <section className={styles.chatDisplay}>
         {
           messages.map((item,i)=>{
             return (
-              <div key={i}>{item}</div>
+              <div key={i} className={styles.message}>{item}</div>
             )
           })
         }
+      </section>
+      <section className={styles.chatHub}>
         {roomID &&
-        <section className={styles.newChat}>
-          Send Message <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
-          <button onClick={handleMessage}>Send</button>
-        </section>
+          <section className={styles.newChat}>
+            Send Message <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
+            <button onClick={handleMessage}>Send</button>
+          </section>
         }
       </section>
-      in chat
     </div>
   )
 }

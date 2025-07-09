@@ -1,9 +1,9 @@
 "use client"
 import { useRef, useState } from "react"
-import ThemeContext from "../assets/ThemeContext"
+import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
-import Sidebar from "../components/Sidebar"
+import Sidebar from "src/components/Sidebar"
 
 function MainDisplay({children, username}){
   const [roomID, setRoomID] = useState("")
@@ -44,8 +44,13 @@ function MainDisplay({children, username}){
 
   return(
     <ThemeContext.Provider value={shared}>
+      <div className="siteWrapper">
         <Sidebar/>
-        {children}
+        <div className="pageContainer">
+          {children}
+        </div>
+      </div>
+        
     </ThemeContext.Provider>
   )
 }
