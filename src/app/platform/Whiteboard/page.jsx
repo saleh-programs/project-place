@@ -3,10 +3,14 @@ import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 import { getInstructions } from "backend/requests"
+import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef } = useContext(ThemeContext)
   externalDrawRef.current = externalDraw
+
+  const currentType = useRef("draw")
+  const currentColor = useRef("black")
   
 //drawCommands, chats, 
   const batchedStrokes = useRef({
@@ -17,6 +21,10 @@ function Whiteboard(){
   const canvasRef = useRef(null)
   const hiddenCanvasRef = useRef(null)
 
+  const colors = [
+    "black","white","gray","red","green","orange","blue", "cyan",
+    "yellow", "purple", "brown", "pink"
+  ]
   
   useEffect(()=>{
     hiddenCanvasRef.current = document.createElement("canvas")
@@ -95,7 +103,7 @@ function Whiteboard(){
     const whiteboardRect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
 
-    whiteboard.fillStyle = "black"
+    whiteboard.strokeStyle = currentColor.current
     whiteboard.beginPath()
     whiteboard.moveTo(...startStrokePoint.current)
 
@@ -125,7 +133,6 @@ function Whiteboard(){
     const whiteboardRect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round(event.touches[0].clientX - whiteboardRect.left), Math.round(event.touches[0].clientY - whiteboardRect.top)]
 
-    whiteboard.fillStyle = "black"
     whiteboard.beginPath()
     whiteboard.moveTo(...startStrokePoint.current)
 
@@ -154,7 +161,6 @@ function Whiteboard(){
   function externalDraw(commands, type){
     const whiteboard = hiddenCanvasRef.current.getContext("2d")
     whiteboard.clearRect(0,0,200,200)
-    whiteboard.fillStyle = "black"
     whiteboard.beginPath()
     whiteboard.moveTo(...commands[0])
 
@@ -181,6 +187,23 @@ function Whiteboard(){
       {roomID &&
       <div>
         <canvas ref={canvasRef} width={200} height={200} onMouseDown={startDrawing} onTouchStart={startDrawingMobile} style={{backgroundColor:'white'}}/>
+        <div className={styles.whiteboardHub}>
+          <section className={styles.types}>
+            <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
+            <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
+            <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
+          </section>
+          <section className={styles.colors}>
+            {
+              colors.map(item=>{
+                return (
+                  <span key={item} className={styles.color} style={{backgroundColor:`${item}`}} onClick={() => {currentColor.current = item}}>
+                  </span>
+                )
+              })
+            }
+          </section>
+        </div>
       </div>
       }
     </div>
