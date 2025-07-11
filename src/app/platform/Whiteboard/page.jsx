@@ -9,7 +9,7 @@ function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef } = useContext(ThemeContext)
   externalDrawRef.current = externalDraw
 
-  const currentType = useRef("draw")
+  const currentType = useRef("draw") //draw, erase, or fill
   const currentColor = useRef("black")
   
 //drawCommands, chats, 
@@ -38,6 +38,7 @@ function Whiteboard(){
     }
   },[roomID])
 
+  //matbe in future we can 
   async function reconstructCanvas(roomID) {
     const response = await getInstructions(roomID)
     if (response){
@@ -60,7 +61,8 @@ function Whiteboard(){
     batchedStrokes.current.batchStroke.unshift(startStrokePoint.current)
     startStrokePoint.current = batchedStrokes.current.batchStroke[batchedStrokes.current.batchStroke.length-1]
     sendJsonMessage({
-      "type": "isDrawing",
+      "type": currentType.current,
+      "status": "isDrawing",
       "data": batchedStrokes.current.batchStroke
     })
     batchedStrokes.current.batchStroke = []
@@ -68,11 +70,13 @@ function Whiteboard(){
 
   function sendStroke(){
     sendJsonMessage({
-      "type": "doneDrawing",
+      "type": currentType.current,
+      "status": "doneDrawing",
       "data": batchedStrokes.current.fullStroke
     })
     batchedStrokes.current.fullStroke = []
   }
+
     function throttle(func){
     let timerID = null
     let lastFunc = null
@@ -98,19 +102,20 @@ function Whiteboard(){
     }
   }
 
+
   function startDrawing(event){
     const whiteboard = canvasRef.current.getContext("2d")
     const whiteboardRect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
-
     whiteboard.strokeStyle = currentColor.current
     whiteboard.beginPath()
     whiteboard.moveTo(...startStrokePoint.current)
+    whiteboard.globalAlpha = 1.0
 
     batchedStrokes.current.fullStroke.push(startStrokePoint.current)
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
-    const onMove = (e) => {
+    function onMoveDraw(e){
       const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
       whiteboard.lineTo(...whiteboardPos)
       whiteboard.stroke()
@@ -118,15 +123,42 @@ function Whiteboard(){
       batchedStrokes.current.fullStroke.push(whiteboardPos)
       sendBatchStrokesThrottled()
     }
-
-    const onRelease = (e) => {
+     function onReleaseDraw(e){
       sendStroke()
-      canvasRef.current.removeEventListener("mousemove", onMove)
-      document.removeEventListener("mouseup", onRelease) 
+      canvasRef.current.removeEventListener("mousemove", onMoveDraw)
+      document.removeEventListener("mouseup", onReleaseDraw) 
     }
-    canvasRef.current.addEventListener("mousemove", onMove)
-    document.addEventListener("mouseup", onRelease)
+
+    function onMoveErase(e){
+      const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
+      whiteboard.lineTo(...whiteboardPos)
+      whiteboard.stroke()
+      batchedStrokes.current.batchStroke.push(whiteboardPos)
+      batchedStrokes.current.fullStroke.push(whiteboardPos)
+      sendBatchStrokesThrottled()
+    }
+    function onReleaseErase(e){
+      sendStroke()
+      canvasRef.current.removeEventListener("mousemove", onMoveErase)
+      document.removeEventListener("mouseup", onReleaseErase)
+    }
+
+    switch (currentType.current){
+      case "draw":
+        canvasRef.current.addEventListener("mousemove", onMoveDraw)
+        document.addEventListener("mouseup", onReleaseDraw)
+        break
+      case "erase":
+        whiteboard.strokeStyle = "white"
+        canvasRef.current.addEventListener("mousemove", onMoveErase)
+        document.addEventListener("mouseup", onReleaseErase)
+        break
+      case "fill":
+        //call recursive fill
+    }
   }
+
+  //ignore for now
   function startDrawingMobile(event){
     event.preventDefault()
     const whiteboard = canvasRef.current.getContext("2d")
@@ -158,20 +190,32 @@ function Whiteboard(){
     document.addEventListener("touchend", onRelease)
   }
 
-  function externalDraw(commands, type){
+  function externalDraw(data){
     const whiteboard = hiddenCanvasRef.current.getContext("2d")
     whiteboard.clearRect(0,0,200,200)
     whiteboard.beginPath()
-    whiteboard.moveTo(...commands[0])
-
-    switch (type){
-      case "isDrawing":
-        for (let i = 1; i < commands.length; i++){
-          whiteboard.lineTo(...commands[i])
+    const commands = data.data
+    console.log(data.type)
+    switch (data.type){
+      case "draw":
+        whiteboard.strokeStyle = "black"
+        whiteboard.moveTo(...commands[0])
+        if (data.status === "isDrawing"){
+          for (let i = 1; i < commands.length; i++){
+            whiteboard.lineTo(...commands[i])
+          }
+          whiteboard.stroke()
+          break
+        }else if (data.status === "doneDrawing"){
+          for (let i = 1; i < commands.length; i++){
+            whiteboard.lineTo(...commands[i])
+            whiteboard.stroke()
+          }
+          break
         }
-        whiteboard.stroke()
-        break
-      case "doneDrawing":
+      case "erase":
+        whiteboard.strokeStyle = "white"
+        console.log(commands)
         for (let i = 1; i < commands.length; i++){
           whiteboard.lineTo(...commands[i])
           whiteboard.stroke()

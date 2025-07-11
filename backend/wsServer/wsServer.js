@@ -28,12 +28,23 @@ async function handleMessage(data, uuid){
       roomsLatest[users[uuid].roomID] = parsedData.messageID
       broadcastMessage(parsedData, uuid)
       break
-    case "isDrawing":
-      broadcastWhiteboard(parsedData, uuid)
+    case "draw":
+      if (parsedData.status === "isDrawing"){
+        broadcastWhiteboard(parsedData, uuid)
+      }else if (parsedData.status === "doneDrawing"){
+        await addInstruction(parsedData.data, users[uuid].roomID)
+        broadcastWhiteboard(parsedData, uuid)
+      }
       break
-    case "doneDrawing":
-      await addInstruction(parsedData.data, users[uuid].roomID)
-      broadcastWhiteboard(parsedData, uuid)
+    case "erase":
+      if (parsedData.status === "isDrawing"){
+        broadcastWhiteboard(parsedData, uuid)
+      }else if (parsedData.status === "doneDrawing"){
+        await addInstruction(parsedData.data, users[uuid].roomID)
+        broadcastWhiteboard(parsedData, uuid)
+      }
+      break
+    case "fill":
       break
   }
 }
@@ -84,6 +95,7 @@ function broadcastWhiteboard(data, uuid){
     if (conn !== connections[uuid]){
       conn.send(JSON.stringify({
         "type": data.type,
+        "status": data?.status,
         "user": data.username,
         "data": data.data,
       }))

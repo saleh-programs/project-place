@@ -25,11 +25,11 @@ function MainDisplay({children, username}){
           const newMessages = data.data.map(item => item[2])
           setMessages(prev=>[...newMessages, ...prev])
           break
-        case "isDrawing":
-          externalDrawRef.current(data.data, data.type)
+        case "draw":
+          externalDrawRef.current(data)
           break
-        case "doneDrawing":
-          externalDrawRef.current(data.data, data.type)
+        case "erase":
+          externalDrawRef.current(data)
           break
       }
     }
