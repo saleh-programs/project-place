@@ -96,6 +96,8 @@ function broadcastWhiteboard(data, uuid){
       conn.send(JSON.stringify({
         "type": data.type,
         "status": data?.status,
+        "color": data.color,
+        "size": data.size,
         "user": data.username,
         "data": data.data,
       }))

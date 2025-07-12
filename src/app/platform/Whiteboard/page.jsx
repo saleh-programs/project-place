@@ -7,10 +7,12 @@ import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef } = useContext(ThemeContext)
+
   externalDrawRef.current = externalDraw
 
   const currentType = useRef("draw") //draw, erase, or fill
   const currentColor = useRef("black")
+  const strokeSizeRef = useRef(null)
   
 //drawCommands, chats, 
   const batchedStrokes = useRef({
@@ -63,6 +65,8 @@ function Whiteboard(){
     sendJsonMessage({
       "type": currentType.current,
       "status": "isDrawing",
+      "color": currentColor.current,
+      "size": strokeSizeRef.current.value,
       "data": batchedStrokes.current.batchStroke
     })
     batchedStrokes.current.batchStroke = []
@@ -72,6 +76,8 @@ function Whiteboard(){
     sendJsonMessage({
       "type": currentType.current,
       "status": "doneDrawing",
+      "color": currentColor.current,
+      "size": strokeSizeRef.current.value,
       "data": batchedStrokes.current.fullStroke
     })
     batchedStrokes.current.fullStroke = []
@@ -108,6 +114,7 @@ function Whiteboard(){
     const whiteboardRect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
     whiteboard.strokeStyle = currentColor.current
+    whiteboard.lineWidth = strokeSizeRef.current.value
     whiteboard.beginPath()
     whiteboard.moveTo(...startStrokePoint.current)
     whiteboard.globalAlpha = 1.0
@@ -196,9 +203,12 @@ function Whiteboard(){
     whiteboard.beginPath()
     const commands = data.data
     console.log(data.type)
+    console.log(data.size)
+    whiteboard.lineWidth = data.size
     switch (data.type){
       case "draw":
-        whiteboard.strokeStyle = "black"
+        whiteboard.strokeStyle = data.color
+        console.log(data.color)
         whiteboard.moveTo(...commands[0])
         if (data.status === "isDrawing"){
           for (let i = 1; i < commands.length; i++){
@@ -236,6 +246,7 @@ function Whiteboard(){
             <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
             <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
             <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
+            <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
           </section>
           <section className={styles.colors}>
             {
