@@ -44,6 +44,8 @@ async function handleMessage(data, uuid){
         broadcastWhiteboard(parsedData, uuid)
       }
       break
+    case "clear":
+      broadcastWhiteboard(parsedData, uuid)
     case "fill":
       break
   }
@@ -96,10 +98,10 @@ function broadcastWhiteboard(data, uuid){
       conn.send(JSON.stringify({
         "type": data.type,
         "status": data?.status,
-        "color": data.color,
-        "size": data.size,
-        "user": data.username,
-        "data": data.data,
+        "color": data?.color,
+        "size": data?.size,
+        "user": data?.username,
+        "data": data?.data,
       }))
      }
   })

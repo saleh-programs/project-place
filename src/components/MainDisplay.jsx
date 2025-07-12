@@ -31,6 +31,9 @@ function MainDisplay({children, username}){
         case "erase":
           externalDrawRef.current(data)
           break
+        case "clear":
+          externalDrawRef.current(data)
+          break
       }
     }
   },roomID !== "")

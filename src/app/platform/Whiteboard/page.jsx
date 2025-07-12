@@ -3,6 +3,7 @@ import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 import { getInstructions } from "backend/requests"
+import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
@@ -30,8 +31,8 @@ function Whiteboard(){
   
   useEffect(()=>{
     hiddenCanvasRef.current = document.createElement("canvas")
-    hiddenCanvasRef.current.width = 200
-    hiddenCanvasRef.current.height = 200
+    hiddenCanvasRef.current.width = canvasRef.current.width
+    hiddenCanvasRef.current.height = canvasRef.current.height
   },[])
 
   useEffect(()=>{
@@ -47,7 +48,7 @@ function Whiteboard(){
       const whiteboard = hiddenCanvasRef.current.getContext("2d")
       const mainCanvas = canvasRef.current.getContext("2d")
       response.forEach(instruction => {
-        whiteboard.clearRect(0,0,200,200)
+        whiteboard.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
         whiteboard.beginPath()
         whiteboard.moveTo(...instruction[0])
         for (let i = 0; i < instruction.length; i++){
@@ -161,8 +162,19 @@ function Whiteboard(){
         document.addEventListener("mouseup", onReleaseErase)
         break
       case "fill":
-        //call recursive fill
+        console.log("hi")
+        canvasFill(event)
     }
+  }
+
+  function clearCanvas(){
+    const whiteboard = canvasRef.current.getContext("2d")
+    // whiteboard.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
+    whiteboard.fillStyle = "white"
+    whiteboard.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+    sendJsonMessage({
+      "type": "clear",
+    })
   }
 
   //ignore for now
@@ -197,13 +209,85 @@ function Whiteboard(){
     document.addEventListener("touchend", onRelease)
   }
 
+  async function canvasFill(e){
+    const whiteboard = canvasRef.current.getContext("2d", { willReadFrequently: true })
+    const whiteboardRect = canvasRef.current.getBoundingClientRect()
+    const mousePos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
+
+    const startColor = whiteboard.getImageData(mousePos[0],mousePos[1],1,1).data
+
+    whiteboard.fillStyle = currentColor.current
+    whiteboard.fillRect(mousePos[0],mousePos[1],1,1)
+    const fillColor = whiteboard.getImageData(mousePos[0],mousePos[1],1,1).data
+
+    const newPixel = whiteboard.createImageData(1,1)
+    newPixel.data.set(startColor,0)
+    whiteboard.putImageData(newPixel,mousePos[0],mousePos[1])
+    newPixel.data.set(fillColor,0)
+    
+    const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
+
+    const pixelQueue = new Queue()
+    pixelQueue.enqueue([mousePos[0],mousePos[1]])
+
+    const tolerance = 15
+    let totalPixels = 0
+
+    while (!pixelQueue.isEmpty()){
+      const [x, y] = pixelQueue.dequeue()
+      const isInCanvas = (
+        (x >= 0 && x < canvasRef.current.width) 
+        && 
+        (y >=0 && y < canvasRef.current.height))
+
+      if (!isInCanvas || visited[x + y * canvasRef.current.width]){
+        continue
+      }
+      visited[x + y * canvasRef.current.width] = 1
+      const currentColor = whiteboard.getImageData(x,y,1,1).data
+      const matchesColor = (
+        Math.abs(startColor[0] - currentColor[0]) <= tolerance
+        &&
+        Math.abs(startColor[1] - currentColor[1]) <= tolerance
+        &&        
+        Math.abs(startColor[2] - currentColor[2]) <= tolerance
+
+      )
+      if (!matchesColor){
+        continue
+      }
+
+
+      whiteboard.putImageData(newPixel,x,y)
+      totalPixels += 1
+      if (totalPixels % Math.floor(100000) === 0){
+        await new Promise(requestAnimationFrame)
+      }
+      const neighbors = [
+        [x,y-1],[x,y+1],
+        [x-1,y],[x+1,y],
+      ]
+      // for (let i = neighbors.length - 1; i > 0; i--) {
+      //   const j = Math.floor(Math.random() * (i + 1));
+      //   [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]]
+      // }
+      // const neighbors = [
+      //   [x-1, y-1], [x,y-1], [x+1,y-1],
+      //   [x-1,y], [x+1,y],
+      //   [x-1,y+1],[x,y+1],[x+1,y+1]
+      // ]
+      neighbors.forEach(item=>{
+        pixelQueue.enqueue(item)
+      })
+    }
+  }
   function externalDraw(data){
     const whiteboard = hiddenCanvasRef.current.getContext("2d")
-    whiteboard.clearRect(0,0,200,200)
+    whiteboard.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
     whiteboard.beginPath()
     const commands = data.data
     console.log(data.type)
-    console.log(data.size)
+    console.log(data)
     whiteboard.lineWidth = data.size
     switch (data.type){
       case "draw":
@@ -231,6 +315,8 @@ function Whiteboard(){
           whiteboard.stroke()
         }
         break
+      case "clear":
+        canvasRef.current.getContext("2d").clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
     }
     canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
   }
@@ -240,12 +326,13 @@ function Whiteboard(){
       whiteboard
       {roomID &&
       <div>
-        <canvas ref={canvasRef} width={200} height={200} onMouseDown={startDrawing} onTouchStart={startDrawingMobile} style={{backgroundColor:'white'}}/>
+        <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
         <div className={styles.whiteboardHub}>
           <section className={styles.types}>
             <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
             <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
             <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
+            <button onClick={clearCanvas}>Clear</button>
             <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
           </section>
           <section className={styles.colors}>
