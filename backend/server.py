@@ -5,7 +5,7 @@ from urllib.parse import quote_plus, urlencode
 from random import randint, choice
 
 from authlib.integrations.flask_client import OAuth
-from flask import Flask, request, jsonify, redirect, render_template, session, url_for
+from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for
 from flask_cors import CORS
 
 from dotenv import load_dotenv
@@ -57,7 +57,7 @@ with AccessDatabase() as cursor:
       email VARCHAR(350)
     )
     '''
-  ),
+  )
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS messages (
@@ -78,12 +78,21 @@ with AccessDatabase() as cursor:
       roomName VARCHAR(70)
     )
     '''
-  ),
+  )
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS canvasInstructions (
       id INT AUTO_INCREMENT PRIMARY KEY,
       instruction TEXT,
+      roomID VARCHAR(10)
+    )
+    '''
+  )
+  cursor.execute(
+    '''
+    CREATE TABLE IF NOT EXISTS canvases (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      canvas BLOB,
       roomID VARCHAR(10)
     )
     '''
@@ -178,6 +187,43 @@ def getInstructions():
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to get instructions for canvas"}, 500
+  
+# Updates canvas image. Receives roomID as query param and sends canvasdata as bytes
+@app.route("/updateCanvas", methods=["POST"])
+def updateCanvas():
+  try:
+    roomID = request.args.get("roomID")
+    canvasBytes = request.get_data()
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT 1 FROM canvases where roomID = %s",(roomID,))
+      exists = cursor.fetchone() is not None
+
+      if exists:
+        cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
+      else:
+        cursor.execute("INSERT INTO canvases (canvas, roomID) VALUES (%s, %s)", (canvasBytes, roomID))
+
+    return {"success": True}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to update canvas data"}, 500
+
+# gets canvas data for new connections joining
+@app.route("/getCanvas")
+def getCanvas():
+  try:
+    roomID = request.args.get("roomID")
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT canvas FROM canvases where roomID = %s",(roomID,))
+      canvasBytes = cursor.fetchone()
+      if canvasBytes is None:
+        raise ValueError()
+      canvasBytes = canvasBytes[0]
+    return Response(canvasBytes, mimetype='application/octet-stream', status=200)
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to update canvas data"}, 500
+  
 
 # getUsername. Like what else would it mean
 @app.route("/getUsername", methods=["POST"])
@@ -204,7 +250,6 @@ def updateUsername():
   except Exception as e:
     print(e)
     return jsonify({"success": False, "message": "updating username failed"}), 500
-
 
 
 # adds user to db if they don't exist (NOT ENDPOINT)

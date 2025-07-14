@@ -2,7 +2,7 @@
 import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
-import { getInstructions } from "backend/requests"
+import { getCanvas, getInstructions } from "backend/requests"
 import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
 
@@ -33,6 +33,9 @@ function Whiteboard(){
     hiddenCanvasRef.current = document.createElement("canvas")
     hiddenCanvasRef.current.width = canvasRef.current.width
     hiddenCanvasRef.current.height = canvasRef.current.height
+
+    canvasRef.current.getContext("2d").fillStyle = "white"
+    canvasRef.current.getContext("2d").fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
   },[])
 
   useEffect(()=>{
@@ -43,20 +46,11 @@ function Whiteboard(){
 
   //matbe in future we can 
   async function reconstructCanvas(roomID) {
-    const response = await getInstructions(roomID)
+    const response = await getCanvas(roomID)
     if (response){
-      const whiteboard = hiddenCanvasRef.current.getContext("2d")
-      const mainCanvas = canvasRef.current.getContext("2d")
-      response.forEach(instruction => {
-        whiteboard.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
-        whiteboard.beginPath()
-        whiteboard.moveTo(...instruction[0])
-        for (let i = 0; i < instruction.length; i++){
-          whiteboard.lineTo(...instruction[i])
-          whiteboard.stroke()
-        }
-        mainCanvas.drawImage(hiddenCanvasRef.current,0,0)
-      })
+      const img = await createImageBitmap(response)
+      const whiteboard = canvasRef.current.getContext("2d")
+      whiteboard.drawImage(img,0,0)
     }
   }
 
@@ -119,8 +113,10 @@ function Whiteboard(){
     whiteboard.beginPath()
     whiteboard.moveTo(...startStrokePoint.current)
     whiteboard.globalAlpha = 1.0
+    if (currentType.current !== "fill"){
+          batchedStrokes.current.fullStroke.push(startStrokePoint.current)
 
-    batchedStrokes.current.fullStroke.push(startStrokePoint.current)
+    }
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
     function onMoveDraw(e){
@@ -162,8 +158,13 @@ function Whiteboard(){
         document.addEventListener("mouseup", onReleaseErase)
         break
       case "fill":
-        console.log("hi")
-        canvasFill(event)
+        sendJsonMessage({
+          "type": "fill",
+          "fillStart": [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)],
+          "color": currentColor.current
+        })
+        canvasFill(Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top), currentColor.current)
+        break
     }
   }
 
@@ -209,14 +210,12 @@ function Whiteboard(){
     document.addEventListener("touchend", onRelease)
   }
 
-  async function canvasFill(e){
+  async function canvasFill(x, y, color){
     const whiteboard = canvasRef.current.getContext("2d", { willReadFrequently: true })
-    const whiteboardRect = canvasRef.current.getBoundingClientRect()
-    const mousePos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
-
+    const mousePos = [x, y]
     const startColor = whiteboard.getImageData(mousePos[0],mousePos[1],1,1).data
 
-    whiteboard.fillStyle = currentColor.current
+    whiteboard.fillStyle = color
     whiteboard.fillRect(mousePos[0],mousePos[1],1,1)
     const fillColor = whiteboard.getImageData(mousePos[0],mousePos[1],1,1).data
 
@@ -226,13 +225,13 @@ function Whiteboard(){
     newPixel.data.set(fillColor,0)
     
     const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
+    const canvasImage = whiteboard.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
+    const canvasData = canvasImage.data
 
     const pixelQueue = new Queue()
     pixelQueue.enqueue([mousePos[0],mousePos[1]])
-
-    const tolerance = 15
+    const tolerance = 70
     let totalPixels = 0
-
     while (!pixelQueue.isEmpty()){
       const [x, y] = pixelQueue.dequeue()
       const isInCanvas = (
@@ -244,33 +243,37 @@ function Whiteboard(){
         continue
       }
       visited[x + y * canvasRef.current.width] = 1
-      const currentColor = whiteboard.getImageData(x,y,1,1).data
-      const matchesColor = (
-        Math.abs(startColor[0] - currentColor[0]) <= tolerance
-        &&
-        Math.abs(startColor[1] - currentColor[1]) <= tolerance
-        &&        
-        Math.abs(startColor[2] - currentColor[2]) <= tolerance
+      const val = 4*(x + y * canvasRef.current.width)
+      const currentColor = [
+        canvasData[val],
+        canvasData[val + 1],
+        canvasData[val + 2],
+        canvasData[val + 3]
+      ]
 
-      )
+      const RGBdistance = 
+        (currentColor[0] - startColor[0])**2 +
+        (currentColor[1] - startColor[1])**2 +
+        (currentColor[2] - startColor[2])**2
+      
+      const matchesColor = RGBdistance < tolerance**2
+
       if (!matchesColor){
         continue
       }
 
+      canvasData[val] = fillColor[0]
+      canvasData[val + 1] = fillColor[1]
+      canvasData[val + 2] = fillColor[2]
 
-      whiteboard.putImageData(newPixel,x,y)
       totalPixels += 1
-      if (totalPixels % Math.floor(100000) === 0){
-        await new Promise(requestAnimationFrame)
-      }
+      // if (totalPixels % Math.floor(200) === 0){
+      //   await new Promise(requestAnimationFrame)
+      // }
       const neighbors = [
         [x,y-1],[x,y+1],
         [x-1,y],[x+1,y],
       ]
-      // for (let i = neighbors.length - 1; i > 0; i--) {
-      //   const j = Math.floor(Math.random() * (i + 1));
-      //   [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]]
-      // }
       // const neighbors = [
       //   [x-1, y-1], [x,y-1], [x+1,y-1],
       //   [x-1,y], [x+1,y],
@@ -280,13 +283,14 @@ function Whiteboard(){
         pixelQueue.enqueue(item)
       })
     }
+    console.log("done FIll")
+    whiteboard.putImageData(canvasImage,0,0)
   }
   function externalDraw(data){
     const whiteboard = hiddenCanvasRef.current.getContext("2d")
     whiteboard.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
     whiteboard.beginPath()
     const commands = data.data
-    console.log(data.type)
     console.log(data)
     whiteboard.lineWidth = data.size
     switch (data.type){
@@ -299,15 +303,15 @@ function Whiteboard(){
             whiteboard.lineTo(...commands[i])
           }
           whiteboard.stroke()
-          break
         }else if (data.status === "doneDrawing"){
           for (let i = 1; i < commands.length; i++){
             whiteboard.lineTo(...commands[i])
             whiteboard.stroke()
           }
-          break
         }
+        break
       case "erase":
+        console.log("cru")
         whiteboard.strokeStyle = "white"
         console.log(commands)
         for (let i = 1; i < commands.length; i++){
@@ -315,8 +319,15 @@ function Whiteboard(){
           whiteboard.stroke()
         }
         break
+      case "fill":
+        console.log(data.fillStart[0], data.fillStart[1], data.color)
+        canvasFill(data.fillStart[0], data.fillStart[1], data.color)
+        break
       case "clear":
-        canvasRef.current.getContext("2d").clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
+        const mainCanvas =  canvasRef.current.getContext("2d")
+        mainCanvas.fillStyle = "white"
+        mainCanvas.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+        break
     }
     canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
   }

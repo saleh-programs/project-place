@@ -165,7 +165,41 @@ async function updateUsernameReq(email, username){
     }
     return data
   }catch (err){
-    console.err(err)
+    console.error(err)
+    return null
+  }
+}
+
+async function updateCanvas(canvasBuffer,roomID){
+  try{
+    const response = await fetch(baseurl + "updateCanvas" + `?roomID=${roomID}`, {
+      "method": "POST",
+      "headers": {"Content-Type": "application/octet-stream"},
+      "body": canvasBuffer
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data
+  }catch (err){
+    console.error(err)
+    return null
+  }
+}
+
+async function getCanvas(roomID){
+  try{
+    const response = await fetch(baseurl + "getCanvas" + `?roomID=${roomID}`, {
+      "method": "GET",
+    })
+    if (response.status !== 200){
+      throw new Error("req failed")
+    }
+    const canvasBlob = await response.blob() 
+    return canvasBlob
+  }catch(err){
+    console.error(err)
     return null
   }
 }
@@ -179,4 +213,4 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getUserInfoReq, getUsernameReq, updateUsernameReq}
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getUserInfoReq, getUsernameReq, updateUsernameReq, getCanvas, updateCanvas}
