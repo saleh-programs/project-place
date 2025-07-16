@@ -8,9 +8,13 @@ html, body, #root, .siteWrapper{
 }
 .siteWrapper{
   display: flex;
+  height: 100vh;
 }
 .pageContainer{
   flex: 1;
+  height: 100vh;
+
+  display: flex;
 }
 
 

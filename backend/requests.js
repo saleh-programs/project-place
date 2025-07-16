@@ -194,7 +194,8 @@ async function getCanvas(roomID){
       "method": "GET",
     })
     if (response.status !== 200){
-      throw new Error("req failed")
+      //fix later
+      return null
     }
     const canvasBlob = await response.blob() 
     return canvasBlob

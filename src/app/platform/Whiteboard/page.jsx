@@ -15,7 +15,7 @@ function Whiteboard(){
   const currentColor = useRef("black")
   const strokeSizeRef = useRef(null)
   
-//drawCommands, chats, 
+//drawCommands, chats,  
   const batchedStrokes = useRef({
     "fullStroke": [],
     "batchStroke": []
@@ -30,12 +30,14 @@ function Whiteboard(){
   ]
   
   useEffect(()=>{
-    hiddenCanvasRef.current = document.createElement("canvas")
-    hiddenCanvasRef.current.width = canvasRef.current.width
-    hiddenCanvasRef.current.height = canvasRef.current.height
+    if (canvasRef.current){
+      hiddenCanvasRef.current = document.createElement("canvas")
+      hiddenCanvasRef.current.width = canvasRef.current.width
+      hiddenCanvasRef.current.height = canvasRef.current.height
 
-    canvasRef.current.getContext("2d").fillStyle = "white"
-    canvasRef.current.getContext("2d").fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+      canvasRef.current.getContext("2d").fillStyle = "white"
+      canvasRef.current.getContext("2d").fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+    }
   },[])
 
   useEffect(()=>{
@@ -333,28 +335,42 @@ function Whiteboard(){
   }
 
   return (
-    <div>
-      whiteboard
+    <div className={styles.whiteboardPage}>
+      <h1 className={styles.title}>
+        Whiteboard
+      </h1>
       {roomID &&
-      <div>
-        <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
-        <div className={styles.whiteboardHub}>
-          <section className={styles.types}>
+      <div className={styles.mainContent}>
+        <div className={styles.whiteboardContainer}>
+          <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
+          {/* <button className={styles.clearButton}>clear</button> */}
+          <span>
+            <button className={styles.undoButton}>left</button>
+            <button className={styles.redoButton}>right</button>
+          </span>
+        </div>
+        <div className={styles.tools}>
+
+          <section className={styles.modesContainer}>
+            <h3>Draw</h3>
             <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
             <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
             <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
             <button onClick={clearCanvas}>Clear</button>
             <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
           </section>
-          <section className={styles.colors}>
-            {
-              colors.map(item=>{
-                return (
-                  <span key={item} className={styles.color} style={{backgroundColor:`${item}`}} onClick={() => {currentColor.current = item}}>
-                  </span>
-                )
-              })
-            }
+          <section className={styles.colorsContainer}>
+            <h3>Colors</h3>
+            <section className={styles.colors}>
+              {
+                colors.map(item=>{
+                  return (
+                    <span key={item} className={styles.color} style={{backgroundColor:`${item}`}} onClick={() => {currentColor.current = item}}>
+                    </span>
+                  )
+                })
+              }
+            </section>
           </section>
         </div>
       </div>

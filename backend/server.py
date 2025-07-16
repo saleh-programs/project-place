@@ -217,7 +217,7 @@ def getCanvas():
       cursor.execute("SELECT canvas FROM canvases where roomID = %s",(roomID,))
       canvasBytes = cursor.fetchone()
       if canvasBytes is None:
-        raise ValueError()
+        return {"success": False, "message": "failed to update canvas data"}, 500
       canvasBytes = canvasBytes[0]
     return Response(canvasBytes, mimetype='application/octet-stream', status=200)
   except Exception as e:
