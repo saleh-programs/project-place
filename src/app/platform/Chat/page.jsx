@@ -21,9 +21,9 @@ function Chat(){
   }
   return(
     <div className={styles.chatPage}>
-      <section className={styles.chatTitle}>
+      <h1 className={styles.title}>
         Chat
-      </section>
+      </h1>
       <section className={styles.chatDisplay}>
         {
           messages.map((item,i)=>{

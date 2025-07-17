@@ -2,7 +2,7 @@
 import ThemeContext from "src/assets/ThemeContext"
 import { useRef, useState, useContext } from "react"
 
-import "styles/platform/Documents.module.css"
+import styles from "styles/platform/Documents.module.css"
 
 function Documents(){
   const { roomID } = useContext(ThemeContext)
@@ -28,8 +28,10 @@ function Documents(){
   }
 
   return (
-    <div>
-      documents
+    <div className={styles.documentsPage}>
+      <h1 className={styles.title}>
+        Documents
+      </h1>
         <section>
           <input type="file" ref={fileSelectRef} onChange={handleFileChange}/>
         </section>
