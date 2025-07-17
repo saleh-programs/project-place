@@ -342,25 +342,27 @@ function Whiteboard(){
       {roomID &&
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
-          <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
-          {/* <button className={styles.clearButton}>clear</button> */}
-          <span>
-            <button className={styles.undoButton}>left</button>
-            <button className={styles.redoButton}>right</button>
+          <div className={styles.whiteboardScrollable}>
+            <section className={styles.canvasArea}>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
+            </section>
+          </div>
+          <button className={styles.clearButton} onClick={clearCanvas}>clear</button>
+          <span className={styles.reverseButtons}>
+            <button className={styles.undoButton}>undo</button>
+            <button className={styles.redoButton}>redo</button>
           </span>
         </div>
         <div className={styles.tools}>
-
+          <h3>Draw</h3>
           <section className={styles.modesContainer}>
-            <h3>Draw</h3>
             <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
             <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
             <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
-            <button onClick={clearCanvas}>Clear</button>
             <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
           </section>
+          <h3>Colors</h3>
           <section className={styles.colorsContainer}>
-            <h3>Colors</h3>
             <section className={styles.colors}>
               {
                 colors.map(item=>{

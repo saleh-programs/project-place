@@ -1,5 +1,4 @@
 .whiteboardPage{
-  border: 3px solid red;
   height: 100vh;
 
   display: flex;
@@ -18,32 +17,52 @@
 .mainContent{
   display: flex;
   flex: 1;
+  justify-content: flex-end;
 }
 .whiteboardContainer{
-  border: 1px solid;
   flex: 1;
-
+  position: relative;
   display: flex;
+}
+.whiteboardScrollable{
+  flex: 1;
+  position: relative;
+  border: 5px solid;
   overflow: auto;
 }
-.whiteboardContainer canvas{ 
-  border: 1px solid blue;
+.clearButton{
+  top: 0;
+  right: 0;
+  position: absolute;
+}
+.reverseButtons{
+  position: absolute;
+}
+.canvasArea{ 
+  background-color: rgb(191, 189, 189);
+  position: absolute;
+  padding: 50px;
 } 
 .tools{
+  border: 3px solid;
+  padding: 10px 25px;
+  background-color: rgb(131, 83, 69);
+  border-radius: 20px;
   border: 4px solid;
-  align-self: flex-start;
-  flex: 0 0 400px;
+  flex: 0 0 300px;
 }
 .tools h3{
   text-align: center;
   font-size: 2rem;
 }
 .modesContainer{
-
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 .modesContainer button{
-  font-size: larger;
-  padding: 50px;
+  width: 70px;
+  height: 70px;
 }
 .colorsContainer{
 }
@@ -54,9 +73,10 @@
   gap: 3px;
 }
 .color{
-  border: 1px solid black;
-  width: 70px;
-  height: 70px;
+  border: 3px solid black;
+  border-radius: 10%;
+  width: 50px;
+  height: 50px;
 
   &:hover{
     cursor: pointer;
