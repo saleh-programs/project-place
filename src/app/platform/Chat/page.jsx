@@ -1,23 +1,46 @@
 "use client"
-import { useState, useContext } from "react"
+import { useState, useContext, useEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 import { getUniqueMessageID } from "backend/requests"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
-  const {sendJsonMessage, roomID, messages, setMessages} = useContext(ThemeContext)
+  const {externalChatRef ,sendJsonMessage, roomID, messages, setMessages, username} = useContext(ThemeContext)
   const [newMessage, setNewMessage] = useState("")
+
+  useEffect(()=>{
+    externalChatRef.current = externalChat
+    return ()=>{
+      externalChatRef.current = (param1) => {}
+    }
+  },[])
 
   function handleMessage(e) {
     sendJsonMessage({
+      "origin": "chat",
       "type": "chat",
+      "username": username,
       "data": newMessage,
-      "timestamp": Date.now(),
-      "messageID": getUniqueMessageID()
+      "metadata":{
+        "timestamp": Date.now(),
+        "messageID": getUniqueMessageID()
+      }
     })
     setNewMessage("")
     setMessages(prev=>[...prev, newMessage])
+  }
+
+  function externalChat(data){
+    switch (data.type){
+      case "newMessage":
+        setMessages(prev=>[...prev, data.data])
+        break
+      case "chatHistory":
+        const newMessages = data.data.map(item => item[2])
+        setMessages(prev=>[...newMessages, ...prev])
+        break 
+    }
   }
   return(
     <div className={styles.chatPage}>

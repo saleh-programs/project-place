@@ -17,7 +17,7 @@ async function PlatformLayout({ children }) {
   } 
 
   return (
-    <MainDisplay>
+    <MainDisplay username={username}>
       {children}
     </MainDisplay>
   )

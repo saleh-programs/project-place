@@ -7,14 +7,12 @@ import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalDrawRef } = useContext(ThemeContext)
-
-  externalDrawRef.current = externalDraw
+  const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
 
   const currentType = useRef("draw") //draw, erase, or fill
   const currentColor = useRef("black")
   const strokeSizeRef = useRef(null)
-  
+
 //drawCommands, chats,  
   const batchedStrokes = useRef({
     "fullStroke": [],
@@ -28,20 +26,22 @@ function Whiteboard(){
     "black","white","gray","red","green","orange","blue", "cyan",
     "yellow", "purple", "brown", "pink"
   ]
-  
+
+  useEffect(()=>{  
+    externalDrawRef.current = externalDraw
+  return ()=>{
+    externalDrawRef.current = (param1) => {}
+  }
+  },[])
+
   useEffect(()=>{
-    if (canvasRef.current){
+    if (roomID){
       hiddenCanvasRef.current = document.createElement("canvas")
       hiddenCanvasRef.current.width = canvasRef.current.width
       hiddenCanvasRef.current.height = canvasRef.current.height
 
       canvasRef.current.getContext("2d").fillStyle = "white"
       canvasRef.current.getContext("2d").fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
-    }
-  },[])
-
-  useEffect(()=>{
-    if (roomID){
       reconstructCanvas(roomID)
     }
   },[roomID])
@@ -60,27 +60,35 @@ function Whiteboard(){
     batchedStrokes.current.batchStroke.unshift(startStrokePoint.current)
     startStrokePoint.current = batchedStrokes.current.batchStroke[batchedStrokes.current.batchStroke.length-1]
     sendJsonMessage({
+      "origin": "whiteboard",
       "type": currentType.current,
-      "status": "isDrawing",
-      "color": currentColor.current,
-      "size": strokeSizeRef.current.value,
-      "data": batchedStrokes.current.batchStroke
+      "username": username,
+      "data": batchedStrokes.current.batchStroke,
+      "metadata": {
+        "status": "isDrawing",
+        "color": currentColor.current,
+        "size": strokeSizeRef.current.value,
+      }
     })
     batchedStrokes.current.batchStroke = []
   }
 
   function sendStroke(){
     sendJsonMessage({
+      "origin": "whiteboard",
       "type": currentType.current,
-      "status": "doneDrawing",
-      "color": currentColor.current,
-      "size": strokeSizeRef.current.value,
-      "data": batchedStrokes.current.fullStroke
+      "username": username,
+      "data": batchedStrokes.current.fullStroke,
+      "metadata": {
+        "status": "doneDrawing",
+        "color": currentColor.current,
+        "size": strokeSizeRef.current.value,
+      }
     })
     batchedStrokes.current.fullStroke = []
   }
 
-    function throttle(func){
+  function throttle(func){
     let timerID = null
     let lastFunc = null
 
@@ -117,7 +125,6 @@ function Whiteboard(){
     whiteboard.globalAlpha = 1.0
     if (currentType.current !== "fill"){
           batchedStrokes.current.fullStroke.push(startStrokePoint.current)
-
     }
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
@@ -161,9 +168,13 @@ function Whiteboard(){
         break
       case "fill":
         sendJsonMessage({
+          "origin": "whiteboard",
           "type": "fill",
-          "fillStart": [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)],
-          "color": currentColor.current
+          "username": username,
+          "data": [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)],
+          "metadata": {
+            "color": currentColor.current
+          }
         })
         canvasFill(Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top), currentColor.current)
         break
@@ -176,7 +187,9 @@ function Whiteboard(){
     whiteboard.fillStyle = "white"
     whiteboard.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
     sendJsonMessage({
+      "origin": "whiteboard",
       "type": "clear",
+      "username": username
     })
   }
 
@@ -292,20 +305,19 @@ function Whiteboard(){
     const whiteboard = hiddenCanvasRef.current.getContext("2d")
     whiteboard.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
     whiteboard.beginPath()
-    const commands = data.data
-    console.log(data)
-    whiteboard.lineWidth = data.size
+    const commands = data?.data
+
     switch (data.type){
       case "draw":
-        whiteboard.strokeStyle = data.color
-        console.log(data.color)
+        whiteboard.lineWidth = data.metadata.size
+        whiteboard.strokeStyle = data.metadata.color
         whiteboard.moveTo(...commands[0])
-        if (data.status === "isDrawing"){
+        if (data.metadata.status === "isDrawing"){
           for (let i = 1; i < commands.length; i++){
             whiteboard.lineTo(...commands[i])
           }
           whiteboard.stroke()
-        }else if (data.status === "doneDrawing"){
+        }else if (data.metadata.status === "doneDrawing"){
           for (let i = 1; i < commands.length; i++){
             whiteboard.lineTo(...commands[i])
             whiteboard.stroke()
@@ -313,17 +325,15 @@ function Whiteboard(){
         }
         break
       case "erase":
-        console.log("cru")
+        whiteboard.lineWidth = data.metadata.size
         whiteboard.strokeStyle = "white"
-        console.log(commands)
         for (let i = 1; i < commands.length; i++){
           whiteboard.lineTo(...commands[i])
           whiteboard.stroke()
         }
         break
       case "fill":
-        console.log(data.fillStart[0], data.fillStart[1], data.color)
-        canvasFill(data.fillStart[0], data.fillStart[1], data.color)
+        canvasFill(data.data[0], data.data[1], data.metadata.color)
         break
       case "clear":
         const mainCanvas =  canvasRef.current.getContext("2d")

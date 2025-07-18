@@ -18,45 +18,29 @@ const users = {}
 const rooms = {}
 const roomsLatest = {}
 
-async function handleMessage(data, uuid){
+// any message layout:
+/*
+{
+  "origin" : chat/whiteboard/documents, ---all have this---
+  "type" :  erase/newMessage/fill (specific type)
+  "user": username,  ---all have this---
+  "data": draw commands/fill instructions/newest chat, ---all have this---
+  "metadata": user's color/ stroke size/ draw status(isDraw/doneDraw)
+}
+ */
+
+
+function handleMessage(data, uuid){
   const parsedData = JSON.parse(data.toString())
-  switch (parsedData.type){
+
+  switch (parsedData.origin){
     case "chat":
-      await storeMessageReq({
-        "username": users[uuid].username,
-        "roomID": users[uuid].roomID,
-        "message": parsedData.data,
-        "messageID": parsedData.messageID,
-        "timestamp": parsedData.timestamp,
-      })
-      roomsLatest[users[uuid].roomID] = parsedData.messageID
       broadcastMessage(parsedData, uuid)
       break
-    case "draw":
-      if (parsedData.status === "isDrawing"){
-        broadcastWhiteboard(parsedData, uuid)
-      }else if (parsedData.status === "doneDrawing"){
-        broadcastWhiteboard(parsedData, uuid)
-      }
-      break
-    case "erase":
-      if (parsedData.status === "isDrawing"){
-        broadcastWhiteboard(parsedData, uuid)
-      }else if (parsedData.status === "doneDrawing"){
-        broadcastWhiteboard(parsedData, uuid)
-      }
-      break
-    case "fill":
-      broadcastWhiteboard(parsedData, uuid)
-      break
-    case "clear":
+    case "whiteboard":
       broadcastWhiteboard(parsedData, uuid)
       break
   }
-}
-function handleClose(uuid){
-  rooms[users[uuid].roomID]["connections"] = rooms[users[uuid].roomID]["connections"].filter(item => item !== connections[uuid])
-  delete connections[uuid]
 }
 
 
@@ -90,55 +74,68 @@ wsServer.on("connection", (connection, request)=>{
   connection.on("close",()=>handleClose(uuid))
 })
 
-function broadcastMessage(data, uuid){
+function handleClose(uuid){
+  rooms[users[uuid].roomID]["connections"] = rooms[users[uuid].roomID]["connections"].filter(item => item !== connections[uuid])
+  delete connections[uuid]
+}
+
+//broadcast functions
+async function broadcastMessage(data, uuid){
+  // store room's last message sent (for specific case where user enters room with lots of messages coming in)
+  roomsLatest[users[uuid].roomID] = data.metadata.messageID
+
+  // store message in database before broadcasting 
+  await storeMessageReq({
+    "username": data.username,
+    "roomID": users[uuid].roomID,
+    "message": data.data,
+    "messageID": data.metadata.messageID,
+    "timestamp": parsedData.metadata.timestamp,
+  })
+
+  // sends everyone the data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
     if (conn !== connections[uuid]){
-      conn.send(JSON.stringify({
-        "type": "chat",
-        "user": data.username,
-        "data": data.data,
-        "timestamp": data.timestamp
-      }))
+      conn.send(JSON.stringify(data))
      }
   })
 }
 function broadcastWhiteboard(data, uuid){
-  const whiteboardBroadcast = {
-        "type": data.type,
-        "status": data?.status,
-        "color": data?.color,
-        "size": data?.size,
-        "user": data?.username,
-        "data": data?.data,
-        "fillStart": data?.fillStart
-  }
+  // Updates the server's canvas
   setImmediate(()=>{
-    updateServerCanvas(whiteboardBroadcast, users[uuid].roomID)
+    updateServerCanvas(data, users[uuid].roomID)
     addInstruction(data, users[uuid].roomID)
     updateCanvas(rooms[users[uuid].roomID]["canvas"].toBuffer("image/png"),users[uuid].roomID)
   })
+
+  // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
     if (conn !== connections[uuid]){
-      conn.send(JSON.stringify(whiteboardBroadcast))
+      conn.send(JSON.stringify(data))
      }
   })
 }
+
+
+
+//utility functions
 function updateServerCanvas(data, roomID){
-    const whiteboard = rooms[roomID]["canvas"].getContext("2d")
-    const commands = data.data
-    whiteboard.lineWidth = data.size
+    const mainCanvas = rooms[roomID]["canvas"]
+    const whiteboard = mainCanvas.getContext("2d")
+    const commands = data?.data
     
     whiteboard.beginPath()
     switch (data.type){
       case "draw":
-        whiteboard.strokeStyle = data.color
+        whiteboard.lineWidth = data.metadata.size
+        whiteboard.strokeStyle = data.metadata.color
         whiteboard.moveTo(...commands[0])
-        if (data.status === "isDrawing"){
+        if (data.metadata.status === "isDrawing"){
           for (let i = 1; i < commands.length; i++){
             whiteboard.lineTo(...commands[i])
           }
           whiteboard.stroke()
-        }else if (data.status === "doneDrawing"){
+        }else if (data.metadata.status === "doneDrawing"){
           for (let i = 1; i < commands.length; i++){
             whiteboard.lineTo(...commands[i])
             whiteboard.stroke()
@@ -146,6 +143,7 @@ function updateServerCanvas(data, roomID){
         }
         break
       case "erase":
+        whiteboard.lineWidth = data.metadata.size
         whiteboard.strokeStyle = "white"
         for (let i = 1; i < commands.length; i++){
           whiteboard.lineTo(...commands[i])
@@ -153,11 +151,11 @@ function updateServerCanvas(data, roomID){
         }
         break
       case "fill":
-        canvasFill(data.fillStart[0], data.fillStart[1], data.color, roomID)
+        canvasFill(data.data[0], data.data[1], data.metadata.color, roomID)
         break
       case "clear":
         whiteboard.fillStyle = "white"
-        whiteboard.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+        whiteboard.fillRect(0,0,mainCanvas.width, mainCanvas.height)
         break
     }
 }
@@ -237,8 +235,10 @@ async function canvasFill(x, y, color, roomID){
     }
     whiteboard.putImageData(canvasImage,0,0)
 }
+
 async function getMessages(connection, roomID) {
   connection.send(JSON.stringify({
+    "origin": "chat",
     "type": "chatHistory",
     "data": await getMessagesReq(roomID,roomsLatest[roomID])
   }))

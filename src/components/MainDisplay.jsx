@@ -8,33 +8,21 @@ import Sidebar from "src/components/Sidebar"
 function MainDisplay({children, username}){
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
-  const externalDrawRef = useRef((param1, param2)=>{})
+  const externalDrawRef = useRef((param1)=>{})
+  const externalChatRef = useRef((param1)=>{})
 
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
-      "username": "123",
+      "username": username,
       "roomID": roomID
     },
     onMessage:(event)=>{
       const data = JSON.parse(event.data)
-      switch (data.type){
+      switch (data.origin){
         case "chat":
-          setMessages(prev=>[...prev, data.data])
+          externalChatRef.current(data)
           break
-        case "chatHistory":
-          const newMessages = data.data.map(item => item[2])
-          setMessages(prev=>[...newMessages, ...prev])
-          break
-        case "draw":
-          externalDrawRef.current(data)
-          break
-        case "erase":
-          externalDrawRef.current(data)
-          break
-        case "fill":
-          externalDrawRef.current(data)
-          break
-        case "clear":
+        case "whiteboard":
           externalDrawRef.current(data)
           break
       }
@@ -42,8 +30,9 @@ function MainDisplay({children, username}){
   },roomID !== "")
 
   const shared = {
+    username,
     sendJsonMessage,
-    externalDrawRef,
+    externalDrawRef,externalChatRef,
     roomID, setRoomID,
     messages, setMessages
   }
