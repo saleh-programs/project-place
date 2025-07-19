@@ -28,7 +28,7 @@
   flex: 1;
   position: relative;
   border: 5px solid;
-  overflow: auto;
+  overflow: hidden;
 }
 .clearButton{
   top: 0;

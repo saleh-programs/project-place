@@ -126,7 +126,19 @@ function Whiteboard(){
     if (currentType.current !== "fill"){
           batchedStrokes.current.fullStroke.push(startStrokePoint.current)
     }
+
+    const startMousePos = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
+
+    //for navigate
+    const currShift = getComputedStyle(canvasRef.current).transform
+    let shiftX = 0
+    let shiftY = 0
+    if (currShift !== "none"){
+      const matrix = new DOMMatrix(currShift)
+      shiftX = matrix.m41
+      shiftY = matrix.m42
+    }
 
     function onMoveDraw(e){
       const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
@@ -155,6 +167,18 @@ function Whiteboard(){
       canvasRef.current.removeEventListener("mousemove", onMoveErase)
       document.removeEventListener("mouseup", onReleaseErase)
     }
+    function onMoveNavigate(e){
+      const mousePos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
+      const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
+
+
+      canvasRef.current.style.transform = `translate(${shiftX + offset[0]}px, ${shiftY + offset[1]}px)`;
+
+    }
+    function onReleaseNavigate(e){
+      canvasRef.current.removeEventListener("mousemove", onMoveNavigate)
+      document.removeEventListener("mouseup", onReleaseNavigate)
+    }
 
     switch (currentType.current){
       case "draw":
@@ -177,6 +201,10 @@ function Whiteboard(){
           }
         })
         canvasFill(Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top), currentColor.current)
+        break
+      case "navigate":
+        canvasRef.current.addEventListener("mousemove", onMoveNavigate)
+        document.addEventListener("mouseup", onReleaseNavigate)
         break
     }
   }
@@ -369,6 +397,7 @@ function Whiteboard(){
             <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
             <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
             <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
+            <button onClick={()=>{currentType.current = "navigate"}}>Navigate</button>
             <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
           </section>
           <h3>Colors</h3>
