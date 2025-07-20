@@ -13,6 +13,12 @@ function Whiteboard(){
   const currentColor = useRef("black")
   const strokeSizeRef = useRef(null)
 
+  const canvasStylesRef = useRef({
+    "scale": 1.0,
+    "translateX": 0,
+    "translateY": 0 
+  })
+
 //drawCommands, chats,  
   const batchedStrokes = useRef({
     "fullStroke": [],
@@ -127,18 +133,7 @@ function Whiteboard(){
           batchedStrokes.current.fullStroke.push(startStrokePoint.current)
     }
 
-    const startMousePos = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
-
-    //for navigate
-    const currShift = getComputedStyle(canvasRef.current).transform
-    let shiftX = 0
-    let shiftY = 0
-    if (currShift !== "none"){
-      const matrix = new DOMMatrix(currShift)
-      shiftX = matrix.m41
-      shiftY = matrix.m42
-    }
 
     function onMoveDraw(e){
       const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
@@ -167,18 +162,6 @@ function Whiteboard(){
       canvasRef.current.removeEventListener("mousemove", onMoveErase)
       document.removeEventListener("mouseup", onReleaseErase)
     }
-    function onMoveNavigate(e){
-      const mousePos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
-      const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
-
-
-      canvasRef.current.style.transform = `translate(${shiftX + offset[0]}px, ${shiftY + offset[1]}px)`;
-
-    }
-    function onReleaseNavigate(e){
-      canvasRef.current.removeEventListener("mousemove", onMoveNavigate)
-      document.removeEventListener("mouseup", onReleaseNavigate)
-    }
 
     switch (currentType.current){
       case "draw":
@@ -201,10 +184,6 @@ function Whiteboard(){
           }
         })
         canvasFill(Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top), currentColor.current)
-        break
-      case "navigate":
-        canvasRef.current.addEventListener("mousemove", onMoveNavigate)
-        document.addEventListener("mouseup", onReleaseNavigate)
         break
     }
   }
@@ -372,6 +351,55 @@ function Whiteboard(){
     canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
   }
 
+  function zoomIn(){
+    const maxScale = 2.0
+    if (canvasStylesRef.current["scale"] < maxScale){
+      canvasRef.current.style.transform = `translate(${canvasStylesRef.current["translateX"]}px, ${canvasStylesRef.current["translateY"]}px) scale(${canvasStylesRef.current["scale"] + .2})`;
+      canvasStylesRef.current["scale"] += .2
+    }
+  }
+  function zoomOut(){
+    const minScale = 0.4
+    if (canvasStylesRef.current["scale"] > minScale){
+      canvasRef.current.style.transform = `translate(${canvasStylesRef.current["translateX"]}px, ${canvasStylesRef.current["translateY"]}px) scale(${canvasStylesRef.current["scale"] - .2})`;    
+      canvasStylesRef.current["scale"] -= .2
+    }
+  }
+  function startNavigatingCanvas(){
+    if (currentType.current !== "navigate"){
+      return
+    }
+    const whiteboardRect = canvasRef.current.getBoundingClientRect()
+    const startMousePos = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
+    const shiftX = canvasStylesRef.current["translateX"]
+    const shiftY = canvasStylesRef.current["translateY"]
+
+    function onMoveNavigate(e){
+      const mousePos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
+      const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
+
+      let newShiftX = canvasStylesRef.current["translateX"]
+      let newShiftY = canvasStylesRef.current["translateY"]
+      console.log(newShiftX, newShiftY)
+      if (Math.abs(shiftX + offset[0]) < whiteboardRect.width/4){
+        newShiftX = shiftX + offset[0]
+      }
+      if (Math.abs(shiftY + offset[1]) < whiteboardRect.height/4){
+        newShiftY = shiftY + offset[1]
+      }
+      canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasStylesRef.current["scale"]})`;
+      canvasStylesRef.current["translateX"] = newShiftX
+      canvasStylesRef.current["translateY"] = newShiftY
+    }
+
+    function onReleaseNavigate(e){
+      document.removeEventListener("mousemove", onMoveNavigate)
+      document.removeEventListener("mouseup", onReleaseNavigate)
+    }
+
+    document.addEventListener("mousemove", onMoveNavigate)
+    document.addEventListener("mouseup", onReleaseNavigate)
+  }
   return (
     <div className={styles.whiteboardPage}>
       <h1 className={styles.title}>
@@ -381,7 +409,7 @@ function Whiteboard(){
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable}>
-            <section className={styles.canvasArea}>
+            <section className={styles.canvasArea} onMouseDown={startNavigatingCanvas}>
               <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
             </section>
           </div>
@@ -398,6 +426,9 @@ function Whiteboard(){
             <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
             <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
             <button onClick={()=>{currentType.current = "navigate"}}>Navigate</button>
+            <button onClick={zoomIn}>Zoom In</button>
+            <button onClick={zoomOut}>Zoom Out</button>
+
             <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
           </section>
           <h3>Colors</h3>
