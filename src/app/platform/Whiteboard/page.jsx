@@ -365,38 +365,49 @@ function Whiteboard(){
       canvasStylesRef.current["scale"] -= .2
     }
   }
-  function startNavigatingCanvas(){
+  function startNavigatingCanvas(e){
     if (currentType.current !== "navigate"){
       return
     }
-    const whiteboardRect = canvasRef.current.getBoundingClientRect()
-    const startMousePos = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
+    const whiteboardContainerRect = e.currentTarget.getBoundingClientRect()
+    let whiteboardRect = canvasRef.current.getBoundingClientRect()
+    const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
     const shiftX = canvasStylesRef.current["translateX"]
     const shiftY = canvasStylesRef.current["translateY"]
 
     function onMoveNavigate(e){
-      const mousePos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
+      whiteboardRect = canvasRef.current.getBoundingClientRect()
+      const mousePos = [Math.round(e.clientX), Math.round(e.clientY)]
       const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
 
       let newShiftX = canvasStylesRef.current["translateX"]
       let newShiftY = canvasStylesRef.current["translateY"]
-      console.log(newShiftX, newShiftY)
-      if (Math.abs(shiftX + offset[0]) < whiteboardRect.width/4){
+
+      const withinHorizontalBounds = whiteboardRect.right + offset[0] >= whiteboardContainerRect.left + 10 && whiteboardRect.left + offset[0] <= whiteboardContainerRect.right - 10
+      const withinVerticalBounds = whiteboardRect.top + offset[1] <= whiteboardContainerRect.bottom - 10 && whiteboardRect.bottom + offset[1] >= whiteboardContainerRect.top + 10
+
+      if (withinHorizontalBounds){
         newShiftX = shiftX + offset[0]
       }
-      if (Math.abs(shiftY + offset[1]) < whiteboardRect.height/4){
+      if (withinVerticalBounds){
         newShiftY = shiftY + offset[1]
       }
+      // console.log(whiteboardRect.top + offset[1] >= whiteboardContainerRect.top - 400, whiteboardRect.bottom + offset[1] <= whiteboardContainerRect.bottom + 40)
+      console.log(whiteboardRect.bottom, offset[1],
+        whiteboardContainerRect.bottom + 100
+      )
       canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasStylesRef.current["scale"]})`;
       canvasStylesRef.current["translateX"] = newShiftX
       canvasStylesRef.current["translateY"] = newShiftY
     }
 
     function onReleaseNavigate(e){
+      document.body.style.userSelect = "";
       document.removeEventListener("mousemove", onMoveNavigate)
       document.removeEventListener("mouseup", onReleaseNavigate)
     }
 
+    document.body.style.userSelect = "none";
     document.addEventListener("mousemove", onMoveNavigate)
     document.addEventListener("mouseup", onReleaseNavigate)
   }
@@ -408,8 +419,8 @@ function Whiteboard(){
       {roomID &&
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
-          <div className={styles.whiteboardScrollable}>
-            <section className={styles.canvasArea} onMouseDown={startNavigatingCanvas}>
+          <div className={styles.whiteboardScrollable} onMouseDown={startNavigatingCanvas}>
+            <section className={styles.canvasArea}>
               <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
             </section>
           </div>
