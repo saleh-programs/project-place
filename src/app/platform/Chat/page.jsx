@@ -17,26 +17,39 @@ function Chat(){
   },[])
 
   function handleMessage(e) {
+    const currTime = Date.now()
+    const messageID = getUniqueMessageID()
     sendJsonMessage({
       "origin": "chat",
       "type": "chat",
       "username": username,
       "data": newMessage,
       "metadata":{
-        "timestamp": Date.now(),
-        "messageID": getUniqueMessageID()
+        "timestamp": currTime,
+        "messageID": messageID
       }
     })
     setNewMessage("")
-    setMessages(prev=>[...prev, newMessage])
+    setMessages(prev=>[...prev, {
+      "username": username,
+      "message": newMessage,
+      "timestamp": currTime,
+      "messageID": messageID
+    }])
   }
 
   function externalChat(data){
     switch (data.type){
       case "newMessage":
-        setMessages(prev=>[...prev, data.data])
+        setMessages(prev=>[...prev, {
+          "username": data.username,
+          "message": data.data,
+          "timestamp": data.metadata.timestamp,
+          "messageID": data.metadata.messageID
+        }])
         break
       case "chatHistory":
+        //fix later
         const newMessages = data.data.map(item => item[2])
         setMessages(prev=>[...newMessages, ...prev])
         break 
@@ -51,7 +64,9 @@ function Chat(){
         {
           messages.map((item,i)=>{
             return (
-              <div key={i} className={styles.message}>{item}</div>
+              <div key={i} className={styles.message}>
+                <div>{JSON.stringify(item,null,3)}</div>
+              </div>
             )
           })
         }
