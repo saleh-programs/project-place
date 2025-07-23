@@ -1,0 +1,30 @@
+.accountHub{
+  border: 3px solid red;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 2px;
+}
+
+.header{
+  display: flex;
+}
+.profilePic{
+  border: 1px solid;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.username{
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: bold;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.createRoom{
+}
