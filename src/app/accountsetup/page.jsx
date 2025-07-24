@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react";
-import { updateUsernameReq, getUserInfoReq } from "backend/requests";
+import { updateUsernameReq, getSessionUserInfoReq } from "backend/requests";
 import { useRouter } from "next/navigation";
 
 import styles from "styles/accountsetup/AccountSetup.module.css"
@@ -13,7 +13,7 @@ function AccountSetup(){
 
   useEffect(()=>{
     async function getEmail(){
-      const response = await getUserInfoReq()
+      const response = await getSessionUserInfoReq()
       setEmail(response["email"])
     }
     getEmail()

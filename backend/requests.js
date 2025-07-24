@@ -108,7 +108,7 @@ async function getInstructions(roomID) {
   }
 }
 
-async function getUserInfoReq(sessionToken=null) {
+async function getSessionUserInfoReq(sessionToken=null) {
   try{
     let options;
     if (sessionToken){
@@ -122,7 +122,7 @@ async function getUserInfoReq(sessionToken=null) {
         "credentials": "include"
       }
     }
-    const response = await fetch(baseurl + "getUserInfo", options)
+    const response = await fetch(baseurl + "getSessionUserInfo", options)
     const data = await response.json()
     if (!data.success){ 
       throw new Error(data.message ||"req failed")
@@ -134,15 +134,15 @@ async function getUserInfoReq(sessionToken=null) {
   }
 }
 
-async function getUsernameReq(email) {
+async function getUserInfoReq(email) {
   try{
-    const response = await fetch(baseurl + "getUsername",{
+    const response = await fetch(baseurl +"getUserInfo", {
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "body": JSON.stringify({"email": email})
+      "body": JSON.stringify({"email":email})
     })
     const data = await response.json()
-    if (!data.success){
+    if (!data.success){ 
       throw new Error(data.message ||"req failed")
     }
     return data.data
@@ -151,6 +151,7 @@ async function getUsernameReq(email) {
     return null
   }
 }
+
 
 async function updateUsernameReq(email, username){
   try{
@@ -214,4 +215,4 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getUserInfoReq, getUsernameReq, updateUsernameReq, getCanvas, updateCanvas}
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getSessionUserInfoReq, getUserInfoReq, updateUsernameReq, getCanvas, updateCanvas}

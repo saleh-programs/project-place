@@ -54,6 +54,7 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(70),
+      profilePicURL TEXT,
       email VARCHAR(350)
     )
     '''
@@ -97,7 +98,16 @@ with AccessDatabase() as cursor:
     )
     '''
   )
-
+  cursor.execute(
+    '''
+    CREATE TABLE IF NOT EXISTS images (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      image BLOB,
+      mimeType VARCHAR(100),
+      imageID TEXT
+    )
+    '''
+  )
 # Adds message from any room to messages table
 @app.route("/storeMessage", methods=["POST"])
 def storeMessage():
@@ -224,16 +234,18 @@ def getCanvas():
     print(e)
     return {"success": False, "message": "failed to update canvas data"}, 500
   
-
-# getUsername. Like what else would it mean
-@app.route("/getUsername", methods=["POST"])
-def getUsername():
+# getUserInfo. Get site's unique user info, not Auth0's general user info
+@app.route("/getUserInfo", methods=["POST"])
+def getUserInfo():
   data = request.get_json()
   try:
     with AccessDatabase() as cursor:
-      cursor.execute("SELECT username FROM users WHERE email = %s", (data["email"],))
-      username = cursor.fetchone()[0]
-    return jsonify({"success": True, "data": {"username":username}}), 200
+      cursor.execute("SELECT * FROM users WHERE email = %s", (data["email"],))
+
+      keys = cursor.column_names
+      values = cursor.fetchone()
+      userInfo = {keys[i]: values[i] for i in range(len(keys))}
+    return jsonify({"success": True, "data": userInfo}), 200
   except Exception as e:
     print(e)
     return jsonify({"success": False, "message": "checking if user has username failed"}), 500
@@ -251,6 +263,19 @@ def updateUsername():
     print(e)
     return jsonify({"success": False, "message": "updating username failed"}), 500
 
+@app.route("/getImage/<imageID>")
+def getImage(imageID):
+  try:
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
+      imageInfo = cursor.fetchone()
+      if imageInfo is None:
+        return {"success": False, "message": "failed to locate image"}, 500
+    return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to get image"}, 500
+
 
 # adds user to db if they don't exist (NOT ENDPOINT)
 def addUser(email):
@@ -259,7 +284,7 @@ def addUser(email):
       cursor.execute("SELECT email FROM users WHERE email = %s", (email,))
       exists = cursor.fetchone() is not None
       if not exists:
-        cursor.execute("INSERT INTO users (email, username) VALUES (%s, %s)", (email, None))
+        cursor.execute("INSERT INTO users (email, username, profilePicURL) VALUES (%s, %s, %s)", (email, None, "src/assets/defaultPfps/willow.png"))
   except Exception as e:
     print(e)
 
@@ -301,8 +326,8 @@ def logout():
   )
 
 # Used to get user information (email mainly)
-@app.route("/getUserInfo")
-def getUserInfo():
+@app.route("/getSessionUserInfo")
+def getSessionUserInfo():
   user = session.get("user")
   if not user:
     return jsonify({"success": False}), 400

@@ -11,16 +11,18 @@ import JoinRoom from "./JoinRoom"
 
 
 function AccountHub(){
-  const {roomID, setRoomID, username} = useContext(ThemeContext)
+  const {roomID, setRoomID, username, userInfo} = useContext(ThemeContext)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
  
- 
+  useEffect(()=>{
+    console.log(userInfo["profilePicURL"])
+  },[])
   return(
     <div className={styles.accountHub}>
       {roomID}
       <section className={styles.header}>
-        <span className={styles.profilePic}><img src={null} alt="nth" /></span>
+        <span className={styles.profilePic}><img src={"http://localhost:5000/getImage/willow"} alt="nth" /></span>
         <span className={styles.username}>{username}</span>
       </section>
       <button className={styles.createRoom}
