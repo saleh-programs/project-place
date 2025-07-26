@@ -284,7 +284,7 @@ def addUser(email):
       cursor.execute("SELECT email FROM users WHERE email = %s", (email,))
       exists = cursor.fetchone() is not None
       if not exists:
-        cursor.execute("INSERT INTO users (email, username, profilePicURL) VALUES (%s, %s, %s)", (email, None, "src/assets/defaultPfps/willow.png"))
+        cursor.execute("INSERT INTO users (email, username, profilePicURL) VALUES (%s, %s, %s)", (email, None, "http://localhost:5000/getImage/willow"))
   except Exception as e:
     print(e)
 

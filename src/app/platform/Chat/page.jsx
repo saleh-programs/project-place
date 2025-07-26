@@ -1,13 +1,16 @@
 "use client"
-import { useState, useContext, useEffect } from "react"
+import { useState, useContext, useEffect, useRef } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 import { getUniqueMessageID } from "backend/requests"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
-  const {externalChatRef ,sendJsonMessage, roomID, messages, setMessages, username} = useContext(ThemeContext)
+  const {externalChatRef ,sendJsonMessage, roomID, messages, setMessages, username, userInfo} = useContext(ThemeContext)
   const [newMessage, setNewMessage] = useState("")
+
+  const chatPageRef = useRef(null)
+  const [darkMode, setDarkMode] = useState(false)
 
   useEffect(()=>{
     externalChatRef.current = externalChat
@@ -55,21 +58,41 @@ function Chat(){
         break 
     }
   }
+
   return(
-    <div className={styles.chatPage}>
+    <div className={styles.chatPage}
+    style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "black" : "white"}}>
       <h1 className={styles.title}>
         Chat
+
       </h1>
-      <section className={styles.chatDisplay}>
+      <section className={styles.chatDisplay}> 
         {
           messages.map((item,i)=>{
+            const currTime = new Date(item["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
             return (
-              <div key={i} className={styles.message}>
-                <div>{JSON.stringify(item,null,3)}</div>
+              <div key={i} className={styles.messageContainer}>
+                <section className={styles.messageLeft}>
+                  <span className="profilePic">
+                    <img src={userInfo["profilePicURL"]} alt="nth" />
+                  </span>
+                  <span className={styles.timestamp}>{currTime}</span>
+                </section>
+                <section className={styles.messageRight}>
+                  <div className={styles.username}>
+                    {username}
+                  </div>
+                  <div className={styles.textContainer}>
+                    <div className={styles.message}>
+                      {item["message"]}
+                    </div>
+                  </div>
+
+                </section>
               </div>
             )
           })
-        }
+        } 
       </section>
       <section className={styles.chatHub}>
         {roomID &&

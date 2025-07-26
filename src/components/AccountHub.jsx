@@ -22,7 +22,7 @@ function AccountHub(){
     <div className={styles.accountHub}>
       {roomID}
       <section className={styles.header}>
-        <span className={styles.profilePic}><img src={"http://localhost:5000/getImage/willow"} alt="nth" /></span>
+        <span className="profilePic"><img src={userInfo["profilePicURL"]} alt="nth" /></span>
         <span className={styles.username}>{username}</span>
       </section>
       <button className={styles.createRoom}
