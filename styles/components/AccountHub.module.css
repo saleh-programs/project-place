@@ -18,6 +18,12 @@
   justify-content: center;
   align-items: center;
 }
+.changeImage{
+  &:hover{
+    opacity: .8;
+    cursor: pointer;
+  }
+}
 
 .createRoom{
-}
+} 

@@ -8,21 +8,26 @@ import styles from "styles/components/AccountHub.module.css"
 
 import CreateRoom from "./CreateRoom"
 import JoinRoom from "./JoinRoom"
-
+import ChooseImage from "./ChooseImage"
 
 function AccountHub(){
-  const {roomID, setRoomID, username, userInfo} = useContext(ThemeContext)
+  const {roomID, setRoomID, username, userInfo, setUserInfo} = useContext(ThemeContext)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
- 
-  useEffect(()=>{
-    console.log(userInfo["profilePicURL"])
-  },[])
+
+  const [IsChangingImage, setIsChangingImage] = useState(false)
+  console.log("ran again")
   return(
     <div className={styles.accountHub}>
       {roomID}
       <section className={styles.header}>
-        <span className="profilePic"><img src={userInfo["profilePicURL"]} alt="nth" /></span>
+        <span className={`profilePic ${styles.changeImage}`} onClick={()=>setIsChangingImage(!IsChangingImage)}>
+          <img src={userInfo["profilePicURL"]} alt="nth" />
+        </span>
+        {
+          IsChangingImage &&
+          <ChooseImage {...{setIsChangingImage, username, setUserInfo}}/>
+        }
         <span className={styles.username}>{username}</span>
       </section>
       <button className={styles.createRoom}

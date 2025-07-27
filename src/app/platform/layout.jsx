@@ -11,15 +11,15 @@ async function PlatformLayout({ children }) {
   const infoRes = await getSessionUserInfoReq(sessionToken)
   const email = infoRes["email"]
 
-  const userInfo = await getUserInfoReq(email)
-  const username = userInfo["username"]
+  const userInfoInitial = await getUserInfoReq(email)
+  const username = userInfoInitial["username"]
 
   if (!username){
     redirect("/accountsetup")
   } 
 
   return (
-    <MainDisplay {...{username, userInfo}}>
+    <MainDisplay {...{username, userInfoInitial}}>
       {children}
     </MainDisplay>
   )

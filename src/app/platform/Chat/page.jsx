@@ -69,7 +69,7 @@ function Chat(){
   }
   return(
     <div className={styles.chatPage}
-    style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "rgb(35, 34, 37)" : "white"}}>
+    style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "rgba(44, 45, 50,.97)" : "white"}}>
       <h1 className={styles.title}>
         Chat
         <label className={styles.toggleAppearance}>

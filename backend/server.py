@@ -103,8 +103,10 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS images (
       id INT AUTO_INCREMENT PRIMARY KEY,
       image BLOB,
-      mimeType VARCHAR(100),
-      imageID TEXT
+      mimeType VARCHAR(100),      
+      imageID TEXT,
+      accessType VARCHAR(100),
+      owner VARCHAR(70)
     )
     '''
   )
@@ -250,6 +252,24 @@ def getUserInfo():
     print(e)
     return jsonify({"success": False, "message": "checking if user has username failed"}), 500
 
+#modify any fields from a user's data
+@app.route("/modifyUserInfo", methods=["POST"])
+def modifyUserInfo():
+  try:
+    userInfo = request.get_json()
+
+    username = userInfo["username"]
+    del userInfo["username"]
+
+    changeFieldsStr = ", ".join(f"{field} = %s" for field in userInfo.keys())
+    newFieldValuesTup = tuple(list(userInfo.values()) + [username])
+    with AccessDatabase() as cursor:
+      cursor.execute(f"UPDATE users SET {changeFieldsStr} WHERE username = %s", newFieldValuesTup)
+    return jsonify({"success":True}), 200
+  except Exception as e:
+    print(e)
+    return jsonify({"success": False, "message":"Failed to modify user info"}), 500
+  
 # updates usermame. Usually after new account is made.
 @app.route("/updateUsername", methods=["POST"])
 def updateUsername():
@@ -266,8 +286,12 @@ def updateUsername():
 @app.route("/getImage/<imageID>")
 def getImage(imageID):
   try:
+    username = request.args.get("username")
     with AccessDatabase() as cursor:
-      cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
+      if username is None:
+        cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
+      else:
+        cursor.execute("SELECT image, mimeType FROM images where imageID = %s AND owner = %s",(imageID,username))
       imageInfo = cursor.fetchone()
       if imageInfo is None:
         return {"success": False, "message": "failed to locate image"}, 500

@@ -151,7 +151,23 @@ async function getUserInfoReq(email) {
     return null
   }
 }
-
+async function modifyUserInfoReq(changedFieldsObj) {
+  try{
+    const response = await fetch(baseurl + "modifyUserInfo", {
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify(changedFieldsObj)
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
 
 async function updateUsernameReq(email, username){
   try{
@@ -215,4 +231,4 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getSessionUserInfoReq, getUserInfoReq, updateUsernameReq, getCanvas, updateCanvas}
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, updateUsernameReq, getCanvas, updateCanvas}

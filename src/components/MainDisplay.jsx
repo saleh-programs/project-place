@@ -5,11 +5,13 @@ import useWebSocket from "react-use-websocket"
 
 import Sidebar from "src/components/Sidebar"
 
-function MainDisplay({children, username, userInfo}){
+function MainDisplay({children, username, userInfoInitial}){
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
   const externalDrawRef = useRef((param1)=>{})
   const externalChatRef = useRef((param1)=>{})
+
+  const [userInfo, setUserInfo] = useState(userInfoInitial)
 
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
@@ -30,7 +32,7 @@ function MainDisplay({children, username, userInfo}){
   },roomID !== "")
 
   const shared = {
-    username,userInfo,
+    username,userInfo, setUserInfo,
     sendJsonMessage,
     externalDrawRef,externalChatRef,
     roomID, setRoomID,
