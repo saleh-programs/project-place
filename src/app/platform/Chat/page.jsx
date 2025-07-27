@@ -58,13 +58,27 @@ function Chat(){
         break 
     }
   }
-
+  function toggleAppearance(e){
+    setDarkMode(e.target.checked)
+    const toggleElem = document.querySelector(`.${styles.toggleAppearance}`)
+    if (e.target.checked){
+      toggleElem.classList.add(`${styles.enableDarkMode}`)
+    }else{
+      toggleElem.classList.remove(`${styles.enableDarkMode}`)
+    }
+  }
   return(
     <div className={styles.chatPage}
-    style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "black" : "white"}}>
+    style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "rgb(35, 34, 37)" : "white"}}>
       <h1 className={styles.title}>
         Chat
-
+        <label className={styles.toggleAppearance}>
+          <input 
+          type="checkbox"
+          onClick={toggleAppearance}
+          />
+          <span></span>
+        </label>
       </h1>
       <section className={styles.chatDisplay}> 
         {
@@ -73,10 +87,12 @@ function Chat(){
             return (
               <div key={i} className={styles.messageContainer}>
                 <section className={styles.messageLeft}>
+                  <span className={styles.timestamp}>
+                    {currTime}
+                  </span>
                   <span className="profilePic">
                     <img src={userInfo["profilePicURL"]} alt="nth" />
                   </span>
-                  <span className={styles.timestamp}>{currTime}</span>
                 </section>
                 <section className={styles.messageRight}>
                   <div className={styles.username}>

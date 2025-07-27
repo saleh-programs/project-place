@@ -20,7 +20,7 @@ html, body, #root, .siteWrapper{
 
 /* globals */
 .profilePic{
-  border: 1px solid rgb(213, 213, 213);
+  /* border: 1px solid rgb(213, 213, 213); */
   width: 40px;
   height: 40px;
   border-radius: 50%;
