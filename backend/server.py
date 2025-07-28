@@ -7,7 +7,7 @@ from random import randint, choice
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for
 from flask_cors import CORS
-
+import uuid
 from dotenv import load_dotenv
 load_dotenv(dotenv_path="../.env")
 
@@ -55,6 +55,7 @@ with AccessDatabase() as cursor:
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(70),
       profilePicURL TEXT,
+      images TEXT,
       email VARCHAR(350)
     )
     '''
@@ -102,7 +103,7 @@ with AccessDatabase() as cursor:
     '''
     CREATE TABLE IF NOT EXISTS images (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      image BLOB,
+      image MEDIUMBLOB,
       mimeType VARCHAR(100),      
       imageID TEXT,
       accessType VARCHAR(100),
@@ -245,7 +246,9 @@ def getUserInfo():
       cursor.execute("SELECT * FROM users WHERE email = %s", (data["email"],))
 
       keys = cursor.column_names
+      print(keys)
       values = cursor.fetchone()
+      print(values)
       userInfo = {keys[i]: values[i] for i in range(len(keys))}
     return jsonify({"success": True, "data": userInfo}), 200
   except Exception as e:
@@ -300,7 +303,19 @@ def getImage(imageID):
     print(e)
     return {"success": False, "message": "failed to get image"}, 500
 
-
+@app.route("/uploadNewImage", methods=["POST"])
+def uploadNewImage():
+  try:
+    rawImageData = request.get_data()
+    imageType = request.content_type
+    # newImageID = str(uuid.uuid4())
+    newImageID = "dude"
+    with AccessDatabase() as cursor:
+      cursor.execute("INSERT INTO images (image, mimeType, imageID) VALUES (%s, %s, %s)", (rawImageData, imageType, newImageID))
+    return {"success": True, "data": newImageID}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to upload image"}, 500
 # adds user to db if they don't exist (NOT ENDPOINT)
 def addUser(email):
   try:

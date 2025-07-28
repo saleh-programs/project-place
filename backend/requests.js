@@ -169,6 +169,24 @@ async function modifyUserInfoReq(changedFieldsObj) {
   }
 }
 
+async function uploadNewImageReq(imageFile) {
+  try{
+    const rawImageData = new Uint8Array(await imageFile.arrayBuffer())
+    const response = await fetch(baseurl + "uploadNewImage", {
+      "method": "POST",
+      "headers": {"Content-Type": "application/octet-stream"},
+      "body": rawImageData
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data.data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
 async function updateUsernameReq(email, username){
   try{
     const response = await fetch(baseurl + "updateUsername",{
@@ -231,4 +249,6 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, updateUsernameReq, getCanvas, updateCanvas}
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
+  uploadNewImageReq,
+  updateUsernameReq, getCanvas, updateCanvas}

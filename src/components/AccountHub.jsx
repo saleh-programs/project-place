@@ -26,7 +26,7 @@ function AccountHub(){
         </span>
         {
           IsChangingImage &&
-          <ChooseImage {...{setIsChangingImage, username, setUserInfo}}/>
+          <ChooseImage {...{setIsChangingImage, username,userInfo,setUserInfo}}/>
         }
         <span className={styles.username}>{username}</span>
       </section>
