@@ -64,10 +64,10 @@ with AccessDatabase() as cursor:
     '''
     CREATE TABLE IF NOT EXISTS messages (
       id INT AUTO_INCREMENT PRIMARY KEY,
+      message TEXT,
       roomID VARCHAR(10),
       username VARCHAR(70),
       timestamp BIGINT,
-      message TEXT,
       messageID VARCHAR(50)
     )
     '''
@@ -138,8 +138,16 @@ def getMessages():
         cursor.execute("SELECT id FROM messages WHERE messageID = %s", (data["messageID"],))
         lastSentID = cursor.fetchone()[0]
         cursor.execute("SELECT username, timestamp, message, messageID FROM messages WHERE roomID = %s AND id <= %s", (data["roomID"], lastSentID))
-        messages = cursor.fetchall()
-    return jsonify({"success": True, "data": messages }), 200
+        tupleMessages = cursor.fetchall()
+        jsonMessages = [
+          {
+            "username": lst[0],
+            "timestamp": lst[1],
+            "message": lst[2],
+            "messageID": lst[3]
+           } for lst in tupleMessages
+        ]
+    return jsonify({"success": True, "data": jsonMessages }), 200
   except Exception as e:
     print(e)
     return jsonify({"success": False, "message": "Failed to get room messages"}), 500
@@ -308,8 +316,7 @@ def uploadNewImage():
   try:
     rawImageData = request.get_data()
     imageType = request.content_type
-    # newImageID = str(uuid.uuid4())
-    newImageID = "dude"
+    newImageID = str(uuid.uuid4())
     with AccessDatabase() as cursor:
       cursor.execute("INSERT INTO images (image, mimeType, imageID) VALUES (%s, %s, %s)", (rawImageData, imageType, newImageID))
     return {"success": True, "data": newImageID}, 200

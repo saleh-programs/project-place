@@ -24,7 +24,7 @@ function Chat(){
     const messageID = getUniqueMessageID()
     sendJsonMessage({
       "origin": "chat",
-      "type": "chat",
+      "type": "newMessage",
       "username": username,
       "data": newMessage,
       "metadata":{
@@ -42,19 +42,19 @@ function Chat(){
   }
 
   function externalChat(data){
+    console.log(data)
     switch (data.type){
       case "newMessage":
         setMessages(prev=>[...prev, {
-          "username": data.username,
+          "username": data.username, 
           "message": data.data,
           "timestamp": data.metadata.timestamp,
           "messageID": data.metadata.messageID
         }])
         break
       case "chatHistory":
-        //fix later
-        const newMessages = data.data.map(item => item[2])
-        setMessages(prev=>[...newMessages, ...prev])
+        console.log(data.data)
+        setMessages(prev=>[...data.data, ...prev])
         break 
     }
   }
@@ -84,6 +84,7 @@ function Chat(){
         {
           messages.map((item,i)=>{
             const currTime = new Date(item["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
+
             return (
               <div key={i} className={styles.messageContainer}>
                 <section className={styles.messageLeft}>

@@ -90,7 +90,7 @@ async function broadcastMessage(data, uuid){
     "roomID": users[uuid].roomID,
     "message": data.data,
     "messageID": data.metadata.messageID,
-    "timestamp": parsedData.metadata.timestamp,
+    "timestamp": data.metadata.timestamp, 
   })
 
   // sends everyone the data
