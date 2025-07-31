@@ -33,28 +33,65 @@ function Chat(){
       }
     })
     setNewMessage("")
-    setMessages(prev=>[...prev, {
-      "username": username,
-      "message": newMessage,
-      "timestamp": currTime,
-      "messageID": messageID
-    }])
+
+    if (messages.length === 0 || messages[messages.length-1]["username"] !== username || currTime -  messages[messages.length-1]["timestamp"] >= 5000){
+      setMessages(prev=>[...prev, {
+        "username": username,
+        "timestamp": currTime,
+        "messages": [newMessage]
+      }])
+    }else{
+      const newMessages = [...messages]
+      newMessages[newMessages.length-1]["messages"].push(newMessage)
+      setMessages(newMessages)
+    }
   }
 
   function externalChat(data){
-    console.log(data)
     switch (data.type){
       case "newMessage":
-        setMessages(prev=>[...prev, {
-          "username": data.username, 
-          "message": data.data,
-          "timestamp": data.metadata.timestamp,
-          "messageID": data.metadata.messageID
-        }])
+        setMessages(prev => {
+          if (prev.length === 0 || prev[prev.length-1]["username"] !== data["username"] || data["metadata"]["timestamp"] - prev[prev.length-1]["timestamp"] >= 5000){
+            return [...prev, {
+              "username": data["username"],
+              "timestamp": data["metadata"]["timestamp"],
+              "messages": [data["data"]]
+            }]
+          }else{
+            const newMessages = JSON.parse(JSON.stringify(prev))
+            newMessages[newMessages.length-1]["messages"].push(data["data"])
+            console.log(newMessage)
+            return newMessages
+          }
+        })
         break
       case "chatHistory":
-        console.log(data.data)
-        setMessages(prev=>[...data.data, ...prev])
+        if (data.data){
+          setMessages(prev => {
+            const allMessages = [...data.data, ...prev]
+            const groupedMessages = []
+            
+            let ind = 0
+            while (ind < allMessages.length){
+              const currUsername = allMessages[ind]["username"]
+              const timestamp = allMessages[ind]["timestamp"]
+              const message = allMessages[ind]["message"]
+              const groupedMessage = {
+                "username": currUsername,
+                "timestamp": timestamp,
+                "messages": [message]
+              }
+              ind += 1
+              while (ind < allMessages.length && allMessages[ind]["username"] == currUsername && allMessages[ind]["timestamp"] - timestamp < 5000){
+                  groupedMessage["messages"].push(allMessages[ind]["message"])
+                  ind += 1
+              }
+              groupedMessages.push(groupedMessage)
+            }
+
+            return groupedMessages
+          })
+        }
         break 
     }
   }
@@ -97,12 +134,17 @@ function Chat(){
                 </section>
                 <section className={styles.messageRight}>
                   <div className={styles.username}>
-                    {username}
+                    {item["username"]}
                   </div>
                   <div className={styles.textContainer}>
-                    <div className={styles.message}>
-                      {item["message"]}
-                    </div>
+                    { 
+                      item["messages"].map((mssg,i)=>{
+                      return (
+                        <div key={i} className={styles.message}>
+                          {mssg}
+                        </div>
+                      )})
+                    }
                   </div>
 
                 </section>

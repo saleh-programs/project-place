@@ -16,7 +16,6 @@ function AccountHub(){
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
 
   const [IsChangingImage, setIsChangingImage] = useState(false)
-  console.log("ran again")
   return(
     <div className={styles.accountHub}>
       {roomID}
