@@ -83,18 +83,27 @@ with AccessDatabase() as cursor:
   )
   cursor.execute(
     '''
-    CREATE TABLE IF NOT EXISTS canvasInstructions (
+    CREATE TABLE IF NOT EXISTS canvases (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      instruction TEXT,
+      canvas BLOB,
       roomID VARCHAR(10)
     )
     '''
   )
   cursor.execute(
     '''
-    CREATE TABLE IF NOT EXISTS canvases (
+    CREATE TABLE IF NOT EXISTS undoStates (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      canvas BLOB,
+      state BLOB,
+      roomID VARCHAR(10)
+    )
+    '''
+  )
+  cursor.execute(
+    '''
+    CREATE TABLE IF NOT EXISTS redoStates (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      state BLOB,
       roomID VARCHAR(10)
     )
     '''
@@ -184,31 +193,89 @@ def validateRoom():
     print(e)
     return jsonify({"success":False, "message": "failed to valdiate room"}), 500
 
-# Adds an instruction to the canvas 
-@app.route("/addInstruction", methods=["POST"])
-def addInstruction():
-  try:
-    data = request.get_json()
+# # Adds an instruction to the canvas 
+# @app.route("/addInstruction", methods=["POST"])
+# def addInstruction():
+#   try:
+#     data = request.get_json()
+#     with AccessDatabase() as cursor:
+#       cursor.execute("INSERT INTO canvasInstructions (instruction, roomID) VALUES (%s, %s)", (json.dumps(data["instruction"]), data["roomID"]))
+#     return {"success": True}, 200
+#   except Exception as e:
+#     print(e)
+#     return {"success": False, "message": "failed to add instruction to canvas"}, 500
+  
+# # Retrieves all instructions for canvas (for reconstruction)
+# @app.route("/getInstructions", methods=["POST"])
+# def getInstructions():
+#   try:
+#     data = request.get_json()
+#     with AccessDatabase() as cursor:
+#       cursor.execute("SELECT instruction from canvasInstructions WHERE roomID = %s", (data["roomID"],))
+#       instructions = [json.loads(each[0]) for each in cursor.fetchall()]
+#     return {"success": True, "data": instructions}, 200
+#   except Exception as e:
+#     print(e)
+#     return {"success": False, "message": "failed to get instructions for canvas"}, 500
+  
+def saveNewUndo(canvasBytes, roomID):
+  with AccessDatabase() as cursor:
+    cursor.execute("INSERT INTO undoStates (state, roomID) VALUES (%s, %s)", (canvasBytes, roomID))
+def saveNewRedo(canvasBytes, roomID):
     with AccessDatabase() as cursor:
-      cursor.execute("INSERT INTO canvasInstructions (instruction, roomID) VALUES (%s, %s)", (json.dumps(data["instruction"]), data["roomID"]))
+      cursor.execute("INSERT INTO redoStates (state, roomID) VALUES (%s, %s)", (canvasBytes, roomID))
+@app.route("/addUndo")
+def addUndo():
+  try:
+    roomID = request.args.get("roomID")
+    canvasBytes = request.get_data()
+    saveNewUndo(canvasBytes, roomID)
     return {"success": True}, 200
   except Exception as e:
     print(e)
-    return {"success": False, "message": "failed to add instruction to canvas"}, 500
-  
-# Retrieves all instructions for canvas (for reconstruction)
-@app.route("/getInstructions", methods=["POST"])
-def getInstructions():
+    return {"success": False, "message": "failed to add undo state"}, 500
+@app.route("/addRedo")
+def addRedo():
   try:
-    data = request.get_json()
-    with AccessDatabase() as cursor:
-      cursor.execute("SELECT instruction from canvasInstructions WHERE roomID = %s", (data["roomID"],))
-      instructions = [json.loads(each[0]) for each in cursor.fetchall()]
-    return {"success": True, "data": instructions}, 200
+    roomID = request.args.get("roomID")
+    canvasBytes = request.get_data()
+    saveNewRedo(canvasBytes, roomID)
+    return {"success": True}, 200
   except Exception as e:
     print(e)
-    return {"success": False, "message": "failed to get instructions for canvas"}, 500
+    return {"success": False, "message": "failed to add redo state"}, 500
   
+  
+@app.route("/getUndo")
+def getUndo():
+  try:
+    roomID = request.args.get("roomID")
+    canvasBytes = None
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT (state) FROM undoStates WHERE roomID = %s ORDER BY id DESC LIMIT 1", (roomID,))
+      canvasBytes = cursor.fetchone()[0]
+      cursor.execute("DELETE FROM undoStates WHERE roomID = %s ORDER BY id DESC LIMIT 1", (roomID,))
+    saveNewRedo(canvasBytes, roomID)
+    return Response(canvasBytes, mimetype='application/octet-stream', status=200)
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to get undo state"}, 500
+  
+@app.route("/getRedo")
+def getRedo():
+  try:
+    roomID = request.args.get("roomID")
+    canvasBytes = None
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT (state) FROM redoStates WHERE roomID = %s ORDER BY id DESC LIMIT 1", (roomID,))
+      canvasBytes = cursor.fetchone()[0]
+      cursor.execute("DELETE FROM redoStates WHERE roomID = %s ORDER BY id DESC LIMIT 1", (roomID,))
+    saveNewUndo(canvasBytes, roomID)
+    return Response(canvasBytes, mimetype='application/octet-stream', status=200)
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to get redo state"}, 500
+
 # Updates canvas image. Receives roomID as query param and sends canvasdata as bytes
 @app.route("/updateCanvas", methods=["POST"])
 def updateCanvas():

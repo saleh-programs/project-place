@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const Queue = require("./Queue.js")
 
-const { storeMessageReq, getMessagesReq, addInstruction, updateCanvas } = require("../requests.js")
+const { storeMessageReq, getMessagesReq, addInstructionReq, updateCanvasReq } = require("../requests.js")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -104,8 +104,9 @@ function broadcastWhiteboard(data, uuid){
   // Updates the server's canvas
   setImmediate(()=>{
     updateServerCanvas(data, users[uuid].roomID)
-    addInstruction(data, users[uuid].roomID)
-    updateCanvas(rooms[users[uuid].roomID]["canvas"].toBuffer("image/png"),users[uuid].roomID)
+    if (data["type"] = )
+    addInstructionReq(data, users[uuid].roomID)
+    updateCanvasReq(rooms[users[uuid].roomID]["canvas"].toBuffer("image/png"),users[uuid].roomID)
   })
 
   // sends everyone data

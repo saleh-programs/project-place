@@ -34,7 +34,7 @@ function Chat(){
     })
     setNewMessage("")
 
-    if (messages.length === 0 || messages[messages.length-1]["username"] !== username || currTime -  messages[messages.length-1]["timestamp"] >= 5000){
+    if (messages.length === 0 || messages[messages.length-1]["username"] !== username || currTime -  messages[messages.length-1]["timestamp"] >= 300000){
       setMessages(prev=>[...prev, {
         "username": username,
         "timestamp": currTime,
@@ -51,7 +51,7 @@ function Chat(){
     switch (data.type){
       case "newMessage":
         setMessages(prev => {
-          if (prev.length === 0 || prev[prev.length-1]["username"] !== data["username"] || data["metadata"]["timestamp"] - prev[prev.length-1]["timestamp"] >= 5000){
+          if (prev.length === 0 || prev[prev.length-1]["username"] !== data["username"] || data["metadata"]["timestamp"] - prev[prev.length-1]["timestamp"] >= 300000){
             return [...prev, {
               "username": data["username"],
               "timestamp": data["metadata"]["timestamp"],
@@ -82,7 +82,7 @@ function Chat(){
                 "messages": [message]
               }
               ind += 1
-              while (ind < allMessages.length && allMessages[ind]["username"] == currUsername && allMessages[ind]["timestamp"] - timestamp < 5000){
+              while (ind < allMessages.length && allMessages[ind]["username"] == currUsername && allMessages[ind]["timestamp"] - timestamp < 300000){
                   groupedMessage["messages"].push(allMessages[ind]["message"])
                   ind += 1
               }

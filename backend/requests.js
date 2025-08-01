@@ -72,7 +72,7 @@ async function getMessagesReq(roomID, messageID=null) {
   }
 }
 
-async function addInstruction(instruction, roomID) {
+async function addInstructionReq(instruction, roomID) {
   try{
     const response = await fetch(baseurl + "addInstruction",{
       "method": "POST",
@@ -205,7 +205,7 @@ async function updateUsernameReq(email, username){
   }
 }
 
-async function updateCanvas(canvasBuffer,roomID){
+async function updateCanvasReq(canvasBuffer,roomID){
   try{
     const response = await fetch(baseurl + "updateCanvas" + `?roomID=${roomID}`, {
       "method": "POST",
@@ -249,6 +249,6 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 export {getUniqueMessageID,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstruction, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
-  updateUsernameReq, getCanvas, updateCanvas}
+  updateUsernameReq, getCanvas, updateCanvasReq}
