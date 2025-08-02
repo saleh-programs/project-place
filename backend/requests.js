@@ -248,6 +248,63 @@ function getUniqueMessageID(){
   }
   return messageID.join("")
 }
+
+async function addUndo(canvasBuffer){
+  try{
+    const response = await fetch(baseurl + "/addUndo", {
+      "method": "POST",
+      "headers": {"Content-Type": "application/octet-stream"},
+      "body": canvasBuffer
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
+async function addRedo(canvasBuffer){
+  try{
+    const response = await fetch(baseurl + "/addUndo", {
+      "method": "POST",
+      "headers": {"Content-Type": "application/octet-stream"},
+      "body": canvasBuffer
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
+async function getUndo(canvasBuffer){
+  try{
+    const response = await fetch(baseurl + "/addUndo", {
+      "method": "GET"
+    })
+    const data = await response.blob()
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
+async function getRedo(){
+  try{
+    const response = await fetch(baseurl + "/addUndo", {
+      "method": "GET"
+    })
+    const data = await response.blob()
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
 export {getUniqueMessageID,
   createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
