@@ -2,7 +2,7 @@
 import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
-import { getCanvas, getInstructions } from "backend/requests"
+import { getCanvas, getInstructions, addUndoReq, addRedoReq, getUndoReq, getRedoReq } from "backend/requests"
 import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
 
@@ -75,6 +75,7 @@ function Whiteboard(){
         "color": currentColor.current,
         "size": strokeSizeRef.current.value,
       }
+
     })
     batchedStrokes.current.batchStroke = []
   }
@@ -92,6 +93,7 @@ function Whiteboard(){
       }
     })
     batchedStrokes.current.fullStroke = []
+    canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
   }
 
   function throttle(func){
@@ -184,9 +186,11 @@ function Whiteboard(){
           }
         })
         canvasFill(Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top), currentColor.current)
+        canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
         break
     }
   }
+
 
   function clearCanvas(){
     const whiteboard = canvasRef.current.getContext("2d")
@@ -198,6 +202,7 @@ function Whiteboard(){
       "type": "clear",
       "username": username
     })
+    canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
   }
 
   //ignore for now
@@ -411,6 +416,19 @@ function Whiteboard(){
     document.addEventListener("mousemove", onMoveNavigate)
     document.addEventListener("mouseup", onReleaseNavigate)
   }
+
+  async function undoCanvas(){
+    const response = await getUndoReq(roomID)
+    console.log(response)
+    const image = await createImageBitmap(response)
+    canvasRef.current.getContext("2d").drawImage(image, 0, 0)
+  }
+  async function redoCanvas(){
+    const response = await getRedoReq(roomID)
+    const image = await createImageBitmap(response)
+    canvasRef.current.getContext("2d").drawImage(image, 0, 0)
+  }
+
   return (
     <div className={styles.whiteboardPage}>
       <h1 className={styles.title}>
@@ -426,8 +444,8 @@ function Whiteboard(){
           </div>
           <button className={styles.clearButton} onClick={clearCanvas}>clear</button>
           <span className={styles.reverseButtons}>
-            <button className={styles.undoButton}>undo</button>
-            <button className={styles.redoButton}>redo</button>
+            <button className={styles.undoButton} onClick={undoCanvas}>undo</button>
+            <button className={styles.redoButton} onClick={redoCanvas}>redo</button>
           </span>
         </div>
         <div className={styles.tools}>

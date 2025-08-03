@@ -249,9 +249,10 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 
-async function addUndo(canvasBuffer){
+async function addUndoReq(canvasBuffer, roomID){
+  console.log(canvasBuffer, roomID)
   try{
-    const response = await fetch(baseurl + "/addUndo", {
+    const response = await fetch(baseurl + "/addUndo" + `?roomID=${roomID}}`, {
       "method": "POST",
       "headers": {"Content-Type": "application/octet-stream"},
       "body": canvasBuffer
@@ -266,9 +267,9 @@ async function addUndo(canvasBuffer){
     return null
   }
 }
-async function addRedo(canvasBuffer){
+async function addRedoReq(canvasBuffer, roomID){
   try{
-    const response = await fetch(baseurl + "/addUndo", {
+    const response = await fetch(baseurl + "/addRedo" + `?roomID=${roomID}}`, {
       "method": "POST",
       "headers": {"Content-Type": "application/octet-stream"},
       "body": canvasBuffer
@@ -283,29 +284,32 @@ async function addRedo(canvasBuffer){
     return null
   }
 }
-async function getUndo(canvasBuffer){
+async function getUndoReq(roomID){
   try{
-    const response = await fetch(baseurl + "/addUndo", {
+    const response = await fetch(baseurl + "/getUndo" + `?roomID=${roomID}}`, {
       "method": "GET"
     })
     const data = await response.blob()
+    return data
   }catch(err){
     console.error(err)
     return null
   }
 }
-async function getRedo(){
+async function getRedoReq(roomID){
   try{
-    const response = await fetch(baseurl + "/addUndo", {
+    const response = await fetch(baseurl + "/getRedo" + `?roomID=${roomID}}`, {
       "method": "GET"
     })
     const data = await response.blob()
+    return data
   }catch(err){
     console.error(err)
     return null
   }
 }
 export {getUniqueMessageID,
+  addUndoReq, addRedoReq, getUndoReq, getRedoReq,
   createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
   updateUsernameReq, getCanvas, updateCanvasReq}

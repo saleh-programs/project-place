@@ -224,7 +224,7 @@ def saveNewUndo(canvasBytes, roomID):
 def saveNewRedo(canvasBytes, roomID):
     with AccessDatabase() as cursor:
       cursor.execute("INSERT INTO redoStates (state, roomID) VALUES (%s, %s)", (canvasBytes, roomID))
-@app.route("/addUndo")
+@app.route("/addUndo", methods = ["POST"])
 def addUndo():
   try:
     roomID = request.args.get("roomID")
@@ -234,7 +234,7 @@ def addUndo():
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to add undo state"}, 500
-@app.route("/addRedo")
+@app.route("/addRedo", methods = ["POST"])
 def addRedo():
   try:
     roomID = request.args.get("roomID")
