@@ -7,7 +7,14 @@
   flex-direction: column;
 }
 .sidePanelHandle{
-  border: 2px solid red;
+  position: relative;
+  border: 1px solid;
+}
+.sidePanelHandle img{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
 }
 .features{
   display: flex;
