@@ -18,11 +18,82 @@ function Chat(){
       externalChatRef.current = (param1) => {}
     }
   },[])
+  useEffect(()=>{
+    
+  })
+
+// {
+//       "origin": "chat",
+//       "type": "newMessage",
+//       "username": username,
+//       "data": newMessage,
+//       "metadata":{
+//         "timestamp": currTime,
+//         "messageID": messageID
+//       }
+//     }
+  function getGroupedMessages(messageList){
+    const delay = 30000
+    const groupedMessages = []
+    let group = null;
+    let i = 0
+    while (i < messageList.length){
+      const msg = messageList[i]
+      const [user, timestamp, data] = [msg["username"], msg["metadata"]["timestamp"], msg["data"]]
+      group = {
+        "username": user,
+        "timestamp": timestamp,
+        "messages": [data]
+      }
+      i += 1
+      while (i < messageList.length){
+        const nextMsg = messageList[i]
+        const [nextUser, nextTimestamp, nextData] = [nextMsg["username"], nextMsg["metadata"]["timestamp"], nextMsg["data"]]
+        if (user === nextUser && nextTimestamp - timestamp < delay){
+          group["messages"].push(nextMsg["data"])
+          i += 1
+        }else{
+          groupedMessages.push(group)
+          group = null
+          break
+        }
+      }
+    }
+    if (group){
+      groupedMessages.push(group)
+    }
+    return groupedMessages
+  }
+  function addGroupedMessage(groupedMessages, message){
+    if (groupedMessages.length === 0){
+      return [...groupedMessages, {
+        "username": message["username"],
+        "timestamp": message["metadata"]["timestamp"],
+        "messages": [message["data"]]
+      }]
+    }
+    const delay = 30000
+    const [user, timestamp] = [message["username"], message["metadata"]["timestamp"]]
+    const [lastUser, lastTimestamp] = [groupedMessages[groupedMessages.length-1]["username"], groupedMessages[groupedMessages.length-1]["timestamp"]]
+    if (user === lastUser && timestamp - lastTimestamp < delay){
+      groupedMessages[groupedMessages.length-1]["messages"].push(message["data"])
+      return [...groupedMessages]
+    }else{
+      return [...groupedMessages, {
+        "username": message["username"],
+        "timestamp": message["metadata"]["timestamp"],
+        "messages": [message["data"]]
+      }]
+    }
+  }
+
+
+
 
   function handleMessage(e) {
     const currTime = Date.now()
     const messageID = getUniqueMessageID()
-    sendJsonMessage({
+    const msg = {
       "origin": "chat",
       "type": "newMessage",
       "username": username,
@@ -31,66 +102,21 @@ function Chat(){
         "timestamp": currTime,
         "messageID": messageID
       }
-    })
-    setNewMessage("")
-
-    if (messages.length === 0 || messages[messages.length-1]["username"] !== username || currTime -  messages[messages.length-1]["timestamp"] >= 300000){
-      setMessages(prev=>[...prev, {
-        "username": username,
-        "timestamp": currTime,
-        "messages": [newMessage]
-      }])
-    }else{
-      const newMessages = [...messages]
-      newMessages[newMessages.length-1]["messages"].push(newMessage)
-      setMessages(newMessages)
     }
+    sendJsonMessage(msg)
+    setNewMessage("")
+    setMessages(addGroupedMessage(messages, msg))
   }
 
   function externalChat(data){
     switch (data.type){
       case "newMessage":
-        setMessages(prev => {
-          if (prev.length === 0 || prev[prev.length-1]["username"] !== data["username"] || data["metadata"]["timestamp"] - prev[prev.length-1]["timestamp"] >= 300000){
-            return [...prev, {
-              "username": data["username"],
-              "timestamp": data["metadata"]["timestamp"],
-              "messages": [data["data"]]
-            }]
-          }else{
-            const newMessages = JSON.parse(JSON.stringify(prev))
-            newMessages[newMessages.length-1]["messages"].push(data["data"])
-            console.log(newMessage)
-            return newMessages
-          }
-        })
+        setMessages(prev => addGroupedMessage(prev, data))
         break
       case "chatHistory":
         if (data.data){
-          setMessages(prev => {
-            const allMessages = [...data.data, ...prev]
-            const groupedMessages = []
-            
-            let ind = 0
-            while (ind < allMessages.length){
-              const currUsername = allMessages[ind]["username"]
-              const timestamp = allMessages[ind]["timestamp"]
-              const message = allMessages[ind]["message"]
-              const groupedMessage = {
-                "username": currUsername,
-                "timestamp": timestamp,
-                "messages": [message]
-              }
-              ind += 1
-              while (ind < allMessages.length && allMessages[ind]["username"] == currUsername && allMessages[ind]["timestamp"] - timestamp < 300000){
-                  groupedMessage["messages"].push(allMessages[ind]["message"])
-                  ind += 1
-              }
-              groupedMessages.push(groupedMessage)
-            }
-
-            return groupedMessages
-          })
+          console.log(data)
+          setMessages(prev => getGroupedMessages(prev, data))
         }
         break 
     }
