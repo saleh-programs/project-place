@@ -3,6 +3,7 @@ import { useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
+import styles from "styles/components/MainDisplay.module.css"
 import Sidebar from "src/components/Sidebar"
 
 function MainDisplay({children, username, userInfoInitial}){
@@ -43,13 +44,13 @@ function MainDisplay({children, username, userInfoInitial}){
     <ThemeContext.Provider value={shared}>
       <div className="siteWrapper">
         <Sidebar/>
-        <div className="pageContainer">
+        <div className={`pageContainer ${!roomID ? styles.dimScreen: ""}`}>
           {children}
         </div>
       </div>
         
     </ThemeContext.Provider>
-  )
+  ) 
 }
 
 export default MainDisplay

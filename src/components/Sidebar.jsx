@@ -58,7 +58,7 @@ function Sidebar(){
         <AccountHub/>
       </section>
       <section className={styles.sidePanelHandle}>
-        <img src="" alt="smth" onMouseDown={startDrag}/>
+        <img src={null} alt="smth" onMouseDown={startDrag}/>
       </section>
     </div>  
       )

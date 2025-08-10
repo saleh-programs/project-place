@@ -16,7 +16,6 @@ const wsServer = new WebSocketServer({server: httpServer})
 const connections = {}
 const users = {}
 const rooms = {}
-const roomsLatest = {}
 
 // any message layout:
 /*
@@ -28,8 +27,6 @@ const roomsLatest = {}
   "metadata": user's color/ stroke size/ draw status(isDraw/doneDraw)
 }
  */
-
-
 function handleMessage(data, uuid){
   const parsedData = JSON.parse(data.toString())
 
@@ -49,7 +46,9 @@ wsServer.on("connection", (connection, request)=>{
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
   const uuid = uuidv4()
-  
+
+  connections[uuid] = connection
+
   if (roomID in rooms){
     rooms[roomID]["connections"].push(connection)
   }else{
@@ -60,10 +59,10 @@ wsServer.on("connection", (connection, request)=>{
       "connections": [connection],
       "canvas": newCanvas
     }
-    roomsLatest[roomID] = null
   }
+
   getMessages(connection, roomID)
-  connections[uuid] = connection
+  
   users[uuid] = {
     username: username,
     roomID: roomID
@@ -81,17 +80,9 @@ function handleClose(uuid){
 
 //broadcast functions
 async function broadcastMessage(data, uuid){
-  // store room's last message sent (for specific case where user enters room with lots of messages coming in)
-  roomsLatest[users[uuid].roomID] = data.metadata.messageID
-
   // store message in database before broadcasting 
-  await storeMessageReq({
-    "username": data.username,
-    "roomID": users[uuid].roomID,
-    "message": data.data,
-    "messageID": data.metadata.messageID,
-    "timestamp": data.metadata.timestamp, 
-  })
+  const {origin, type, ...msgToStore} = data
+  await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]})
 
   // sends everyone the data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
@@ -239,7 +230,7 @@ async function getMessages(connection, roomID) {
   connection.send(JSON.stringify({
     "origin": "chat",
     "type": "chatHistory",
-    "data": await getMessagesReq(roomID,roomsLatest[roomID])
+    "data": await getMessagesReq(roomID)
   }))
     
 }

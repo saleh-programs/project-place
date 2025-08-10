@@ -11,7 +11,6 @@ function Home(){
 
   return(
   <div className={styles.homepage}>
-
     <button onClick={()=>{window.location.href="http://localhost:5000/login"}}>Log In</button>
     <button onClick={()=>{window.location.href="http://localhost:5000/logout"}}>Log Out</button>
   </div>

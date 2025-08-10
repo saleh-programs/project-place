@@ -38,6 +38,7 @@ async function validateRoomReq(roomID) {
 
 async function storeMessageReq(messageInfo) {
   try{
+    console.log(messageInfo)
     const response = await fetch(baseurl + "storeMessage",{
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -54,12 +55,12 @@ async function storeMessageReq(messageInfo) {
   }
 }
 
-async function getMessagesReq(roomID, messageID=null) {
+async function getMessagesReq(roomID) {
   try{
     const response = await fetch(baseurl + "getMessages",{
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
-      "body": JSON.stringify({"messageID":messageID, "roomID":roomID})
+      "body": JSON.stringify({"roomID":roomID})
     })
     const data = await response.json()
     if (!data.success){

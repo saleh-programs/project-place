@@ -64,8 +64,8 @@ with AccessDatabase() as cursor:
     '''
     CREATE TABLE IF NOT EXISTS messages (
       id INT AUTO_INCREMENT PRIMARY KEY,
-      message TEXT,
       roomID VARCHAR(10),
+      data TEXT,
       username VARCHAR(70),
       timestamp BIGINT,
       messageID VARCHAR(50)
@@ -109,6 +109,7 @@ with AccessDatabase() as cursor:
     '''
   )
   cursor.execute(
+
     '''
     CREATE TABLE IF NOT EXISTS images (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -120,13 +121,14 @@ with AccessDatabase() as cursor:
     )
     '''
   )
+   
 # Adds message from any room to messages table
 @app.route("/storeMessage", methods=["POST"])
 def storeMessage():
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
-      cursor.execute("INSERT INTO messages (username, roomID, message, timestamp, messageID) VALUES (%s, %s, %s, %s, %s)", (data["username"], data["roomID"], data["message"], data["timestamp"], data["messageID"]))
+      cursor.execute("INSERT INTO messages (roomID, username, data, timestamp, messageID) VALUES (%s, %s, %s, %s, %s)", (data["roomID"], data["username"], data["data"], data["metadata"]["timestamp"], data["metadata"]["messageID"]))
       
     return jsonify({"success":True}),200
   except Exception as e:
@@ -139,27 +141,23 @@ def getMessages():
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
-      messages = []
-      if (not data["messageID"]):
-        cursor.execute("SELECT username, timestamp, message, messageID FROM messages WHERE roomID = %s", (data["roomID"],))
-        messages = cursor.fetchall()
-      else:
-        cursor.execute("SELECT id FROM messages WHERE messageID = %s", (data["messageID"],))
-        lastSentID = cursor.fetchone()[0]
-        cursor.execute("SELECT username, timestamp, message, messageID FROM messages WHERE roomID = %s AND id <= %s", (data["roomID"], lastSentID))
-        tupleMessages = cursor.fetchall()
-        jsonMessages = [
-          {
-            "username": lst[0],
-            "timestamp": lst[1],
-            "message": lst[2],
-            "messageID": lst[3]
-           } for lst in tupleMessages
-        ]
+      cursor.execute("SELECT username,  data, timestamp, messageID FROM messages WHERE roomID = %s", (data["roomID"],))
+      tupleMessages = cursor.fetchall()
+      jsonMessages = [
+        {
+          "username": lst[0],
+          "data": lst[1],
+          "metadata": {
+            "timestamp": lst[2],
+            "messageID": lst[3] 
+          }
+        } for lst in tupleMessages
+      ]
     return jsonify({"success": True, "data": jsonMessages }), 200
   except Exception as e:
     print(e)
     return jsonify({"success": False, "message": "Failed to get room messages"}), 500
+
 
 # Creates room with name and unique 6 char code
 @app.route("/createRoom", methods=["POST"])

@@ -18,9 +18,6 @@ function Chat(){
       externalChatRef.current = (param1) => {}
     }
   },[])
-  useEffect(()=>{
-    
-  })
 
 // {
 //       "origin": "chat",
@@ -115,8 +112,9 @@ function Chat(){
         break
       case "chatHistory":
         if (data.data){
-          console.log(data)
-          setMessages(prev => getGroupedMessages(prev, data))
+          console.log(data.data)
+          console.log(getGroupedMessages(data.data))
+          setMessages(getGroupedMessages(data.data))
         }
         break 
     }
