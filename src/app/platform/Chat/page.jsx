@@ -8,7 +8,7 @@ import styles from "styles/platform/Chat.module.css"
 function Chat(){
   const {externalChatRef ,sendJsonMessage, roomID, messages, setMessages, username, userInfo} = useContext(ThemeContext)
   const [newMessage, setNewMessage] = useState("")
-
+  const rawMessages = useRef([])
   const chatPageRef = useRef(null)
   const [darkMode, setDarkMode] = useState(false)
 
@@ -50,6 +50,7 @@ function Chat(){
           group["messages"].push(nextMsg["data"])
           i += 1
         }else{
+
           groupedMessages.push(group)
           group = null
           break
@@ -89,6 +90,12 @@ function Chat(){
 
   function handleMessage(e) {
     const currTime = Date.now()
+    if (rawMessages.current.length > 0){
+      const lastMsg = rawMessages.current[rawMessages.current.length - 1]
+      if (username === lastMsg["username"] && currTime - lastMsg["metadata"]["timestamp"] < 100){
+        return
+      }
+    }
     const messageID = getUniqueMessageID()
     const msg = {
       "origin": "chat",
@@ -100,8 +107,10 @@ function Chat(){
         "messageID": messageID
       }
     }
+    const {origin, type, ...msgData} = msg
     sendJsonMessage(msg)
     setNewMessage("")
+    rawMessages.current.push(msgData)
     setMessages(addGroupedMessage(messages, msg))
   }
 
@@ -109,11 +118,12 @@ function Chat(){
     switch (data.type){
       case "newMessage":
         setMessages(prev => addGroupedMessage(prev, data))
+        const {type, origin, ...msg} = data
+        rawMessages.current.push(msg)
         break
       case "chatHistory":
         if (data.data){
-          console.log(data.data)
-          console.log(getGroupedMessages(data.data))
+          rawMessages.current = [...data.data, ...rawMessages.current]
           setMessages(getGroupedMessages(data.data))
         }
         break 
