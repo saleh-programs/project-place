@@ -9,6 +9,7 @@ function Chat(){
   const {externalChatRef ,sendJsonMessage, roomID, messages, setMessages, username, userInfo} = useContext(ThemeContext)
   const [newMessage, setNewMessage] = useState("")
   const rawMessages = useRef([])
+  const pendingMessages = useRef(new Set())
   const chatPageRef = useRef(null)
   const [darkMode, setDarkMode] = useState(false)
 
@@ -35,22 +36,21 @@ function Chat(){
     let group = null;
     let i = 0
     while (i < messageList.length){
-      const msg = messageList[i]
-      const [user, timestamp, data] = [msg["username"], msg["metadata"]["timestamp"], msg["data"]]
+      const {origin, type, ...msg} = messageList[i]
+      const [user, timestamp] = [msg["username"], msg["metadata"]["timestamp"]]
       group = {
         "username": user,
         "timestamp": timestamp,
-        "messages": [data]
+        "messages": [msg]
       }
       i += 1
       while (i < messageList.length){
-        const nextMsg = messageList[i]
-        const [nextUser, nextTimestamp, nextData] = [nextMsg["username"], nextMsg["metadata"]["timestamp"], nextMsg["data"]]
+        const {origin, type, ...nextMsg} = messageList[i]
+        const [nextUser, nextTimestamp] = [nextMsg["username"], nextMsg["metadata"]["timestamp"]]
         if (user === nextUser && nextTimestamp - timestamp < delay){
-          group["messages"].push(nextMsg["data"])
+          group["messages"].push(nextMsg)
           i += 1
         }else{
-
           groupedMessages.push(group)
           group = null
           break
@@ -67,20 +67,25 @@ function Chat(){
       return [...groupedMessages, {
         "username": message["username"],
         "timestamp": message["metadata"]["timestamp"],
-        "messages": [message["data"]]
+        "messages": [message]
       }]
     }
     const delay = 30000
     const [user, timestamp] = [message["username"], message["metadata"]["timestamp"]]
     const [lastUser, lastTimestamp] = [groupedMessages[groupedMessages.length-1]["username"], groupedMessages[groupedMessages.length-1]["timestamp"]]
     if (user === lastUser && timestamp - lastTimestamp < delay){
-      groupedMessages[groupedMessages.length-1]["messages"].push(message["data"])
-      return [...groupedMessages]
+      const lastGroup = groupedMessages[groupedMessages.length-1]
+      const newGroups = groupedMessages.slice(0, -1)
+      return [...newGroups,{
+        "username": lastGroup["username"],
+        "timestamp": lastGroup["timestamp"],
+        "messages": [...lastGroup["messages"], message]
+      }]
     }else{
       return [...groupedMessages, {
         "username": message["username"],
         "timestamp": message["metadata"]["timestamp"],
-        "messages": [message["data"]]
+        "messages": [message]
       }]
     }
   }
@@ -108,18 +113,55 @@ function Chat(){
       }
     }
     const {origin, type, ...msgData} = msg
+    msgData["status"] = "pending"
+    pendingMessages.current.add(currTime)
+
     sendJsonMessage(msg)
     setNewMessage("")
     rawMessages.current.push(msgData)
-    setMessages(addGroupedMessage(messages, msg))
+    setMessages(addGroupedMessage(messages, msgData))
   }
 
+  function handlePending(timestamp){
+    setMessages(prev => {
+      for (let i = prev.length - 1; i >= 0;i -= 1){
+        if (prev[i]["timestamp"] <= timestamp){
+          for (let j = 0; j < prev[i]["messages"].length; j++){
+            if (prev[i]["messages"][j]["metadata"]["timestamp"] === timestamp){
+              const newGroup = {
+                "username" : prev[i]["username"],
+                "timestamp": prev[i]["timestamp"],
+                "messages": prev[i]["messages"].map((mssg, index)=>{
+                  if (index === j){
+                    return ({
+                      ...mssg,
+                      "status": "delivered"
+                    })
+                  }
+                  return mssg
+                })
+              }
+              return [...prev.slice(0, i), newGroup, ...prev.slice(i+1)]
+            }
+          }
+        }
+      }
+      return prev
+    })
+  }
   function externalChat(data){
     switch (data.type){
       case "newMessage":
-        setMessages(prev => addGroupedMessage(prev, data))
         const {type, origin, ...msg} = data
         rawMessages.current.push(msg)
+        const timestamp = data["metadata"]["timestamp"]
+
+        if (pendingMessages.current.has(timestamp)){
+          pendingMessages.current.delete(timestamp)
+          handlePending(timestamp)
+          return
+        }
+        setMessages(prev => addGroupedMessage(prev, data))
         break
       case "chatHistory":
         if (data.data){
@@ -172,10 +214,10 @@ function Chat(){
                   </div>
                   <div className={styles.textContainer}>
                     { 
-                      item["messages"].map((mssg,i)=>{
+                      item["messages"].map((mssg)=>{
                       return (
-                        <div key={i} className={styles.message}>
-                          {mssg}
+                        <div key={mssg["metadata"]["messageID"]} className={`${styles.message}`} style={{opacity: mssg["status"] === "pending" ? ".7": "1"}}>
+                          {mssg["data"]}
                         </div>
                       )})
                     }

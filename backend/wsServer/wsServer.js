@@ -86,9 +86,7 @@ async function broadcastMessage(data, uuid){
 
   // sends everyone the data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
-    if (conn !== connections[uuid]){
-      conn.send(JSON.stringify(data))
-     }
+    conn.send(JSON.stringify(data))
   })
 }
 function broadcastWhiteboard(data, uuid){
