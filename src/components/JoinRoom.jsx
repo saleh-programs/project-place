@@ -1,13 +1,14 @@
 import { useState } from "react";
 import styles from "styles/components/JoinRoom.module.css"
 
-import { validateRoomReq } from "backend/requests";
+import { validateRoomReq, addRoomUserReq } from "backend/requests";
 
-function JoinRoom({setIsLoadingRoom, setRoomID}){
+function JoinRoom({setIsLoadingRoom, setRoomID, username}){
   const [joinRoomID, setJoinRoomID]= useState("")
 
   async function handleRoomLoad(){
     const res = await validateRoomReq(joinRoomID)
+    const joining = await addRoomUserReq(username, joinRoomID)
     if(res){
       setRoomID(joinRoomID);
       setIsLoadingRoom(false)

@@ -309,8 +309,44 @@ async function getRedoReq(roomID){
     return null
   }
 }
+
+async function getRoomUsersReq(roomID) {
+  try{
+    const response = await fetch(baseurl + "getRoomUsers",{
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"roomID": roomID})
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message ||"req failed")
+    }
+    return data.data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
+
+async function addRoomUserReq(username, roomID) {
+  try{
+    const response = await fetch(baseurl + "addRoomUser",{
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"username": username,"roomID": roomID})
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message ||"req failed")
+    }
+    return data
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
 export {getUniqueMessageID,
-  addUndoReq, addRedoReq, getUndoReq, getRedoReq,
+  addUndoReq, addRedoReq, getUndoReq, getRedoReq,getRoomUsersReq,
   createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
   updateUsernameReq, getCanvas, updateCanvasReq}

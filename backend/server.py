@@ -77,7 +77,8 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS rooms (
       id INT AUTO_INCREMENT PRIMARY KEY,
       roomID VARCHAR(10),
-      roomName VARCHAR(70)
+      roomName VARCHAR(70),
+      users TEXT
     )
     '''
   )
@@ -170,12 +171,27 @@ def createRoom():
         roomID = generateRoomCode()
         cursor.execute("SELECT * from rooms WHERE roomID=%s",(roomID,))
         exists = cursor.fetchone() is not None
-      cursor.execute("INSERT INTO rooms (roomID, roomName) VALUES (%s, %s)",(roomID, data["roomName"]))
+      cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, data["roomName"], json.dumps([data["creator"]])))
 
     return jsonify({"success": True, "data": roomID}), 200
   except Exception as e:
     print(e)
     return jsonify({"success": False,"message": "failed to create room"}), 500
+
+@app.route("/addRoomUser", methods=["POST"])
+def addRoomUser():
+  try:
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (data["roomID"],))
+      newUsers = json.loads(cursor.fetchone()[0]).append(data["username"])
+      cursor.execute("UPDATE rooms SET users = %s WHERE roomID = %s",(json.dumps(newUsers), data["roomID"]))
+
+    return jsonify({"success": True}), 200
+  except Exception as e:
+    print(e)
+    return jsonify({"success": False,"message": "failed to add room user"}), 500
+
 
 # checks if roomID exists
 @app.route("/validateRoom", methods=["POST"])
@@ -190,6 +206,25 @@ def validateRoom():
   except Exception as e:
     print(e)
     return jsonify({"success":False, "message": "failed to valdiate room"}), 500
+
+@app.route("/getRoomUsers", methods=["POST"])
+def getRoomUsers():
+  data = request.get_json()
+  roomUsers = []
+  try:
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT users from rooms WHERE roomID = %s", (data["roomID"],))
+      users = json.loads(cursor.fetchone()[0])
+      for user in users:
+        cursor.execute("SELECT profilePicURL from users WHERE username = %s", (user),)
+        profilePicture = cursor.fetchone()[0]
+        roomUsers.append({
+          "username": user,
+          "imageURL": profilePicture
+        })
+    return jsonify({"success":True,"data": roomUsers}), 200
+  except Exception as e:
+    return jsonify({"success":False,"message": "Failed to get room users"}), 500
 
 # # Adds an instruction to the canvas 
 # @app.route("/addInstruction", methods=["POST"])

@@ -42,7 +42,7 @@ function AccountHub(){
         Join Room
       </button>
       {isLoadingRoom && 
-        <JoinRoom {...{setIsLoadingRoom,setRoomID}}/>
+        <JoinRoom {...{setIsLoadingRoom,setRoomID, joinRoom}}/>
       }
     </div>
   )
