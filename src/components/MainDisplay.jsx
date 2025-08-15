@@ -1,5 +1,5 @@
 "use client"
-import { useRef, useState } from "react"
+import { use, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -13,6 +13,11 @@ function MainDisplay({children, username, userInfoInitial}){
   const externalChatRef = useRef((param1)=>{})
 
   const [userInfo, setUserInfo] = useState(userInfoInitial)
+  const [userStates, setUserStates] = useState({})
+
+  useEffect(()=>{
+    console.log(userStates)
+  },[userStates])
 
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
@@ -22,6 +27,9 @@ function MainDisplay({children, username, userInfoInitial}){
     onMessage:(event)=>{
       const data = JSON.parse(event.data)
       switch (data.origin){
+        case "user":
+          updateUserStates(data)
+          break
         case "chat":
           externalChatRef.current(data)
           break
@@ -33,13 +41,39 @@ function MainDisplay({children, username, userInfoInitial}){
   },roomID !== "")
 
   const shared = {
-    username,userInfo, setUserInfo,
+    username,userInfo, setUserInfo, userStates, setUserStates,
     sendJsonMessage,
     externalDrawRef,externalChatRef,
     roomID, setRoomID,
     messages, setMessages
   }
 
+  function updateUserStates(data){
+    switch (data["type"]){
+      case "newUser":
+        setUserStates(prev => {
+          return ({
+            ...prev, 
+            [data["username"]]: {
+                "imageURL": data["imageURL"],
+                "status": "idle",
+                "location": "chat"
+            }})
+        })
+        break
+      case "getUsers":
+        const users = {}
+        data["data"].forEach(user => {
+           users[user["username"]] = {
+            "imageURL": user["imageURL"],
+            "status": "idle",
+            "location": "chat"          
+          }
+        })
+        setUserStates(users)
+        break
+    }
+  }
   return(
     <ThemeContext.Provider value={shared}>
       <div className="siteWrapper">

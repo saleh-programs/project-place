@@ -3,11 +3,11 @@ import styles from "styles/components/CreateRoom.module.css"
 
 import { createRoomReq } from "backend/requests"
 
-function CreateRoom({setIsCreatingRoom, setRoomID}){
+function CreateRoom({setIsCreatingRoom, setRoomID, username}){
   const [newRoomName, setNewRoomName] = useState("")
 
   async function handleRoomCreation(){
-    const res = await createRoomReq(newRoomName)
+    const res = await createRoomReq(newRoomName, username)
     if (res){
       setNewRoomName("")
       setRoomID(res)

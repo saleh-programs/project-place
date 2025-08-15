@@ -1,11 +1,11 @@
 const baseurl = "http://localhost:5000/"
 
-async function createRoomReq(roomName) {
+async function createRoomReq(roomName, username) {
   try{
     const response = await fetch(baseurl + "createRoom",{
       "method": "POST",
       "headers" : {"Content-Type": "application/json"},
-      "body": JSON.stringify({roomName: roomName})
+      "body": JSON.stringify({"roomName": roomName, "username": username})
     })
     const data = await response.json()
     if (!data.success){
@@ -321,6 +321,7 @@ async function getRoomUsersReq(roomID) {
     if (!data.success){
       throw new Error(data.message ||"req failed")
     }
+    console.log(data)
     return data.data
   }catch(err){
     console.error(err)
@@ -346,7 +347,7 @@ async function addRoomUserReq(username, roomID) {
   }
 }
 export {getUniqueMessageID,
-  addUndoReq, addRedoReq, getUndoReq, getRedoReq,getRoomUsersReq,
+  addUndoReq, addRedoReq, getUndoReq, getRedoReq,getRoomUsersReq, addRoomUserReq,
   createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
   updateUsernameReq, getCanvas, updateCanvasReq}

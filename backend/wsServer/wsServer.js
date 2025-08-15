@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const Queue = require("./Queue.js")
 
-const { storeMessageReq, getMessagesReq, addInstructionReq, updateCanvasReq } = require("../requests.js")
+const { storeMessageReq, getMessagesReq, addInstructionReq, updateCanvasReq, getRoomUsersReq } = require("../requests.js")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -61,7 +61,7 @@ wsServer.on("connection", (connection, request)=>{
     }
   }
 
-  getMessages(connection, roomID)
+  sendServerInfo(connection, roomID)
   
   users[uuid] = {
     username: username,
@@ -229,8 +229,19 @@ async function getMessages(connection, roomID) {
     "origin": "chat",
     "type": "chatHistory",
     "data": await getMessagesReq(roomID)
+  })) 
+}
+async function sendServerInfo(connection, roomID) {
+  connection.send(JSON.stringify({
+    "origin": "chat",
+    "type": "chatHistory",
+    "data": await getMessagesReq(roomID)
   }))
-    
+  connection.send(JSON.stringify({
+    "origin": "user",
+    "type": "getUsers",
+    "data": await getRoomUsersReq(roomID)
+  }))
 }
 
 

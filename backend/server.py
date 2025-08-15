@@ -171,7 +171,7 @@ def createRoom():
         roomID = generateRoomCode()
         cursor.execute("SELECT * from rooms WHERE roomID=%s",(roomID,))
         exists = cursor.fetchone() is not None
-      cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, data["roomName"], json.dumps([data["creator"]])))
+      cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, data["roomName"], json.dumps([data["username"]])))
 
     return jsonify({"success": True, "data": roomID}), 200
   except Exception as e:
@@ -184,8 +184,11 @@ def addRoomUser():
     data = request.get_json()
     with AccessDatabase() as cursor:
       cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (data["roomID"],))
-      newUsers = json.loads(cursor.fetchone()[0]).append(data["username"])
-      cursor.execute("UPDATE rooms SET users = %s WHERE roomID = %s",(json.dumps(newUsers), data["roomID"]))
+      users = json.loads(cursor.fetchone()[0])
+      if data["username"] in users:
+        return jsonify({"success": True}), 200
+      users.append(data["username"])
+      cursor.execute("UPDATE rooms SET users = %s WHERE roomID = %s",(json.dumps(users), data["roomID"]))
 
     return jsonify({"success": True}), 200
   except Exception as e:
@@ -213,11 +216,17 @@ def getRoomUsers():
   roomUsers = []
   try:
     with AccessDatabase() as cursor:
-      cursor.execute("SELECT users from rooms WHERE roomID = %s", (data["roomID"],))
+      print("broke here")
+      cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (data["roomID"],))
+      print("broke there")
       users = json.loads(cursor.fetchone()[0])
+      print("you there ???", users)
       for user in users:
-        cursor.execute("SELECT profilePicURL from users WHERE username = %s", (user),)
+        print(user)
+        cursor.execute("SELECT profilePicURL FROM users WHERE username = %s", (user,))
+        print(2)
         profilePicture = cursor.fetchone()[0]
+        print(3)
         roomUsers.append({
           "username": user,
           "imageURL": profilePicture
