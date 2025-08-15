@@ -120,6 +120,33 @@ function Chat(){
     setNewMessage("")
     rawMessages.current.push(msgData)
     setMessages(addGroupedMessage(messages, msgData))
+    setTimeout(()=>{
+      setMessages(prev => {
+        for (let i = prev.length-1; i >= 0; i--){
+          for (let j = prev[i]["messages"].length-1; j >= 0; j--){
+            if (prev[i]["messages"][j]["metadata"]["timestamp"] < currTime){
+              break
+            }else if (prev[i]["messages"][j]["metadata"]["timestamp"] === currTime){
+              const group = {
+                ...prev[i], 
+                "messages": prev[i]["messages"].map((mssg, index)=>{
+                  if (index == j){
+                    return {
+                      ...mssg,
+                      "status": pendingMessages.current.has(currTime) ? "failed" : "delivered"
+                    }
+                  }else{
+                    return mssg
+                  }
+                })
+              }
+              return [...prev.slice(0,i), group,...prev.slice(i+1)]
+            }
+          }
+        }
+        return prev
+      })
+    },3000)
   }
 
   function handlePending(timestamp){
@@ -155,12 +182,12 @@ function Chat(){
         const {type, origin, ...msg} = data
         rawMessages.current.push(msg)
         const timestamp = data["metadata"]["timestamp"]
-
         if (pendingMessages.current.has(timestamp)){
           pendingMessages.current.delete(timestamp)
           handlePending(timestamp)
           return
         }
+        
         setMessages(prev => addGroupedMessage(prev, data))
         break
       case "chatHistory":
@@ -218,6 +245,7 @@ function Chat(){
                       return (
                         <div key={mssg["metadata"]["messageID"]} className={`${styles.message}`} style={{opacity: mssg["status"] === "pending" ? ".7": "1"}}>
                           {mssg["data"]}
+                          {mssg["status"] === "failed" && <span style={{color:"red"}}>FAIL</span>}
                         </div>
                       )})
                     }
