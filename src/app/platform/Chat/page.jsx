@@ -6,7 +6,7 @@ import { getUniqueMessageID } from "backend/requests"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
-  const {externalChatRef ,sendJsonMessage, roomID, messages, setMessages, username, userInfo} = useContext(ThemeContext)
+  const {externalChatRef, sendJsonMessage, roomID, messages, setMessages, username, userInfo, userStates, setUserStates} = useContext(ThemeContext)
   const [newMessage, setNewMessage] = useState("")
   const rawMessages = useRef([])
   const pendingMessages = useRef(new Set())
@@ -27,7 +27,7 @@ function Chat(){
 //       "data": newMessage,
 //       "metadata":{
 //         "timestamp": currTime,
-//         "messageID": messageID
+//         "messageID": messageID 
 //       }
 //     }
   function getGroupedMessages(messageList){
@@ -224,7 +224,6 @@ function Chat(){
         {
           messages.map((item,i)=>{
             const currTime = new Date(item["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
-
             return (
               <div key={i} className={styles.messageContainer}>
                 <section className={styles.messageLeft}>
@@ -232,7 +231,7 @@ function Chat(){
                     {currTime}
                   </span>
                   <span className="profilePic">
-                    <img src={userInfo["profilePicURL"]} alt="nth" />
+                    <img src={userStates[item["username"]]["imageURL"]} alt="nth" />
                   </span>
                 </section>
                 <section className={styles.messageRight}>
@@ -243,7 +242,7 @@ function Chat(){
                     { 
                       item["messages"].map((mssg)=>{
                       return (
-                        <div key={mssg["metadata"]["messageID"]} className={`${styles.message}`} style={{opacity: mssg["status"] === "pending" ? ".7": "1"}}>
+                        <div key={mssg["metadata"]["messageID"]} className={`${styles.message}`} style={{opacity: mssg["status"] !== "delivered" ? ".7": "1"}}>
                           {mssg["data"]}
                           {mssg["status"] === "failed" && <span style={{color:"red"}}>FAIL</span>}
                         </div>

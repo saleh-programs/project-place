@@ -37,6 +37,9 @@ function handleMessage(data, uuid){
     case "whiteboard":
       broadcastWhiteboard(parsedData, uuid)
       break
+    case "user":
+      broadcastUser(parsedData, uuid)
+      break
   }
 }
 
@@ -103,6 +106,11 @@ function broadcastWhiteboard(data, uuid){
      }
   })
 }
+function broadcastUser(data, uuid){
+  // sends everyone data
+  rooms[users[uuid].roomID]["connections"].forEach(conn=>{
+    conn.send(JSON.stringify(data))
+  })}
 
 
 

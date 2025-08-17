@@ -170,10 +170,10 @@ async function modifyUserInfoReq(changedFieldsObj) {
   }
 }
 
-async function uploadNewImageReq(imageFile) {
+async function uploadNewImageReq(imageFile, username) {
   try{
     const rawImageData = new Uint8Array(await imageFile.arrayBuffer())
-    const response = await fetch(baseurl + "uploadNewImage", {
+    const response = await fetch(baseurl + "uploadNewImage" + `?owner=${username}` , {
       "method": "POST",
       "headers": {"Content-Type": "application/octet-stream"},
       "body": rawImageData

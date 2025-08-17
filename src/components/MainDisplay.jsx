@@ -60,6 +60,21 @@ function MainDisplay({children, username, userInfoInitial}){
                 "location": "chat"
             }})
         })
+        setUserStates(prev=>{
+          console.log(prev)
+          return prev
+        })
+        break
+      case "userInfo":
+        console.log("check")
+        setUserStates(prev => {
+          return ({
+            ...prev, 
+            [data["username"]]: {
+                ...prev[data["username"]],
+                ...data["data"]
+            }})
+        })
         break
       case "getUsers":
         const users = {}

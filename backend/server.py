@@ -406,12 +406,8 @@ def updateUsername():
 @app.route("/getImage/<imageID>")
 def getImage(imageID):
   try:
-    username = request.args.get("username")
     with AccessDatabase() as cursor:
-      if username is None:
-        cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
-      else:
-        cursor.execute("SELECT image, mimeType FROM images where imageID = %s AND owner = %s",(imageID,username))
+      cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
       imageInfo = cursor.fetchone()
       if imageInfo is None:
         return {"success": False, "message": "failed to locate image"}, 500
@@ -426,12 +422,14 @@ def uploadNewImage():
     rawImageData = request.get_data()
     imageType = request.content_type
     newImageID = str(uuid.uuid4())
+    username = request.args.get("owner")
     with AccessDatabase() as cursor:
-      cursor.execute("INSERT INTO images (image, mimeType, imageID) VALUES (%s, %s, %s)", (rawImageData, imageType, newImageID))
+      cursor.execute("INSERT INTO images (image, mimeType, imageID, owner) VALUES (%s, %s, %s,%s)", (rawImageData, imageType, newImageID, username))
     return {"success": True, "data": newImageID}, 200
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to upload image"}, 500
+
 # adds user to db if they don't exist (NOT ENDPOINT)
 def addUser(email):
   try:

@@ -11,7 +11,7 @@ import JoinRoom from "./JoinRoom"
 import ChooseImage from "./ChooseImage"
 
 function AccountHub(){
-  const {roomID, setRoomID, username, userInfo, setUserInfo} = useContext(ThemeContext)
+  const {roomID, setRoomID, username, userInfo, setUserInfo, sendJsonMessage} = useContext(ThemeContext)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
 
@@ -25,7 +25,7 @@ function AccountHub(){
         </span>
         {
           IsChangingImage &&
-          <ChooseImage {...{setIsChangingImage, username,userInfo,setUserInfo}}/>
+          <ChooseImage {...{setIsChangingImage, username,userInfo,setUserInfo, sendJsonMessage}}/>
         }
         <span className={styles.username}>{username}</span>
       </section>

@@ -2,16 +2,24 @@ import styles from "styles/components/ChooseImage.module.css"
 import { modifyUserInfoReq, uploadNewImageReq } from "backend/requests"
 import { use } from "react"
 
-function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo}){
-  const publicImages = ["willow","dude","man"]
+function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo, sendJsonMessage}){
+  const publicImages = []// ["willow","dude","man"]
   
   async function setNewUserImage(imageURL){
     const response = await modifyUserInfoReq({"profilePicURL": imageURL, "username": username})
     if (response){
-      setUserInfo((prev) => {
+      setUserInfo(prev => {
         return {
           ...prev,
           "profilePicURL": imageURL
+        }
+      })
+      sendJsonMessage({
+        "origin": "user",
+        "type": "userInfo",
+        "username": username,
+        "data": {
+          "imageURL": imageURL
         }
       })
 
@@ -19,9 +27,9 @@ function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo}){
     }
 
   }
-  async function uploadNewImage(e){
+  async function uploadNewImage(e){ 
     const file = e.target.files[0]
-    const uploadImageRes = await uploadNewImageReq(file)
+    const uploadImageRes = await uploadNewImageReq(file, username)
     if (!uploadImageRes){
       return
     }
@@ -46,12 +54,12 @@ function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo}){
   }
 
   function getUserImages(){
-    console.log(userInfo["images"])
     if (!userInfo["images"]){
       return []
     }
     return JSON.parse(userInfo["images"])
   }
+
   return(
     <div className={styles.chooseImage}>
       <h1>Choose your new Image</h1>
