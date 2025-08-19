@@ -8,7 +8,6 @@ import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
-
   const currentType = useRef("draw") //draw, erase, or fill
   const currentColor = useRef("black")
   const strokeSizeRef = useRef(null)
@@ -34,6 +33,7 @@ function Whiteboard(){
   ]
 
   useEffect(()=>{  
+    console.log("whiteboard")
     externalDrawRef.current = externalDraw
   return ()=>{
     externalDrawRef.current = (param1) => {}

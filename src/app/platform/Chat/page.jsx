@@ -7,11 +7,31 @@ import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
   const {externalChatRef, sendJsonMessage, roomID, messages, setMessages, username, userInfo, userStates, setUserStates} = useContext(ThemeContext)
+
   const [newMessage, setNewMessage] = useState("")
   const [rawMessages, setRawMessages] = useState({})
   const pendingMessages = useRef(new Set())
-  const chatPageRef = useRef(null)
   const [darkMode, setDarkMode] = useState(false)
+
+  /*
+
+  Message Structure:
+  {
+    "username": string,
+    "status": string,
+    "data": string,
+    "metadata": {
+      "timestamp": number,
+      "messageID": string
+      },
+  }
+  Grouped Message Structure:
+  {
+    "username": string,
+    "timestamp": number,
+    "messages": [messageID1, messageID2,...]
+  }
+  */
 
   useEffect(()=>{
     externalChatRef.current = externalChat
@@ -20,33 +40,25 @@ function Chat(){
     }
   },[])
 
-// {
-//       "origin": "chat",
-//       "type": "newMessage",
-//       "username": username,
-//       "data": newMessage,
-//       "metadata":{
-//         "timestamp": currTime,
-//         "messageID": messageID 
-//       }
-//     }
+  // Groups all messages from chat history 
+  // (messages in a group are sent in a 30 second interval from same user)
   function getGroupedMessages(messageList){
-    const delay = 30000
+    const interval = 30000
     const groupedMessages = []
     let group = null;
     let i = 0
     while (i < messageList.length){
-      const [user, timestamp] = [messageList[i]["username"], messageList[i]["metadata"]["timestamp"]]
+      const [user, timestamp, messageID] = [messageList[i]["username"], messageList[i]["metadata"]["timestamp"], messageList[i]["metadata"]["messageID"]]
       group = {
         "username": user,
         "timestamp": timestamp,
-        "messages": [messageList[i]["metadata"]["messageID"]]
+        "messages": [messageID]
       }
       i += 1
       while (i < messageList.length){
-        const [nextUser, nextTimestamp] = [messageList[i]["username"], messageList[i]["metadata"]["timestamp"]]
-        if (user === nextUser && nextTimestamp - timestamp < delay){
-          group["messages"].push(messageList[i]["messageID"])
+        const [nextUser, nextTimestamp, nextMessageID] = [messageList[i]["username"], messageList[i]["metadata"]["timestamp"], messageList[i]["metadata"]["messageID"]]
+        if (user === nextUser && nextTimestamp - timestamp < interval){
+          group["messages"].push(nextMessageID)
           i += 1
         }else{
           groupedMessages.push(group)
@@ -60,36 +72,31 @@ function Chat(){
     }
     return groupedMessages
   }
+  // Groups incoming messages
   function addGroupedMessage(groupedMessages, message){
+    const interval = 30000
+    const [user, timestamp, messageID] = [message["username"], message["metadata"]["timestamp"], message["metadata"]["messageID"]]
     if (groupedMessages.length === 0){
       return [...groupedMessages, {
-        "username": message["username"],
-        "timestamp": message["metadata"]["timestamp"],
-        "messages": [message["metadata"]["messageID"]]
+        "username": user,
+        "timestamp": timestamp,
+        "messages": [messageID]
       }]
     }
-    const delay = 30000
-    const [user, timestamp] = [message["username"], message["metadata"]["timestamp"]]
-    const [lastUser, lastTimestamp] = [groupedMessages[groupedMessages.length-1]["username"], groupedMessages[groupedMessages.length-1]["timestamp"]]
-    if (user === lastUser && timestamp - lastTimestamp < delay){
-      const lastGroup = groupedMessages[groupedMessages.length-1]
-      const newGroups = groupedMessages.slice(0, -1)
-      return [...newGroups,{
-        "username": lastGroup["username"],
-        "timestamp": lastGroup["timestamp"],
+    const [lastUser, lastTimestamp] = [groupedMessages.at(-1)["username"], rawMessages[groupedMessages.at(-1)["messages"].at(-1)]["metadata"]["timestamp"]]
+    if (user === lastUser && timestamp - lastTimestamp < interval){
+      const lastGroup = groupedMessages.at(-1)
+      return [...groupedMessages.slice(0, -1),{
+        ...lastGroup,
         "messages": [...lastGroup["messages"], message["metadata"]["messageID"]]
       }]
-    }else{
-      return [...groupedMessages, {
-        "username": message["username"],
-        "timestamp": message["metadata"]["timestamp"],
-        "messages": [message["metadata"]["messageID"]]
-      }]
     }
+    return [...groupedMessages, {
+      "username": message["username"],
+      "timestamp": message["metadata"]["timestamp"],
+      "messages": [message["metadata"]["messageID"]]
+    }]
   }
-
-
-
 
   function handleMessage(e) {
     const currTime = Date.now()
@@ -99,6 +106,7 @@ function Chat(){
         return
       }
     }
+
     const messageID = getUniqueMessageID()
     const msg = {
       "origin": "chat",
@@ -110,10 +118,11 @@ function Chat(){
         "messageID": messageID
       }
     }
-    const {origin, type, ...msgData} = msg
     sendJsonMessage(msg)
-
+    setNewMessage("")
+    const {origin, type, ...msgData} = msg
     msgData["status"] = "pending"
+
     pendingMessages.current.add(messageID)
     setRawMessages({
       ...rawMessages,
@@ -131,9 +140,11 @@ function Chat(){
           })
         }      
     },3000)
-    setNewMessage("")
   }
 
+
+  // newMessage: update if pending image, else update grouped & raw messages
+  // chatHistory: add all existing chats to grouped & raw messages
   function externalChat(data){
     switch (data.type){
       case "newMessage":
@@ -142,10 +153,7 @@ function Chat(){
         if (pendingMessages.current.has(msgID)){
           pendingMessages.current.delete(msgID)
             setRawMessages(prev => {
-              return ({
-                ...prev, 
-                [msgID]: {...prev[msgID], "status": "delivered"}
-              })
+              return ({...prev, [msgID]: {...prev[msgID], "status": "delivered"}})
             })
           return
         }
@@ -171,6 +179,7 @@ function Chat(){
         break 
     }
   }
+  // Toggle dark/light mode
   function toggleAppearance(e){
     setDarkMode(e.target.checked)
     const toggleElem = document.querySelector(`.${styles.toggleAppearance}`)
@@ -180,6 +189,7 @@ function Chat(){
       toggleElem.classList.remove(`${styles.enableDarkMode}`)
     }
   }
+
   return(
     <div className={styles.chatPage}
     style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "rgba(44, 45, 50,.97)" : "white"}}>
@@ -196,12 +206,12 @@ function Chat(){
       <section className={styles.chatDisplay}> 
         {
           messages.map((item,i)=>{
-            const currTime = new Date(item["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
+            const timestamp = new Date(item["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
             return (
-              <div key={i} className={styles.messageContainer}>
+              <div key={item["timestamp"]} className={styles.messageContainer}>
                 <section className={styles.messageLeft}>
                   <span className={styles.timestamp}>
-                    {currTime}
+                    {timestamp}
                   </span>
                   <span className="profilePic">
                     <img src={userStates[item["username"]]["imageURL"]} alt="nth" />
@@ -218,7 +228,8 @@ function Chat(){
                       return (
                         <div key={mssg["metadata"]["messageID"]} className={`${styles.message}`} style={{opacity: mssg["status"] !== "delivered" ? ".7": "1"}}>
                           {mssg["data"]}
-                          {mssg["status"] === "failed" && <span style={{color:"red"}}>FAIL</span>}
+                          {mssg["metadata"]["timestamp"]}
+                          {mssg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span>}
                         </div>
                       )})
                     }

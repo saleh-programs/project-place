@@ -14,9 +14,8 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
-
   useEffect(()=>{
-    console.log(userStates)
+    console.log(JSON.stringify(userStates))
   },[userStates])
 
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
@@ -77,6 +76,7 @@ function MainDisplay({children, username, userInfoInitial}){
         })
         break
       case "getUsers":
+        console.log("someone")
         const users = {}
         data["data"].forEach(user => {
            users[user["username"]] = {
