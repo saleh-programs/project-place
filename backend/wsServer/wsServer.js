@@ -241,14 +241,14 @@ async function getMessages(connection, roomID) {
 }
 async function sendServerInfo(connection, roomID) {
   connection.send(JSON.stringify({
-    "origin": "chat",
-    "type": "chatHistory",
-    "data": await getMessagesReq(roomID)
-  }))
-  connection.send(JSON.stringify({
     "origin": "user",
     "type": "getUsers",
     "data": await getRoomUsersReq(roomID)
+  }))
+  connection.send(JSON.stringify({
+    "origin": "chat",
+    "type": "chatHistory",
+    "data": await getMessagesReq(roomID)
   }))
 }
 

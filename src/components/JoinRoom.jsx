@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import styles from "styles/components/JoinRoom.module.css"
 
 import { validateRoomReq, addRoomUserReq } from "backend/requests";
+import ThemeContext from "src/assets/ThemeContext";
 
 function JoinRoom({setIsLoadingRoom, setRoomID, username}){
+  const {userInfo} = useContext(ThemeContext)
   const [joinRoomID, setJoinRoomID]= useState("")
 
   async function handleRoomLoad(){
@@ -12,6 +14,12 @@ function JoinRoom({setIsLoadingRoom, setRoomID, username}){
     if(res){
       setRoomID(joinRoomID);
       setIsLoadingRoom(false)
+      // sendJsonMessage({
+      //   "origin": "user",
+      //   "type": "newUser",
+      //   "username": username,
+      //   "imageURL": userInfo["profilePicURL"]
+      // })
     }
   }
 

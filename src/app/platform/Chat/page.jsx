@@ -9,7 +9,8 @@ function Chat(){
   const {externalChatRef, sendJsonMessage, roomID, messages, setMessages, username, userInfo, userStates, setUserStates} = useContext(ThemeContext)
 
   const [newMessage, setNewMessage] = useState("")
-  const [rawMessages, setRawMessages] = useState({})
+  const rawMessagesRef = useRef({})
+  const [rawMessages, setRawMessages] = useState(rawMessagesRef.current)
   const pendingMessages = useRef(new Set())
   const [darkMode, setDarkMode] = useState(false)
 
@@ -39,6 +40,7 @@ function Chat(){
       externalChatRef.current = (param1) => {}
     }
   },[])
+
 
   // Groups all messages from chat history 
   // (messages in a group are sent in a 30 second interval from same user)
@@ -83,7 +85,7 @@ function Chat(){
         "messages": [messageID]
       }]
     }
-    const [lastUser, lastTimestamp] = [groupedMessages.at(-1)["username"], rawMessages[groupedMessages.at(-1)["messages"].at(-1)]["metadata"]["timestamp"]]
+    const [lastUser, lastTimestamp] = [groupedMessages.at(-1)["username"], rawMessagesRef.current[groupedMessages.at(-1)["messages"].at(-1)]["metadata"]["timestamp"]]
     if (user === lastUser && timestamp - lastTimestamp < interval){
       const lastGroup = groupedMessages.at(-1)
       return [...groupedMessages.slice(0, -1),{
@@ -101,7 +103,7 @@ function Chat(){
   function handleMessage(e) {
     const currTime = Date.now()
     if (messages.length > 0){
-      const lastMsg = rawMessages[messages.at(-1)["messages"].at(-1)]
+      const lastMsg = rawMessagesRef.current[messages.at(-1)["messages"].at(-1)]
       if (username === lastMsg["username"] && currTime - lastMsg["metadata"]["timestamp"] < 100){
         return
       }
@@ -124,20 +126,20 @@ function Chat(){
     msgData["status"] = "pending"
 
     pendingMessages.current.add(messageID)
-    setRawMessages({
-      ...rawMessages,
+    rawMessagesRef.current = {
+      ...rawMessagesRef.current,
       [messageID]: msgData
-    })
+    }
+    setRawMessages(rawMessagesRef.current)
     setMessages(addGroupedMessage(messages, msgData))
 
     setTimeout(()=>{
         if (pendingMessages.current.has(messageID)){
-          setRawMessages(prev=>{
-            return ({
+          rawMessagesRef.current = {
               ...prev,
-              [messageID]: {...prev[messageID], "status": "failed"}
-            })
-          })
+            [messageID]: {...prev[messageID], "status": "failed"}
+          }
+          setRawMessages(rawMessagesRef.current)
         }      
     },3000)
   }
@@ -152,28 +154,30 @@ function Chat(){
         const msgID = data["metadata"]["messageID"]
         if (pendingMessages.current.has(msgID)){
           pendingMessages.current.delete(msgID)
-            setRawMessages(prev => {
-              return ({...prev, [msgID]: {...prev[msgID], "status": "delivered"}})
-            })
+          rawMessagesRef.current = {
+            ...rawMessagesRef.current, 
+            [msgID]: {...rawMessagesRef.current[msgID], "status": "delivered"}
+          }
+          setRawMessages(rawMessagesRef.current)
           return
         }
-        setRawMessages(prev => {
-          return ({...prev, [msgID]: {...msg, "status": "delivered"}})
-        })
+        
+        rawMessagesRef.current = {
+          ...rawMessagesRef.current,
+          [msgID]: {...msg, "status": "delivered"}
+        }
+        setRawMessages(rawMessagesRef.current)
         setMessages(prev => addGroupedMessage(prev, data))
         break
       case "chatHistory":
         if (data.data){
-          const newRawMessages = {}
           data.data.forEach(msg=>{
-            newRawMessages[msg["metadata"]["messageID"]] = {
+            rawMessagesRef.current[msg["metadata"]["messageID"]] = {
               ...msg,
               "status": "delivered"
             }
           })
-          setRawMessages(prev => {
-            return {...prev, ...newRawMessages}
-          })
+          setRawMessages(rawMessagesRef.current)
           setMessages(prev => [...getGroupedMessages(data.data), ...prev])
         }
         break 

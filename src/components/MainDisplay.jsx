@@ -59,13 +59,8 @@ function MainDisplay({children, username, userInfoInitial}){
                 "location": "chat"
             }})
         })
-        setUserStates(prev=>{
-          console.log(prev)
-          return prev
-        })
         break
       case "userInfo":
-        console.log("check")
         setUserStates(prev => {
           return ({
             ...prev, 
@@ -76,7 +71,6 @@ function MainDisplay({children, username, userInfoInitial}){
         })
         break
       case "getUsers":
-        console.log("someone")
         const users = {}
         data["data"].forEach(user => {
            users[user["username"]] = {
@@ -85,6 +79,7 @@ function MainDisplay({children, username, userInfoInitial}){
             "location": "chat"          
           }
         })
+        console.log(users)
         setUserStates(users)
         break
     }
