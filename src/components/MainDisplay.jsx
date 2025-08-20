@@ -14,9 +14,6 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
-  useEffect(()=>{
-    console.log(JSON.stringify(userStates))
-  },[userStates])
 
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{

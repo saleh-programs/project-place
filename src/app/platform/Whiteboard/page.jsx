@@ -8,24 +8,25 @@ import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
-  const currentType = useRef("draw") //draw, erase, or fill
-  const currentColor = useRef("black")
-  const strokeSizeRef = useRef(null)
 
-  const canvasStylesRef = useRef({
+  const canvasInfo = useRef({
+    "type": "draw",
+    "color": "black",
+    "lineWidth": 10,
     "scale": 1.0,
     "translateX": 0,
-    "translateY": 0 
+    "translateY": 0,
+    "compositionType": "source-over"
   })
-
-//drawCommands, chats,  
-  const batchedStrokes = useRef({
+  const strokes = useRef({
     "fullStroke": [],
     "batchStroke": []
   })
   const startStrokePoint = useRef(null)
   const canvasRef = useRef(null)
+  const cxt = useRef(null)
   const hiddenCanvasRef = useRef(null)
+  const hiddenCxt = useRef(null)
 
   const colors = [
     "black","white","gray","red","green","orange","blue", "cyan",
@@ -33,8 +34,11 @@ function Whiteboard(){
   ]
 
   useEffect(()=>{  
-    console.log("whiteboard")
-    externalDrawRef.current = externalDraw
+    externalDrawRef.current = externalDraw 
+    cxt.current = canvasRef.current.getContext("2d")
+    hiddenCanvasRef.current = document.createElement("canvas")
+    hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
+
   return ()=>{
     externalDrawRef.current = (param1) => {}
   }
@@ -42,12 +46,6 @@ function Whiteboard(){
 
   useEffect(()=>{
     if (roomID){
-      hiddenCanvasRef.current = document.createElement("canvas")
-      hiddenCanvasRef.current.width = canvasRef.current.width
-      hiddenCanvasRef.current.height = canvasRef.current.height
-
-      canvasRef.current.getContext("2d").fillStyle = "white"
-      canvasRef.current.getContext("2d").fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
       reconstructCanvas(roomID)
     }
   },[roomID])
@@ -123,74 +121,81 @@ function Whiteboard(){
 
 
   function startDrawing(event){
-    const whiteboard = canvasRef.current.getContext("2d")
-    const whiteboardRect = canvasRef.current.getBoundingClientRect()
-    startStrokePoint.current = [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)]
-    whiteboard.strokeStyle = currentColor.current
-    whiteboard.lineWidth = strokeSizeRef.current.value
-    whiteboard.beginPath()
-    whiteboard.moveTo(...startStrokePoint.current)
-    whiteboard.globalAlpha = 1.0
-    if (currentType.current !== "fill"){
-          batchedStrokes.current.fullStroke.push(startStrokePoint.current)
-    }
-
+    const cxt = cxt.current
+    const rect = canvasRef.current.getBoundingClientRect()
+    startStrokePoint.current = [Math.round(event.clientX - rect.left), Math.round(event.clientY - rect.top)]
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
-    function onMoveDraw(e){
+    function onMoveStroke(e){
       const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
       whiteboard.lineTo(...whiteboardPos)
       whiteboard.stroke()
       batchedStrokes.current.batchStroke.push(whiteboardPos)
       batchedStrokes.current.fullStroke.push(whiteboardPos)
-      sendBatchStrokesThrottled()
+      sendBatchStrokesThrottled()      
     }
-     function onReleaseDraw(e){
+     function onReleaseStroke(e){
       sendStroke()
       canvasRef.current.removeEventListener("mousemove", onMoveDraw)
       document.removeEventListener("mouseup", onReleaseDraw) 
     }
 
-    function onMoveErase(e){
-      const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
-      whiteboard.lineTo(...whiteboardPos)
-      whiteboard.stroke()
-      batchedStrokes.current.batchStroke.push(whiteboardPos)
-      batchedStrokes.current.fullStroke.push(whiteboardPos)
-      sendBatchStrokesThrottled()
-    }
-    function onReleaseErase(e){
-      sendStroke()
-      canvasRef.current.removeEventListener("mousemove", onMoveErase)
-      document.removeEventListener("mouseup", onReleaseErase)
-    }
-
     switch (currentType.current){
       case "draw":
-        canvasRef.current.addEventListener("mousemove", onMoveDraw)
-        document.addEventListener("mouseup", onReleaseDraw)
+        canvasRef.current.addEventListener("mousemove", onMoveStroke)
+        document.addEventListener("mouseup", onReleaseStroke)
         break
       case "erase":
-        whiteboard.strokeStyle = "white"
-        canvasRef.current.addEventListener("mousemove", onMoveErase)
-        document.addEventListener("mouseup", onReleaseErase)
+        canvasRef.current.addEventListener("mousemove", onMoveStroke)
+        document.addEventListener("mouseup", onReleaseStroke)
         break
       case "fill":
-        sendJsonMessage({
-          "origin": "whiteboard",
-          "type": "fill",
-          "username": username,
-          "data": [Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top)],
-          "metadata": {
-            "color": currentColor.current
-          }
-        })
-        canvasFill(Math.round(event.clientX - whiteboardRect.left), Math.round(event.clientY - whiteboardRect.top), currentColor.current)
-        canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
+        canvasFill(...startStrokePoint.current)
         break
     }
   }
 
+  //Just ignore server side for now
+  function externalDraw(data){
+    const cxt = hiddenCxt.current
+    cxt.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
+
+    switch (data.type){
+      case "draw":
+        whiteboard.lineWidth = data.metadata.size
+        whiteboard.strokeStyle = data.metadata.color
+        whiteboard.moveTo(...commands[0])
+        if (data.metadata.status === "isDrawing"){
+          for (let i = 1; i < commands.length; i++){
+            whiteboard.lineTo(...commands[i])
+          }
+          whiteboard.stroke()
+        }else if (data.metadata.status === "doneDrawing"){
+          for (let i = 1; i < commands.length; i++){
+            whiteboard.lineTo(...commands[i])
+            whiteboard.stroke()
+          }
+        }
+        break
+      case "erase":
+        whiteboard.lineWidth = data.metadata.size
+        whiteboard.strokeStyle = "white"
+        for (let i = 1; i < commands.length; i++){
+          whiteboard.lineTo(...commands[i])
+          whiteboard.stroke()
+        }
+        break
+      case "fill":
+        canvasFill(data.data[0], data.data[1], data.metadata.color)
+        break
+      case "clear":
+        const mainCanvas =  canvasRef.current.getContext("2d")
+        mainCanvas.fillStyle = "white"
+        mainCanvas.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+        break
+    }
+    canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
+  }
 
   function clearCanvas(){
     const whiteboard = canvasRef.current.getContext("2d")
@@ -203,38 +208,6 @@ function Whiteboard(){
       "username": username
     })
     canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
-  }
-
-  //ignore for now
-  function startDrawingMobile(event){
-    event.preventDefault()
-    const whiteboard = canvasRef.current.getContext("2d")
-    const whiteboardRect = canvasRef.current.getBoundingClientRect()
-    startStrokePoint.current = [Math.round(event.touches[0].clientX - whiteboardRect.left), Math.round(event.touches[0].clientY - whiteboardRect.top)]
-
-    whiteboard.beginPath()
-    whiteboard.moveTo(...startStrokePoint.current)
-
-    batchedStrokes.current.fullStroke.push(startStrokePoint.current)
-    const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
-
-    const onMove = (e) => {
-      e.preventDefault()
-      const whiteboardPos = [Math.round(e.touches[0].clientX - whiteboardRect.left), Math.round(e.touches[0].clientY - whiteboardRect.top)]
-      whiteboard.lineTo(...whiteboardPos)
-      whiteboard.stroke()
-      batchedStrokes.current.batchStroke.push(whiteboardPos)
-      batchedStrokes.current.fullStroke.push(whiteboardPos)
-      sendBatchStrokesThrottled()
-    }
-
-    const onRelease = (e) => {
-      sendStroke()
-      canvasRef.current.removeEventListener("touchmove", onMove)
-      document.removeEventListener("touchend", onRelease) 
-    }
-    canvasRef.current.addEventListener("touchmove", onMove)
-    document.addEventListener("touchend", onRelease)
   }
 
   async function canvasFill(x, y, color){
@@ -310,66 +283,18 @@ function Whiteboard(){
         pixelQueue.enqueue(item)
       })
     }
-    console.log("done FIll")
     whiteboard.putImageData(canvasImage,0,0)
   }
-  function externalDraw(data){
-    const whiteboard = hiddenCanvasRef.current.getContext("2d")
-    whiteboard.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
-    whiteboard.beginPath()
-    const commands = data?.data
 
-    switch (data.type){
-      case "draw":
-        whiteboard.lineWidth = data.metadata.size
-        whiteboard.strokeStyle = data.metadata.color
-        whiteboard.moveTo(...commands[0])
-        if (data.metadata.status === "isDrawing"){
-          for (let i = 1; i < commands.length; i++){
-            whiteboard.lineTo(...commands[i])
-          }
-          whiteboard.stroke()
-        }else if (data.metadata.status === "doneDrawing"){
-          for (let i = 1; i < commands.length; i++){
-            whiteboard.lineTo(...commands[i])
-            whiteboard.stroke()
-          }
-        }
-        break
-      case "erase":
-        whiteboard.lineWidth = data.metadata.size
-        whiteboard.strokeStyle = "white"
-        for (let i = 1; i < commands.length; i++){
-          whiteboard.lineTo(...commands[i])
-          whiteboard.stroke()
-        }
-        break
-      case "fill":
-        canvasFill(data.data[0], data.data[1], data.metadata.color)
-        break
-      case "clear":
-        const mainCanvas =  canvasRef.current.getContext("2d")
-        mainCanvas.fillStyle = "white"
-        mainCanvas.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
-        break
-    }
-    canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
-  }
 
-  function zoomIn(){
-    const maxScale = 2.0
-    if (canvasStylesRef.current["scale"] < maxScale){
-      canvasRef.current.style.transform = `translate(${canvasStylesRef.current["translateX"]}px, ${canvasStylesRef.current["translateY"]}px) scale(${canvasStylesRef.current["scale"] + .2})`;
-      canvasStylesRef.current["scale"] += .2
-    }
-  }
-  function zoomOut(){
+  function zoom(){
     const minScale = 0.4
     if (canvasStylesRef.current["scale"] > minScale){
       canvasRef.current.style.transform = `translate(${canvasStylesRef.current["translateX"]}px, ${canvasStylesRef.current["translateY"]}px) scale(${canvasStylesRef.current["scale"] - .2})`;    
       canvasStylesRef.current["scale"] -= .2
     }
   }
+
   function startNavigatingCanvas(e){
     if (currentType.current !== "navigate"){
       return
@@ -417,17 +342,6 @@ function Whiteboard(){
     document.addEventListener("mouseup", onReleaseNavigate)
   }
 
-  async function undoCanvas(){
-    const response = await getUndoReq(roomID)
-    console.log(response)
-    const image = await createImageBitmap(response)
-    canvasRef.current.getContext("2d").drawImage(image, 0, 0)
-  }
-  async function redoCanvas(){
-    const response = await getRedoReq(roomID)
-    const image = await createImageBitmap(response)
-    canvasRef.current.getContext("2d").drawImage(image, 0, 0)
-  }
 
   return (
     <div className={styles.whiteboardPage}>
@@ -438,8 +352,8 @@ function Whiteboard(){
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable} onMouseDown={startNavigatingCanvas}>
-            <section className={styles.canvasArea}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} onTouchStart={startDrawingMobile}/>
+            <section className={styles.canvasArea} style={{color:"white"}}>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing}/>
             </section>
           </div>
           <button className={styles.clearButton} onClick={clearCanvas}>clear</button>
