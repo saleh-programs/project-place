@@ -123,14 +123,14 @@ function Whiteboard(){
   function startDrawing(event){
     const cxt = cxtRef.current
     const rect = canvasRef.current.getBoundingClientRect()
-    startStrokePoint.current = [Math.round(event.clientX - rect.left), Math.round(event.clientY - rect.top)]
+    startStrokePoint.current = [Math.round((event.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((event.clientY - rect.top))/canvasInfo.current["scale"]]
     // const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
     cxt.strokeStyle = canvasInfo.current["color"]
     cxt.lineWidth = canvasInfo.current["lineWidth"]
 
     function onMoveStroke(e){
-      const pos = [Math.round(e.clientX - rect.left), Math.round(e.clientY - rect.top)]
+      const pos = [Math.round((e.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((e.clientY - rect.top))/canvasInfo.current["scale"]]
       cxt.lineTo(...pos)
       cxt.stroke()
       strokes.current.batchStroke.push(pos)
@@ -277,52 +277,53 @@ function Whiteboard(){
     cxt.putImageData(canvasImage,0,0)
   }
 
-  // function startNavigatingCanvas(e){
-  //   if (currentType.current !== "navigate"){
-  //     return
-  //   }
-  //   const whiteboardContainerRect = e.currentTarget.getBoundingClientRect()
-  //   let whiteboardRect = canvasRef.current.getBoundingClientRect()
-  //   const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
-  //   const shiftX = canvasStylesRef.current["translateX"]
-  //   const shiftY = canvasStylesRef.current["translateY"]
+  function startNavigatingCanvas(e){
+    if (canvasInfo.current["type"] !== "navigate"){
+      return
+    }
+    const containerRect = e.currentTarget.getBoundingClientRect()
+    let canvasRect = canvasRef.current.getBoundingClientRect()
+    const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
+    const shiftX = canvasInfo.current["translateX"]
+    const shiftY = canvasInfo.current["translateY"]
 
-  //   function onMoveNavigate(e){
-  //     whiteboardRect = canvasRef.current.getBoundingClientRect()
-  //     const mousePos = [Math.round(e.clientX), Math.round(e.clientY)]
-  //     const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
+    function onMoveNavigate(e){
+      const pos = [Math.round(e.clientX), Math.round(e.clientY)]
+      const offset = [pos[0] - startMousePos[0], pos[1] - startMousePos[1]]
 
-  //     let newShiftX = canvasStylesRef.current["translateX"]
-  //     let newShiftY = canvasStylesRef.current["translateY"]
+      let newShiftX = canvasInfo.current["translateX"]
+      let newShiftY = canvasInfo.current["translateY"]
 
-  //     const withinHorizontalBounds = whiteboardRect.right + offset[0] >= whiteboardContainerRect.left + 10 && whiteboardRect.left + offset[0] <= whiteboardContainerRect.right - 10
-  //     const withinVerticalBounds = whiteboardRect.top + offset[1] <= whiteboardContainerRect.bottom - 10 && whiteboardRect.bottom + offset[1] >= whiteboardContainerRect.top + 10
+      const withinHorizontalBounds = canvasRect.right + offset[0] >= containerRect.left + 10 && canvasRect.left + offset[0] <= containerRect.right - 10
+      const withinVerticalBounds = canvasRect.top + offset[1] <= containerRect.bottom - 10 && canvasRect.bottom + offset[1] >= containerRect.top + 10
 
-  //     if (withinHorizontalBounds){
-  //       newShiftX = shiftX + offset[0]
-  //     }
-  //     if (withinVerticalBounds){
-  //       newShiftY = shiftY + offset[1]
-  //     }
-  //     // console.log(whiteboardRect.top + offset[1] >= whiteboardContainerRect.top - 400, whiteboardRect.bottom + offset[1] <= whiteboardContainerRect.bottom + 40)
-  //     console.log(whiteboardRect.bottom, offset[1],
-  //       whiteboardContainerRect.bottom + 100
-  //     )
-  //     canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasStylesRef.current["scale"]})`;
-  //     canvasStylesRef.current["translateX"] = newShiftX
-  //     canvasStylesRef.current["translateY"] = newShiftY
-  //   }
+      if (withinHorizontalBounds){
+        newShiftX = shiftX + offset[0]
+      }
+      if (withinVerticalBounds){
+        newShiftY = shiftY + offset[1]
+      }
+      canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasInfo.current["scale"]})`;
+      canvasInfo.current["translateX"] = newShiftX
+      canvasInfo.current["translateY"] = newShiftY
+    }
 
-  //   function onReleaseNavigate(e){
-  //     document.body.style.userSelect = "";
-  //     document.removeEventListener("mousemove", onMoveNavigate)
-  //     document.removeEventListener("mouseup", onReleaseNavigate)
-  //   }
+    function onReleaseNavigate(e){
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMoveNavigate)
+      document.removeEventListener("mouseup", onReleaseNavigate)
+    }
 
-  //   document.body.style.userSelect = "none";
-  //   document.addEventListener("mousemove", onMoveNavigate)
-  //   document.addEventListener("mouseup", onReleaseNavigate)
-  // }
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMoveNavigate)
+    document.addEventListener("mouseup", onReleaseNavigate)
+  }
+
+  function zoom(type){
+    const increment = type === "in" ? 0.2 :  -0.2
+    canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
+    canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
+  }
 
 
   return (
@@ -334,8 +335,8 @@ function Whiteboard(){
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable}>
-            <section className={styles.canvasArea}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} style={{backgroundColor:"white"}}/>
+            <section className={styles.canvasArea} onMouseDown={startNavigatingCanvas}>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing}/>
             </section>
           </div>
           <button className={styles.clearButton} onClick={clearCanvas}>clear</button>
@@ -351,8 +352,8 @@ function Whiteboard(){
             <button onClick={()=>{canvasInfo.current["type"] = "erase"}}>Erase</button>
             <button onClick={()=>{canvasInfo.current["type"] = "fill"}}>Fill</button>
             <button onClick={()=>{canvasInfo.current["type"] = "navigate"}}>Navigate</button>
-            {/* <button onClick={zoomIn}>Zoom In</button>
-            <button onClick={zoomOut}>Zoom Out</button> */}
+            <button onClick={()=>zoom("in")}>Zoom In</button>
+            <button onClick={()=>zoom("out")}>Zoom Out</button>
 
             <input onChange={(e)=>{canvasInfo.current["lineWidth"] = e.target.value}} type="range" min="1" max="30"/>
           </section>
