@@ -24,7 +24,7 @@ function Whiteboard(){
   })
   const startStrokePoint = useRef(null)
   const canvasRef = useRef(null)
-  const cxt = useRef(null)
+  const cxtRef = useRef(null)
   const hiddenCanvasRef = useRef(null)
   const hiddenCxt = useRef(null)
 
@@ -34,10 +34,7 @@ function Whiteboard(){
   ]
 
   useEffect(()=>{  
-    externalDrawRef.current = externalDraw 
-    cxt.current = canvasRef.current.getContext("2d")
-    hiddenCanvasRef.current = document.createElement("canvas")
-    hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
+    // externalDrawRef.current = externalDraw 
 
   return ()=>{
     externalDrawRef.current = (param1) => {}
@@ -46,53 +43,56 @@ function Whiteboard(){
 
   useEffect(()=>{
     if (roomID){
-      reconstructCanvas(roomID)
+      cxtRef.current = canvasRef.current.getContext("2d")
+      hiddenCanvasRef.current = document.createElement("canvas")
+      hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
+      // reconstructCanvas(roomID)
     }
   },[roomID])
 
-  //matbe in future we can 
-  async function reconstructCanvas(roomID) {
-    const response = await getCanvas(roomID)
-    if (response){
-      const img = await createImageBitmap(response)
-      const whiteboard = canvasRef.current.getContext("2d")
-      whiteboard.drawImage(img,0,0)
-    }
-  }
+  // //matbe in future we can 
+  // async function reconstructCanvas(roomID) {
+  //   const response = await getCanvas(roomID)
+  //   if (response){
+  //     const img = await createImageBitmap(response)
+  //     const whiteboard = canvasRef.current.getContext("2d")
+  //     whiteboard.drawImage(img,0,0)
+  //   }
+  // }
 
-  function sendBatchStrokes(){
-    batchedStrokes.current.batchStroke.unshift(startStrokePoint.current)
-    startStrokePoint.current = batchedStrokes.current.batchStroke[batchedStrokes.current.batchStroke.length-1]
-    sendJsonMessage({
-      "origin": "whiteboard",
-      "type": currentType.current,
-      "username": username,
-      "data": batchedStrokes.current.batchStroke,
-      "metadata": {
-        "status": "isDrawing",
-        "color": currentColor.current,
-        "size": strokeSizeRef.current.value,
-      }
+  // function sendBatchStrokes(){
+  //   batchedStrokes.current.batchStroke.unshift(startStrokePoint.current)
+  //   startStrokePoint.current = batchedStrokes.current.batchStroke[batchedStrokes.current.batchStroke.length-1]
+  //   sendJsonMessage({
+  //     "origin": "whiteboard",
+  //     "type": currentType.current,
+  //     "username": username,
+  //     "data": batchedStrokes.current.batchStroke,
+  //     "metadata": {
+  //       "status": "isDrawing",
+  //       "color": currentColor.current,
+  //       "size": strokeSizeRef.current.value,
+  //     }
 
-    })
-    batchedStrokes.current.batchStroke = []
-  }
+  //   })
+  //   batchedStrokes.current.batchStroke = []
+  // }
 
-  function sendStroke(){
-    sendJsonMessage({
-      "origin": "whiteboard",
-      "type": currentType.current,
-      "username": username,
-      "data": batchedStrokes.current.fullStroke,
-      "metadata": {
-        "status": "doneDrawing",
-        "color": currentColor.current,
-        "size": strokeSizeRef.current.value,
-      }
-    })
-    batchedStrokes.current.fullStroke = []
-    canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
-  }
+  // function sendStroke(){
+  //   sendJsonMessage({
+  //     "origin": "whiteboard",
+  //     "type": currentType.current,
+  //     "username": username,
+  //     "data": batchedStrokes.current.fullStroke,
+  //     "metadata": {
+  //       "status": "doneDrawing",
+  //       "color": currentColor.current,
+  //       "size": strokeSizeRef.current.value,
+  //     }
+  //   })
+  //   batchedStrokes.current.fullStroke = []
+  //   canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
+  // }
 
   function throttle(func){
     let timerID = null
@@ -121,31 +121,40 @@ function Whiteboard(){
 
 
   function startDrawing(event){
-    const cxt = cxt.current
+    const cxt = cxtRef.current
     const rect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round(event.clientX - rect.left), Math.round(event.clientY - rect.top)]
-    const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
+    // const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
+
+    cxt.strokeStyle = canvasInfo.current["color"]
+    cxt.lineWidth = canvasInfo.current["lineWidth"]
 
     function onMoveStroke(e){
-      const whiteboardPos = [Math.round(e.clientX - whiteboardRect.left), Math.round(e.clientY - whiteboardRect.top)]
-      whiteboard.lineTo(...whiteboardPos)
-      whiteboard.stroke()
-      batchedStrokes.current.batchStroke.push(whiteboardPos)
-      batchedStrokes.current.fullStroke.push(whiteboardPos)
-      sendBatchStrokesThrottled()      
+      const pos = [Math.round(e.clientX - rect.left), Math.round(e.clientY - rect.top)]
+      cxt.lineTo(...pos)
+      cxt.stroke()
+      strokes.current.batchStroke.push(pos)
+      strokes.current.fullStroke.push(pos)
+      // sendBatchStrokesThrottled()      
     }
      function onReleaseStroke(e){
-      sendStroke()
-      canvasRef.current.removeEventListener("mousemove", onMoveDraw)
-      document.removeEventListener("mouseup", onReleaseDraw) 
+      // sendStroke()
+      canvasRef.current.removeEventListener("mousemove", onMoveStroke)
+      document.removeEventListener("mouseup", onReleaseStroke) 
+      cxt.globalCompositeOperation = "source-over"
     }
 
-    switch (currentType.current){
+    switch (canvasInfo.current["type"]){
       case "draw":
+        cxt.beginPath()
+        cxt.moveTo(...startStrokePoint.current)
         canvasRef.current.addEventListener("mousemove", onMoveStroke)
         document.addEventListener("mouseup", onReleaseStroke)
         break
       case "erase":
+        cxt.globalCompositeOperation = "destination-out"
+        cxt.beginPath()
+        cxt.moveTo(...startStrokePoint.current)
         canvasRef.current.addEventListener("mousemove", onMoveStroke)
         document.addEventListener("mouseup", onReleaseStroke)
         break
@@ -198,47 +207,38 @@ function Whiteboard(){
   }
 
   function clearCanvas(){
-    const whiteboard = canvasRef.current.getContext("2d")
-    // whiteboard.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
-    whiteboard.fillStyle = "white"
-    whiteboard.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
-    sendJsonMessage({
-      "origin": "whiteboard",
-      "type": "clear",
-      "username": username
-    })
-    canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
+    const cxt = cxtRef.current
+    cxt.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
+    // sendJsonMessage({
+    //   "origin": "whiteboard",
+    //   "type": "clear",
+    //   "username": username
+    // })
   }
 
-  async function canvasFill(x, y, color){
-    const whiteboard = canvasRef.current.getContext("2d", { willReadFrequently: true })
-    const mousePos = [x, y]
-    const startColor = whiteboard.getImageData(mousePos[0],mousePos[1],1,1).data
+  async function canvasFill(startX, startY){
+    const cxt = cxtRef.current
+    const startImage = cxt.getImageData(startX, startY,1,1)
+    const startColor = startImage.data
 
-    whiteboard.fillStyle = color
-    whiteboard.fillRect(mousePos[0],mousePos[1],1,1)
-    const fillColor = whiteboard.getImageData(mousePos[0],mousePos[1],1,1).data
+    cxt.fillStyle = canvasInfo.current["color"]
+    cxt.fillRect(startX,startY,1,1)
+    const fillColor = cxt.getImageData(startX,startY,1,1).data
+    cxt.putImageData(startImage,startX,startY)
 
-    const newPixel = whiteboard.createImageData(1,1)
-    newPixel.data.set(startColor,0)
-    whiteboard.putImageData(newPixel,mousePos[0],mousePos[1])
-    newPixel.data.set(fillColor,0)
-    
-    const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
-    const canvasImage = whiteboard.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
+    const canvasImage = cxt.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
     const canvasData = canvasImage.data
 
+    const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
     const pixelQueue = new Queue()
-    pixelQueue.enqueue([mousePos[0],mousePos[1]])
+    pixelQueue.enqueue([startX,startY])
     const tolerance = 70
-    let totalPixels = 0
     while (!pixelQueue.isEmpty()){
       const [x, y] = pixelQueue.dequeue()
       const isInCanvas = (
         (x >= 0 && x < canvasRef.current.width) 
         && 
         (y >=0 && y < canvasRef.current.height))
-
       if (!isInCanvas || visited[x + y * canvasRef.current.width]){
         continue
       }
@@ -254,93 +254,75 @@ function Whiteboard(){
       const RGBdistance = 
         (currentColor[0] - startColor[0])**2 +
         (currentColor[1] - startColor[1])**2 +
-        (currentColor[2] - startColor[2])**2
+        (currentColor[2] - startColor[2])**2 +
+        (currentColor[3] - startColor[3])**2
       
       const matchesColor = RGBdistance < tolerance**2
-
       if (!matchesColor){
         continue
       }
-
       canvasData[val] = fillColor[0]
       canvasData[val + 1] = fillColor[1]
       canvasData[val + 2] = fillColor[2]
+      canvasData[val + 3] = fillColor[3]
 
-      totalPixels += 1
-      // if (totalPixels % Math.floor(200) === 0){
-      //   await new Promise(requestAnimationFrame)
-      // }
       const neighbors = [
         [x,y-1],[x,y+1],
         [x-1,y],[x+1,y],
       ]
-      // const neighbors = [
-      //   [x-1, y-1], [x,y-1], [x+1,y-1],
-      //   [x-1,y], [x+1,y],
-      //   [x-1,y+1],[x,y+1],[x+1,y+1]
-      // ]
       neighbors.forEach(item=>{
         pixelQueue.enqueue(item)
       })
     }
-    whiteboard.putImageData(canvasImage,0,0)
+    cxt.putImageData(canvasImage,0,0)
   }
 
+  // function startNavigatingCanvas(e){
+  //   if (currentType.current !== "navigate"){
+  //     return
+  //   }
+  //   const whiteboardContainerRect = e.currentTarget.getBoundingClientRect()
+  //   let whiteboardRect = canvasRef.current.getBoundingClientRect()
+  //   const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
+  //   const shiftX = canvasStylesRef.current["translateX"]
+  //   const shiftY = canvasStylesRef.current["translateY"]
 
-  function zoom(){
-    const minScale = 0.4
-    if (canvasStylesRef.current["scale"] > minScale){
-      canvasRef.current.style.transform = `translate(${canvasStylesRef.current["translateX"]}px, ${canvasStylesRef.current["translateY"]}px) scale(${canvasStylesRef.current["scale"] - .2})`;    
-      canvasStylesRef.current["scale"] -= .2
-    }
-  }
+  //   function onMoveNavigate(e){
+  //     whiteboardRect = canvasRef.current.getBoundingClientRect()
+  //     const mousePos = [Math.round(e.clientX), Math.round(e.clientY)]
+  //     const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
 
-  function startNavigatingCanvas(e){
-    if (currentType.current !== "navigate"){
-      return
-    }
-    const whiteboardContainerRect = e.currentTarget.getBoundingClientRect()
-    let whiteboardRect = canvasRef.current.getBoundingClientRect()
-    const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
-    const shiftX = canvasStylesRef.current["translateX"]
-    const shiftY = canvasStylesRef.current["translateY"]
+  //     let newShiftX = canvasStylesRef.current["translateX"]
+  //     let newShiftY = canvasStylesRef.current["translateY"]
 
-    function onMoveNavigate(e){
-      whiteboardRect = canvasRef.current.getBoundingClientRect()
-      const mousePos = [Math.round(e.clientX), Math.round(e.clientY)]
-      const offset = [mousePos[0] - startMousePos[0], mousePos[1] - startMousePos[1]]
+  //     const withinHorizontalBounds = whiteboardRect.right + offset[0] >= whiteboardContainerRect.left + 10 && whiteboardRect.left + offset[0] <= whiteboardContainerRect.right - 10
+  //     const withinVerticalBounds = whiteboardRect.top + offset[1] <= whiteboardContainerRect.bottom - 10 && whiteboardRect.bottom + offset[1] >= whiteboardContainerRect.top + 10
 
-      let newShiftX = canvasStylesRef.current["translateX"]
-      let newShiftY = canvasStylesRef.current["translateY"]
+  //     if (withinHorizontalBounds){
+  //       newShiftX = shiftX + offset[0]
+  //     }
+  //     if (withinVerticalBounds){
+  //       newShiftY = shiftY + offset[1]
+  //     }
+  //     // console.log(whiteboardRect.top + offset[1] >= whiteboardContainerRect.top - 400, whiteboardRect.bottom + offset[1] <= whiteboardContainerRect.bottom + 40)
+  //     console.log(whiteboardRect.bottom, offset[1],
+  //       whiteboardContainerRect.bottom + 100
+  //     )
+  //     canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasStylesRef.current["scale"]})`;
+  //     canvasStylesRef.current["translateX"] = newShiftX
+  //     canvasStylesRef.current["translateY"] = newShiftY
+  //   }
 
-      const withinHorizontalBounds = whiteboardRect.right + offset[0] >= whiteboardContainerRect.left + 10 && whiteboardRect.left + offset[0] <= whiteboardContainerRect.right - 10
-      const withinVerticalBounds = whiteboardRect.top + offset[1] <= whiteboardContainerRect.bottom - 10 && whiteboardRect.bottom + offset[1] >= whiteboardContainerRect.top + 10
+  //   function onReleaseNavigate(e){
+  //     document.body.style.userSelect = "";
+  //     document.removeEventListener("mousemove", onMoveNavigate)
+  //     document.removeEventListener("mouseup", onReleaseNavigate)
+  //   }
 
-      if (withinHorizontalBounds){
-        newShiftX = shiftX + offset[0]
-      }
-      if (withinVerticalBounds){
-        newShiftY = shiftY + offset[1]
-      }
-      // console.log(whiteboardRect.top + offset[1] >= whiteboardContainerRect.top - 400, whiteboardRect.bottom + offset[1] <= whiteboardContainerRect.bottom + 40)
-      console.log(whiteboardRect.bottom, offset[1],
-        whiteboardContainerRect.bottom + 100
-      )
-      canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasStylesRef.current["scale"]})`;
-      canvasStylesRef.current["translateX"] = newShiftX
-      canvasStylesRef.current["translateY"] = newShiftY
-    }
-
-    function onReleaseNavigate(e){
-      document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", onMoveNavigate)
-      document.removeEventListener("mouseup", onReleaseNavigate)
-    }
-
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMoveNavigate)
-    document.addEventListener("mouseup", onReleaseNavigate)
-  }
+  //   document.body.style.userSelect = "none";
+  //   document.addEventListener("mousemove", onMoveNavigate)
+  //   document.addEventListener("mouseup", onReleaseNavigate)
+  // }
 
 
   return (
@@ -351,28 +333,28 @@ function Whiteboard(){
       {roomID &&
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
-          <div className={styles.whiteboardScrollable} onMouseDown={startNavigatingCanvas}>
-            <section className={styles.canvasArea} style={{color:"white"}}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing}/>
+          <div className={styles.whiteboardScrollable}>
+            <section className={styles.canvasArea}>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing} style={{backgroundColor:"white"}}/>
             </section>
           </div>
           <button className={styles.clearButton} onClick={clearCanvas}>clear</button>
           <span className={styles.reverseButtons}>
-            <button className={styles.undoButton} onClick={undoCanvas}>undo</button>
-            <button className={styles.redoButton} onClick={redoCanvas}>redo</button>
+            {/* <button className={styles.undoButton} onClick={undoCanvas}>undo</button>
+            <button className={styles.redoButton} onClick={redoCanvas}>redo</button> */}
           </span>
         </div>
         <div className={styles.tools}>
           <h3>Draw</h3>
           <section className={styles.modesContainer}>
-            <button onClick={()=>{currentType.current = "draw"}}>Draw</button>
-            <button onClick={()=>{currentType.current = "erase"}}>Erase</button>
-            <button onClick={()=>{currentType.current = "fill"}}>Fill</button>
-            <button onClick={()=>{currentType.current = "navigate"}}>Navigate</button>
-            <button onClick={zoomIn}>Zoom In</button>
-            <button onClick={zoomOut}>Zoom Out</button>
+            <button onClick={()=>{canvasInfo.current["type"] = "draw"}}>Draw</button>
+            <button onClick={()=>{canvasInfo.current["type"] = "erase"}}>Erase</button>
+            <button onClick={()=>{canvasInfo.current["type"] = "fill"}}>Fill</button>
+            <button onClick={()=>{canvasInfo.current["type"] = "navigate"}}>Navigate</button>
+            {/* <button onClick={zoomIn}>Zoom In</button>
+            <button onClick={zoomOut}>Zoom Out</button> */}
 
-            <input ref={strokeSizeRef} onChange={(e)=>console.log(e.target.value)} type="range" min="1" max="30"/>
+            <input onChange={(e)=>{canvasInfo.current["lineWidth"] = e.target.value}} type="range" min="1" max="30"/>
           </section>
           <h3>Colors</h3>
           <section className={styles.colorsContainer}>
@@ -380,7 +362,7 @@ function Whiteboard(){
               {
                 colors.map(item=>{
                   return (
-                    <span key={item} className={styles.color} style={{backgroundColor:`${item}`}} onClick={() => {currentColor.current = item}}>
+                    <span key={item} className={styles.color} style={{backgroundColor:`${item}`}} onClick={() => {canvasInfo.current["color"] = item}}>
                     </span>
                   )
                 })

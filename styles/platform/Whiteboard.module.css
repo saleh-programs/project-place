@@ -40,6 +40,7 @@
 }
 .canvasArea{ 
   background-color: rgb(191, 189, 189);
+
   position: absolute;
   padding: 50px;
 } 
