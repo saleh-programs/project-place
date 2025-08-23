@@ -250,66 +250,6 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 
-async function addUndoReq(canvasBuffer, roomID){
-  console.log(canvasBuffer, roomID)
-  try{
-    const response = await fetch(baseurl + "/addUndo" + `?roomID=${roomID}}`, {
-      "method": "POST",
-      "headers": {"Content-Type": "application/octet-stream"},
-      "body": canvasBuffer
-    })
-    const data = await response.json()
-    if (!data.success){
-      throw new Error(data.message || "req failed")
-    }
-    return data
-  }catch(err){
-    console.error(err)
-    return null
-  }
-}
-async function addRedoReq(canvasBuffer, roomID){
-  try{
-    const response = await fetch(baseurl + "/addRedo" + `?roomID=${roomID}}`, {
-      "method": "POST",
-      "headers": {"Content-Type": "application/octet-stream"},
-      "body": canvasBuffer
-    })
-    const data = await response.json()
-    if (!data.success){
-      throw new Error(data.message || "req failed")
-    }
-    return data
-  }catch(err){
-    console.error(err)
-    return null
-  }
-}
-async function getUndoReq(roomID){
-  try{
-    const response = await fetch(baseurl + "/getUndo" + `?roomID=${roomID}}`, {
-      "method": "GET"
-    })
-    const data = await response.blob()
-    return data
-  }catch(err){
-    console.error(err)
-    return null
-  }
-}
-async function getRedoReq(roomID){
-  try{
-    const response = await fetch(baseurl + "/getRedo" + `?roomID=${roomID}}`, {
-      "method": "GET"
-    })
-    const data = await response.blob()
-    return data
-  }catch(err){
-    console.error(err)
-    return null
-  }
-}
-
 async function getRoomUsersReq(roomID) {
   try{
     const response = await fetch(baseurl + "getRoomUsers",{
@@ -346,8 +286,7 @@ async function addRoomUserReq(username, roomID) {
     return null
   }
 }
-export {getUniqueMessageID,
-  addUndoReq, addRedoReq, getUndoReq, getRedoReq,getRoomUsersReq, addRoomUserReq,
+export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq,
   createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
   updateUsernameReq, getCanvas, updateCanvasReq}

@@ -28,6 +28,9 @@ function Whiteboard(){
   const hiddenCanvasRef = useRef(null)
   const hiddenCxt = useRef(null)
 
+  const undoStates = useRef([])
+  const redoStates = useRef([])
+
   const colors = [
     "black","white","gray","red","green","orange","blue", "cyan",
     "yellow", "purple", "brown", "pink"
@@ -43,9 +46,11 @@ function Whiteboard(){
 
   useEffect(()=>{
     if (roomID){
-      cxtRef.current = canvasRef.current.getContext("2d")
+      cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
       hiddenCanvasRef.current = document.createElement("canvas")
       hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
+
+      handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
       // reconstructCanvas(roomID)
     }
   },[roomID])
@@ -118,9 +123,12 @@ function Whiteboard(){
       }
     }
   }
-
-
-  function startDrawing(event){
+  function handleCanvasAction(state){
+      undoStates.current.push(state)
+      undoStates.current.length > 10 && undoStates.current.shift()
+      redoStates.current = []
+  }
+  function draw(event){
     const cxt = cxtRef.current
     const rect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round((event.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((event.clientY - rect.top))/canvasInfo.current["scale"]]
@@ -137,11 +145,14 @@ function Whiteboard(){
       strokes.current.fullStroke.push(pos)
       // sendBatchStrokesThrottled()      
     }
+
      function onReleaseStroke(e){
       // sendStroke()
+      cxt.globalCompositeOperation = "source-over"
+      handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
       document.removeEventListener("mouseup", onReleaseStroke) 
-      cxt.globalCompositeOperation = "source-over"
+      
     }
 
     switch (canvasInfo.current["type"]){
@@ -158,11 +169,133 @@ function Whiteboard(){
         canvasRef.current.addEventListener("mousemove", onMoveStroke)
         document.addEventListener("mouseup", onReleaseStroke)
         break
-      case "fill":
-        canvasFill(...startStrokePoint.current)
-        break
     }
   }
+  function fill(startX, startY){
+    const cxt = cxtRef.current
+    const startImage = cxt.getImageData(startX, startY,1,1)
+    const startColor = startImage.data
+
+    cxt.fillStyle = canvasInfo.current["color"]
+    cxt.fillRect(startX,startY,1,1)
+    const fillColor = cxt.getImageData(startX,startY,1,1).data
+    cxt.putImageData(startImage,startX,startY)
+
+    const canvasImage = cxt.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
+    const canvasData = canvasImage.data
+
+    const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
+    const pixelQueue = new Queue()
+    pixelQueue.enqueue([startX,startY])
+    const tolerance = 70
+    while (!pixelQueue.isEmpty()){
+      const [x, y] = pixelQueue.dequeue()
+      visited[x + y * canvasRef.current.width] = 1
+      const val = 4*(x + y * canvasRef.current.width)
+      const currentColor = [
+        canvasData[val],
+        canvasData[val + 1],
+        canvasData[val + 2],
+        canvasData[val + 3]
+      ]
+
+      const RGBdistance = 
+        (currentColor[0] - startColor[0])**2 +
+        (currentColor[1] - startColor[1])**2 +
+        (currentColor[2] - startColor[2])**2 
+
+      const matchesColor = RGBdistance < tolerance**2
+      if (!matchesColor){
+        continue
+      }
+      canvasData[val] = fillColor[0]
+      canvasData[val + 1] = fillColor[1]
+      canvasData[val + 2] = fillColor[2]
+      canvasData[val + 3] = fillColor[3]
+
+      const neighbors = [
+        [x,y-1],[x,y+1],
+        [x-1,y],[x+1,y],
+      ]
+      neighbors.forEach((item)=>{
+        const isInCanvas = (item[0] >= 0 && item[0] < canvasRef.current.width) && (item[1] >=0 && item[1] < canvasRef.current.height);
+        (!visited[item[0] + item[1] * canvasRef.current.width] && isInCanvas) && pixelQueue.enqueue(item);
+      })
+    }
+    cxt.putImageData(canvasImage,0,0)
+    handleCanvasAction(canvasImage)
+  }
+  function clear(){
+    const cxt = cxtRef.current
+    cxt.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
+    handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
+    // sendJsonMessage({
+    //   "origin": "whiteboard",
+    //   "type": "clear",
+    //   "username": username
+    // })
+  }
+  function navigate(e){
+    if (canvasInfo.current["type"] !== "navigate"){
+      return
+    }
+    const containerRect = e.currentTarget.getBoundingClientRect()
+    let canvasRect = canvasRef.current.getBoundingClientRect()
+    const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
+    const shiftX = canvasInfo.current["translateX"]
+    const shiftY = canvasInfo.current["translateY"]
+
+    function onMoveNavigate(e){
+      const pos = [Math.round(e.clientX), Math.round(e.clientY)]
+      const offset = [pos[0] - startMousePos[0], pos[1] - startMousePos[1]]
+
+      let newShiftX = canvasInfo.current["translateX"]
+      let newShiftY = canvasInfo.current["translateY"]
+
+      const withinHorizontalBounds = canvasRect.right + offset[0] >= containerRect.left + 10 && canvasRect.left + offset[0] <= containerRect.right - 10
+      const withinVerticalBounds = canvasRect.top + offset[1] <= containerRect.bottom - 10 && canvasRect.bottom + offset[1] >= containerRect.top + 10
+
+      if (withinHorizontalBounds){
+        newShiftX = shiftX + offset[0]
+      }
+      if (withinVerticalBounds){
+        newShiftY = shiftY + offset[1]
+      }
+      canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasInfo.current["scale"]})`;
+      canvasInfo.current["translateX"] = newShiftX
+      canvasInfo.current["translateY"] = newShiftY
+    }
+
+    function onReleaseNavigate(e){
+      document.body.style.userSelect = "";
+      document.removeEventListener("mousemove", onMoveNavigate)
+      document.removeEventListener("mouseup", onReleaseNavigate)
+    }
+
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMoveNavigate)
+    document.addEventListener("mouseup", onReleaseNavigate)
+  }
+  function zoom(type){
+    const increment = type === "in" ? 0.2 :  -0.2
+    canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
+    canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
+  }
+  function undo(){
+    const cxt = cxtRef.current
+    if (undoStates.current.length > 1){
+      redoStates.current.push(undoStates.current.pop())
+      cxt.putImageData(undoStates.current.at(-1), 0, 0)
+    }
+  }
+  function redo(){
+    const cxt = cxtRef.current
+    if (redoStates.current.length > 0){
+      undoStates.current.push(redoStates.current.pop())
+      cxt.putImageData(undoStates.current.at(-1), 0, 0)
+    }
+  }
+
 
   //Just ignore server side for now
   function externalDraw(data){
@@ -206,124 +339,8 @@ function Whiteboard(){
     canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
   }
 
-  function clearCanvas(){
-    const cxt = cxtRef.current
-    cxt.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
-    // sendJsonMessage({
-    //   "origin": "whiteboard",
-    //   "type": "clear",
-    //   "username": username
-    // })
-  }
 
-  async function canvasFill(startX, startY){
-    const cxt = cxtRef.current
-    const startImage = cxt.getImageData(startX, startY,1,1)
-    const startColor = startImage.data
 
-    cxt.fillStyle = canvasInfo.current["color"]
-    cxt.fillRect(startX,startY,1,1)
-    const fillColor = cxt.getImageData(startX,startY,1,1).data
-    cxt.putImageData(startImage,startX,startY)
-
-    const canvasImage = cxt.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
-    const canvasData = canvasImage.data
-
-    const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
-    const pixelQueue = new Queue()
-    pixelQueue.enqueue([startX,startY])
-    const tolerance = 70
-    while (!pixelQueue.isEmpty()){
-      const [x, y] = pixelQueue.dequeue()
-      const isInCanvas = (
-        (x >= 0 && x < canvasRef.current.width) 
-        && 
-        (y >=0 && y < canvasRef.current.height))
-      if (!isInCanvas || visited[x + y * canvasRef.current.width]){
-        continue
-      }
-      visited[x + y * canvasRef.current.width] = 1
-      const val = 4*(x + y * canvasRef.current.width)
-      const currentColor = [
-        canvasData[val],
-        canvasData[val + 1],
-        canvasData[val + 2],
-        canvasData[val + 3]
-      ]
-
-      const RGBdistance = 
-        (currentColor[0] - startColor[0])**2 +
-        (currentColor[1] - startColor[1])**2 +
-        (currentColor[2] - startColor[2])**2 +
-        (currentColor[3] - startColor[3])**2
-      
-      const matchesColor = RGBdistance < tolerance**2
-      if (!matchesColor){
-        continue
-      }
-      canvasData[val] = fillColor[0]
-      canvasData[val + 1] = fillColor[1]
-      canvasData[val + 2] = fillColor[2]
-      canvasData[val + 3] = fillColor[3]
-
-      const neighbors = [
-        [x,y-1],[x,y+1],
-        [x-1,y],[x+1,y],
-      ]
-      neighbors.forEach(item=>{
-        pixelQueue.enqueue(item)
-      })
-    }
-    cxt.putImageData(canvasImage,0,0)
-  }
-
-  function startNavigatingCanvas(e){
-    if (canvasInfo.current["type"] !== "navigate"){
-      return
-    }
-    const containerRect = e.currentTarget.getBoundingClientRect()
-    let canvasRect = canvasRef.current.getBoundingClientRect()
-    const startMousePos = [Math.round(e.clientX), Math.round(e.clientY)]
-    const shiftX = canvasInfo.current["translateX"]
-    const shiftY = canvasInfo.current["translateY"]
-
-    function onMoveNavigate(e){
-      const pos = [Math.round(e.clientX), Math.round(e.clientY)]
-      const offset = [pos[0] - startMousePos[0], pos[1] - startMousePos[1]]
-
-      let newShiftX = canvasInfo.current["translateX"]
-      let newShiftY = canvasInfo.current["translateY"]
-
-      const withinHorizontalBounds = canvasRect.right + offset[0] >= containerRect.left + 10 && canvasRect.left + offset[0] <= containerRect.right - 10
-      const withinVerticalBounds = canvasRect.top + offset[1] <= containerRect.bottom - 10 && canvasRect.bottom + offset[1] >= containerRect.top + 10
-
-      if (withinHorizontalBounds){
-        newShiftX = shiftX + offset[0]
-      }
-      if (withinVerticalBounds){
-        newShiftY = shiftY + offset[1]
-      }
-      canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasInfo.current["scale"]})`;
-      canvasInfo.current["translateX"] = newShiftX
-      canvasInfo.current["translateY"] = newShiftY
-    }
-
-    function onReleaseNavigate(e){
-      document.body.style.userSelect = "";
-      document.removeEventListener("mousemove", onMoveNavigate)
-      document.removeEventListener("mouseup", onReleaseNavigate)
-    }
-
-    document.body.style.userSelect = "none";
-    document.addEventListener("mousemove", onMoveNavigate)
-    document.addEventListener("mouseup", onReleaseNavigate)
-  }
-
-  function zoom(type){
-    const increment = type === "in" ? 0.2 :  -0.2
-    canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
-    canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
-  }
 
 
   return (
@@ -335,14 +352,14 @@ function Whiteboard(){
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable}>
-            <section className={styles.canvasArea} onMouseDown={startNavigatingCanvas}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startDrawing}/>
+            <section className={styles.canvasArea} onMouseDown={navigate}>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={draw} onClick={e=>{canvasInfo.current["type"] === "fill" && fill(e.clientX, e.clientY)}}/>
             </section>
           </div>
-          <button className={styles.clearButton} onClick={clearCanvas}>clear</button>
+          <button className={styles.clearButton} onClick={clear}>clear</button>
           <span className={styles.reverseButtons}>
-            {/* <button className={styles.undoButton} onClick={undoCanvas}>undo</button>
-            <button className={styles.redoButton} onClick={redoCanvas}>redo</button> */}
+            <button className={styles.undoButton} onClick={undo}>undo</button>
+            <button className={styles.redoButton} onClick={redo}>redo</button>
           </span>
         </div>
         <div className={styles.tools}>
