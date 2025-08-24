@@ -28,4 +28,5 @@ dist-ssr
 venv
 .env
 startDev.ps1
+startDev.sh
 logs.txt
