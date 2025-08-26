@@ -10,7 +10,7 @@ function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
 
   const canvasInfo = useRef({
-    "type": "draw",
+    "type": "idle",
     "color": "black",
     "lineWidth": 10,
     "scale": 1.0,
@@ -37,7 +37,7 @@ function Whiteboard(){
   ]
 
   useEffect(()=>{  
-    // externalDrawRef.current = externalDraw 
+    externalDrawRef.current = externalDraw 
 
   return ()=>{
     externalDrawRef.current = (param1) => {}
@@ -65,39 +65,39 @@ function Whiteboard(){
   //   }
   // }
 
-  // function sendBatchStrokes(){
-  //   batchedStrokes.current.batchStroke.unshift(startStrokePoint.current)
-  //   startStrokePoint.current = batchedStrokes.current.batchStroke[batchedStrokes.current.batchStroke.length-1]
-  //   sendJsonMessage({
-  //     "origin": "whiteboard",
-  //     "type": currentType.current,
-  //     "username": username,
-  //     "data": batchedStrokes.current.batchStroke,
-  //     "metadata": {
-  //       "status": "isDrawing",
-  //       "color": currentColor.current,
-  //       "size": strokeSizeRef.current.value,
-  //     }
+  function sendBatchStrokes(){
+    strokes.current["batchStroke"].unshift(startStrokePoint.current)
+    startStrokePoint.current = strokes.current["batchStroke"].at(-1) 
+    const {strokeType, color, lineWidth} = canvasInfo
+    sendJsonMessage({
+      "origin": "whiteboard",
+      "type": strokeType === "draw" ? "isDrawing" : "isErasing",
+      "username": username,
+      "data": strokes.current["batchStroke"],
+      "metadata": {
+        "color": color,
+        "lineWidth": lineWidth,
+      }
 
-  //   })
-  //   batchedStrokes.current.batchStroke = []
-  // }
+    })
+    strokes.current["batchStroke"] = []
+  }
 
-  // function sendStroke(){
-  //   sendJsonMessage({
-  //     "origin": "whiteboard",
-  //     "type": currentType.current,
-  //     "username": username,
-  //     "data": batchedStrokes.current.fullStroke,
-  //     "metadata": {
-  //       "status": "doneDrawing",
-  //       "color": currentColor.current,
-  //       "size": strokeSizeRef.current.value,
-  //     }
-  //   })
-  //   batchedStrokes.current.fullStroke = []
-  //   canvasRef.current.toBlob(blob => addUndoReq(blob, roomID))
-  // }
+  function sendStroke(){
+    const {strokeType, color, lineWidth} = canvasInfo
+
+    sendJsonMessage({
+      "origin": "whiteboard",
+      "type": strokeType === "draw" ? "doneDrawing" : "doneErasing",
+      "username": username,
+      "data": strokes.current["fullStroke"],
+      "metadata": {
+        "color": color,
+        "lineWidth": lineWidth
+      }
+    })
+    strokes.current["fullStroke"] = []
+  }
 
   function throttle(func){
     let timerID = null
@@ -132,33 +132,42 @@ function Whiteboard(){
     const cxt = cxtRef.current
     const rect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round((event.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((event.clientY - rect.top))/canvasInfo.current["scale"]]
-    // const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
+    const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
     cxt.strokeStyle = canvasInfo.current["color"]
     cxt.lineWidth = canvasInfo.current["lineWidth"]
 
+    let done = false
+
     function onMoveStroke(e){
-      const pos = [Math.round((e.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((e.clientY - rect.top))/canvasInfo.current["scale"]]
-      cxt.lineTo(...pos)
-      cxt.stroke()
-      strokes.current.batchStroke.push(pos)
-      strokes.current.fullStroke.push(pos)
-      // sendBatchStrokesThrottled()      
+      if(!done){
+        done = true
+        requestAnimationFrame(()=>{
+          const pos = [Math.round((e.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((e.clientY - rect.top)/canvasInfo.current["scale"])]
+          cxt.lineTo(...pos)
+          cxt.stroke()
+          strokes.current["batchStroke"].push(pos)
+          strokes.current["fullStroke"].push(pos)
+          sendBatchStrokesThrottled()   
+          done = false
+        })  
+      } 
     }
 
      function onReleaseStroke(e){
-      // sendStroke()
+      sendStroke()
       cxt.globalCompositeOperation = "source-over"
       handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
+
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
       document.removeEventListener("mouseup", onReleaseStroke) 
-      
     }
 
     switch (canvasInfo.current["type"]){
       case "draw":
         cxt.beginPath()
         cxt.moveTo(...startStrokePoint.current)
+
         canvasRef.current.addEventListener("mousemove", onMoveStroke)
         document.addEventListener("mouseup", onReleaseStroke)
         break
@@ -166,17 +175,18 @@ function Whiteboard(){
         cxt.globalCompositeOperation = "destination-out"
         cxt.beginPath()
         cxt.moveTo(...startStrokePoint.current)
+
         canvasRef.current.addEventListener("mousemove", onMoveStroke)
         document.addEventListener("mouseup", onReleaseStroke)
         break
     }
   }
-  function fill(startX, startY){
+  function fill(startX, startY, color, send=true){
     const cxt = cxtRef.current
     const startImage = cxt.getImageData(startX, startY,1,1)
     const startColor = startImage.data
 
-    cxt.fillStyle = canvasInfo.current["color"]
+    cxt.fillStyle = color
     cxt.fillRect(startX,startY,1,1)
     const fillColor = cxt.getImageData(startX,startY,1,1).data
     cxt.putImageData(startImage,startX,startY)
@@ -223,17 +233,29 @@ function Whiteboard(){
       })
     }
     cxt.putImageData(canvasImage,0,0)
-    handleCanvasAction(canvasImage)
+    if (send){
+      handleCanvasAction(canvasImage)
+      sendJsonMessage({
+        "origin": "whiteboard",
+        "type": "fill",
+        "username": username,
+        "data": [startX,startY],
+        "metadata":{
+          "color": canvasInfo.current["color"],
+          "lineWidth": canvasInfo.current["lineWidth"]
+        }
+      })
+    }
   }
   function clear(){
     const cxt = cxtRef.current
     cxt.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
     handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
-    // sendJsonMessage({
-    //   "origin": "whiteboard",
-    //   "type": "clear",
-    //   "username": username
-    // })
+    sendJsonMessage({
+      "origin": "whiteboard",
+      "type": "clear",
+      "username": username
+    })
   }
   function navigate(e){
     if (canvasInfo.current["type"] !== "navigate"){
@@ -297,50 +319,46 @@ function Whiteboard(){
   }
 
 
-  //Just ignore server side for now
   function externalDraw(data){
     const cxt = hiddenCxt.current
-    cxt.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
+    cxt.globalCompositeOperation = "source-over"
+    if (data["metadata"]){
+      cxt.strokeStyle = data["metadata"]["color"]
+      cxt.lineWidth = data["metadata"]["lineWidth"]
+    }
+    data.type = ("isErasing" || "doneErasing") ? "erase" : ("isDrawing" || "doneDrawing") ? "draw" : data.type
+
+    const commands = data["data"]
 
     switch (data.type){
       case "draw":
-        whiteboard.lineWidth = data.metadata.size
-        whiteboard.strokeStyle = data.metadata.color
-        whiteboard.moveTo(...commands[0])
-        if (data.metadata.status === "isDrawing"){
-          for (let i = 1; i < commands.length; i++){
-            whiteboard.lineTo(...commands[i])
-          }
-          whiteboard.stroke()
-        }else if (data.metadata.status === "doneDrawing"){
-          for (let i = 1; i < commands.length; i++){
-            whiteboard.lineTo(...commands[i])
-            whiteboard.stroke()
-          }
+        cxt.beginPath()
+        cxt.moveTo(...commands[0])
+        for (let i = 1; i < commands.length; i++){
+          cxt.lineTo(...commands[i])
         }
+        cxt.stroke()
         break
       case "erase":
-        whiteboard.lineWidth = data.metadata.size
-        whiteboard.strokeStyle = "white"
+        cxt.beginPath()
+        cxt.moveTo(...commands[0])
         for (let i = 1; i < commands.length; i++){
-          whiteboard.lineTo(...commands[i])
-          whiteboard.stroke()
+          cxt.lineTo(...commands[i])
         }
+        cxt.stroke()
+        cxt.globalCompositeOperation = "destination-out"
         break
       case "fill":
-        canvasFill(data.data[0], data.data[1], data.metadata.color)
+        fill(...commands,data["metadata"]["color"],send=false)
         break
       case "clear":
-        const mainCanvas =  canvasRef.current.getContext("2d")
-        mainCanvas.fillStyle = "white"
-        mainCanvas.fillRect(0,0,canvasRef.current.width, canvasRef.current.height)
+        cxt.fillRect(0,0,hiddenCanvasRef.current.width, hiddenCanvasRef.current.height)
+        cxt.globalCompositeOperation = "destination-out"
         break
     }
-    canvasRef.current.getContext("2d").drawImage(hiddenCanvasRef.current,0,0)
+    cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
+    cxt.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
   }
-
-
-
 
 
   return (
@@ -353,7 +371,7 @@ function Whiteboard(){
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable}>
             <section className={styles.canvasArea} onMouseDown={navigate}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={draw} onClick={e=>{canvasInfo.current["type"] === "fill" && fill(e.clientX, e.clientY)}}/>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={draw} onClick={e=>{canvasInfo.current["type"] === "fill" && fill(e.clientX, e.clientY, canvasInfo.current["color"])}}/>
             </section>
           </div>
           <button className={styles.clearButton} onClick={clear}>clear</button>

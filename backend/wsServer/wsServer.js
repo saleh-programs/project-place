@@ -94,10 +94,10 @@ async function broadcastMessage(data, uuid){
 }
 function broadcastWhiteboard(data, uuid){
   // Updates the server's canvas
-  setImmediate(()=>{
-    updateServerCanvas(data, users[uuid].roomID)
-    updateCanvasReq(rooms[users[uuid].roomID]["canvas"].toBuffer("image/png"),users[uuid].roomID)
-  })
+  // setImmediate(()=>{
+  //   updateServerCanvas(data, users[uuid].roomID)
+  //   updateCanvasReq(rooms[users[uuid].roomID]["canvas"].toBuffer("image/png"),users[uuid].roomID)
+  // })
 
   // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
