@@ -42,6 +42,9 @@ class Queue {
   isEmpty(){
     return this.head === null
   }
+  peak(){
+    return this.tail.data
+  }
 }
 
 export default Queue

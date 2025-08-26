@@ -5,6 +5,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import { getCanvas, getInstructions, addUndoReq, addRedoReq, getUndoReq, getRedoReq } from "backend/requests"
 import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
+import { resolve } from "styled-jsx/css"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
@@ -182,6 +183,8 @@ function Whiteboard(){
     }
   }
   function fill(startX, startY, color, send=true){
+    startX /= canvasInfo.current["scale"]
+    startY /= canvasInfo.current["scale"]
     const cxt = cxtRef.current
     const startImage = cxt.getImageData(startX, startY,1,1)
     const startColor = startImage.data
@@ -200,7 +203,6 @@ function Whiteboard(){
     const tolerance = 70
     while (!pixelQueue.isEmpty()){
       const [x, y] = pixelQueue.dequeue()
-      visited[x + y * canvasRef.current.width] = 1
       const val = 4*(x + y * canvasRef.current.width)
       const currentColor = [
         canvasData[val],
@@ -229,7 +231,10 @@ function Whiteboard(){
       ]
       neighbors.forEach((item)=>{
         const isInCanvas = (item[0] >= 0 && item[0] < canvasRef.current.width) && (item[1] >=0 && item[1] < canvasRef.current.height);
-        (!visited[item[0] + item[1] * canvasRef.current.width] && isInCanvas) && pixelQueue.enqueue(item);
+        if (!visited[item[0] + item[1] * canvasRef.current.width] && isInCanvas){
+          pixelQueue.enqueue(item);
+          visited[item[0] + item[1] * canvasRef.current.width] = 1
+        }
       })
     }
     cxt.putImageData(canvasImage,0,0)
@@ -371,7 +376,11 @@ function Whiteboard(){
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable}>
             <section className={styles.canvasArea} onMouseDown={navigate}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={draw} onClick={e=>{canvasInfo.current["type"] === "fill" && fill(e.clientX, e.clientY, canvasInfo.current["color"])}}/>
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={draw}
+              onClick={e=>{
+                const rect = canvasRef.current.getBoundingClientRect()
+                canvasInfo.current["type"] === "fill" && fill(e.clientX-rect.left, e.clientY-rect.top, canvasInfo.current["color"])
+                }}/>
             </section>
           </div>
           <button className={styles.clearButton} onClick={clear}>clear</button>
