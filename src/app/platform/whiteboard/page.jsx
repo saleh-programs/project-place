@@ -49,6 +49,8 @@ function Whiteboard(){
     if (roomID){
       cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
       hiddenCanvasRef.current = document.createElement("canvas")
+      hiddenCanvasRef.current.width = canvasRef.current.width
+      hiddenCanvasRef.current.height = canvasRef.current.height
       hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
 
       handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
@@ -69,10 +71,10 @@ function Whiteboard(){
   function sendBatchStrokes(){
     strokes.current["batchStroke"].unshift(startStrokePoint.current)
     startStrokePoint.current = strokes.current["batchStroke"].at(-1) 
-    const {strokeType, color, lineWidth} = canvasInfo
+    const {type, color, lineWidth} = canvasInfo.current
     sendJsonMessage({
       "origin": "whiteboard",
-      "type": strokeType === "draw" ? "isDrawing" : "isErasing",
+      "type": type === "draw" ? "isDrawing" : "isErasing",
       "username": username,
       "data": strokes.current["batchStroke"],
       "metadata": {
@@ -85,11 +87,11 @@ function Whiteboard(){
   }
 
   function sendStroke(){
-    const {strokeType, color, lineWidth} = canvasInfo
-
+    const {type, color, lineWidth} = canvasInfo.current
+    console.log(type)
     sendJsonMessage({
       "origin": "whiteboard",
-      "type": strokeType === "draw" ? "doneDrawing" : "doneErasing",
+      "type": type === "draw" ? "doneDrawing" : "doneErasing",
       "username": username,
       "data": strokes.current["fullStroke"],
       "metadata": {
@@ -97,6 +99,7 @@ function Whiteboard(){
         "lineWidth": lineWidth
       }
     })
+    console.log("emptied")
     strokes.current["fullStroke"] = []
   }
 
@@ -132,7 +135,9 @@ function Whiteboard(){
   function draw(event){
     const cxt = cxtRef.current
     const rect = canvasRef.current.getBoundingClientRect()
-    startStrokePoint.current = [Math.round((event.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((event.clientY - rect.top))/canvasInfo.current["scale"]]
+    startStrokePoint.current = [Math.round((event.clientX - rect.left) /canvasInfo.current["scale"]),Math.round((event.clientY - rect.top)/canvasInfo.current["scale"])]
+    console.log(strokes)
+    strokes.current["fullStroke"] = [startStrokePoint.current]
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
     cxt.strokeStyle = canvasInfo.current["color"]
@@ -144,11 +149,13 @@ function Whiteboard(){
       if(!done){
         done = true
         requestAnimationFrame(()=>{
-          const pos = [Math.round((e.clientX - rect.left)/canvasInfo.current["scale"]), Math.round((e.clientY - rect.top)/canvasInfo.current["scale"])]
-          cxt.lineTo(...pos)
+          const pos = [e.clientX - rect.left, e.clientY - rect.top]
+          const scaledPos = [Math.round(pos[0] /canvasInfo.current["scale"]),Math.round(pos[1] /canvasInfo.current["scale"])]
+          cxt.lineTo(...scaledPos)
           cxt.stroke()
-          strokes.current["batchStroke"].push(pos)
-          strokes.current["fullStroke"].push(pos)
+          strokes.current["batchStroke"].push(scaledPos)
+          strokes.current["fullStroke"].push(scaledPos)
+          console.log("added")
           sendBatchStrokesThrottled()   
           done = false
         })  
@@ -156,6 +163,7 @@ function Whiteboard(){
     }
 
      function onReleaseStroke(e){
+      sendBatchStrokesThrottled()
       sendStroke()
       cxt.globalCompositeOperation = "source-over"
       handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
@@ -214,7 +222,9 @@ function Whiteboard(){
       const RGBdistance = 
         (currentColor[0] - startColor[0])**2 +
         (currentColor[1] - startColor[1])**2 +
-        (currentColor[2] - startColor[2])**2 
+        (currentColor[2] - startColor[2])**2 +
+        (currentColor[3] - startColor[3])**2 
+
 
       const matchesColor = RGBdistance < tolerance**2
       if (!matchesColor){
@@ -252,15 +262,18 @@ function Whiteboard(){
       })
     }
   }
-  function clear(){
+  function clear(send=true){
     const cxt = cxtRef.current
     cxt.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
-    handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
-    sendJsonMessage({
-      "origin": "whiteboard",
-      "type": "clear",
-      "username": username
-    })
+    if (send){
+      handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
+      sendJsonMessage({
+        "origin": "whiteboard",
+        "type": "clear",
+        "username": username,
+        "metadata": canvasInfo.current
+      })
+    }
   }
   function navigate(e){
     if (canvasInfo.current["type"] !== "navigate"){
@@ -326,14 +339,13 @@ function Whiteboard(){
 
   function externalDraw(data){
     const cxt = hiddenCxt.current
-    cxt.globalCompositeOperation = "source-over"
-    if (data["metadata"]){
-      cxt.strokeStyle = data["metadata"]["color"]
-      cxt.lineWidth = data["metadata"]["lineWidth"]
-    }
-    data.type = ("isErasing" || "doneErasing") ? "erase" : ("isDrawing" || "doneDrawing") ? "draw" : data.type
+    let commands = data["data"]
+    data.type = (data.type === "isErasing" || data.type === "doneErasing") ? "erase" : (( data.type === "isDrawing" || data.type === "doneDrawing") ? "draw" : data.type)
 
-    const commands = data["data"]
+    const old = cxtRef.current.globalCompositeOperation
+    cxt.strokeStyle = data["metadata"]["color"]
+    cxt.lineWidth = data["metadata"]["lineWidth"]
+
 
     switch (data.type){
       case "draw":
@@ -341,27 +353,27 @@ function Whiteboard(){
         cxt.moveTo(...commands[0])
         for (let i = 1; i < commands.length; i++){
           cxt.lineTo(...commands[i])
+          cxt.stroke()
         }
-        cxt.stroke()
         break
       case "erase":
         cxt.beginPath()
         cxt.moveTo(...commands[0])
         for (let i = 1; i < commands.length; i++){
           cxt.lineTo(...commands[i])
+          cxt.stroke()
         }
-        cxt.stroke()
-        cxt.globalCompositeOperation = "destination-out"
+        cxtRef.current.globalCompositeOperation = "destination-out"
         break
       case "fill":
-        fill(...commands,data["metadata"]["color"],send=false)
+        fill(...commands,data["metadata"]["color"],false)
         break
       case "clear":
-        cxt.fillRect(0,0,hiddenCanvasRef.current.width, hiddenCanvasRef.current.height)
-        cxt.globalCompositeOperation = "destination-out"
+        clear(false)
         break
     }
     cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
+    cxtRef.current.globalCompositeOperation = old
     cxt.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
   }
 
