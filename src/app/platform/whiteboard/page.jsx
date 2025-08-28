@@ -88,7 +88,7 @@ function Whiteboard(){
 
   function sendStroke(){
     const {type, color, lineWidth} = canvasInfo.current
-    console.log(type)
+
     sendJsonMessage({
       "origin": "whiteboard",
       "type": type === "draw" ? "doneDrawing" : "doneErasing",
@@ -99,7 +99,6 @@ function Whiteboard(){
         "lineWidth": lineWidth
       }
     })
-    console.log("emptied")
     strokes.current["fullStroke"] = []
   }
 
@@ -132,83 +131,101 @@ function Whiteboard(){
       undoStates.current.length > 10 && undoStates.current.shift()
       redoStates.current = []
   }
-  function draw(event){
+
+  function startStroke(event){
+    if (canvasInfo.current["type"] === "navigate"){
+      return
+    }
     const cxt = cxtRef.current
     const rect = canvasRef.current.getBoundingClientRect()
     startStrokePoint.current = [Math.round((event.clientX - rect.left) /canvasInfo.current["scale"]),Math.round((event.clientY - rect.top)/canvasInfo.current["scale"])]
-    console.log(strokes)
+    strokes.current["batchStroke"] = []
     strokes.current["fullStroke"] = [startStrokePoint.current]
+
     const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
 
-    cxt.strokeStyle = canvasInfo.current["color"]
-    cxt.lineWidth = canvasInfo.current["lineWidth"]
+    const isErasing = canvasInfo.current["type"] == "erase"
+    draw([startStrokePoint.current], cxt, isErasing)
 
     let done = false
-
     function onMoveStroke(e){
       if(!done){
         done = true
         requestAnimationFrame(()=>{
-          const pos = [e.clientX - rect.left, e.clientY - rect.top]
-          const scaledPos = [Math.round(pos[0] /canvasInfo.current["scale"]),Math.round(pos[1] /canvasInfo.current["scale"])]
-          cxt.lineTo(...scaledPos)
-          cxt.stroke()
+          const scaledPos = [Math.round((e.clientX - rect.left) /canvasInfo.current["scale"]),Math.round((e.clientY - rect.top) /canvasInfo.current["scale"])]
+          draw([scaledPos], cxt, isErasing, {persistent: true})
           strokes.current["batchStroke"].push(scaledPos)
           strokes.current["fullStroke"].push(scaledPos)
-          console.log("added")
           sendBatchStrokesThrottled()   
           done = false
         })  
       } 
     }
 
-     function onReleaseStroke(e){
-      sendBatchStrokesThrottled()
+    function onReleaseStroke(e){
       sendStroke()
-      cxt.globalCompositeOperation = "source-over"
       handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
 
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
       document.removeEventListener("mouseup", onReleaseStroke) 
-    }
+    } 
 
-    switch (canvasInfo.current["type"]){
-      case "draw":
-        cxt.beginPath()
-        cxt.moveTo(...startStrokePoint.current)
-
-        canvasRef.current.addEventListener("mousemove", onMoveStroke)
-        document.addEventListener("mouseup", onReleaseStroke)
-        break
-      case "erase":
-        cxt.globalCompositeOperation = "destination-out"
-        cxt.beginPath()
-        cxt.moveTo(...startStrokePoint.current)
-
-        canvasRef.current.addEventListener("mousemove", onMoveStroke)
-        document.addEventListener("mouseup", onReleaseStroke)
-        break
-    }
+    canvasRef.current.addEventListener("mousemove", onMoveStroke)
+    document.addEventListener("mouseup", onReleaseStroke)
   }
-  function fill(startX, startY, color, send=true){
-    startX /= canvasInfo.current["scale"]
-    startY /= canvasInfo.current["scale"]
+
+  function draw(commands, context, erase, options = {}){
+      const {
+        lineWidth=canvasInfo.current["lineWidth"], 
+        color=canvasInfo.current["color"], 
+        persistent=false} = options
+
+      if (persistent){
+        for (let i = 0; i < commands.length; i++){
+          context.lineTo(...commands[i])
+          context.stroke()
+        }
+        return
+      }
+
+      context.lineWidth = lineWidth
+      context.strokeStyle = color
+      context.globalCompositeOperation = erase ? "destination-out" : "source-over"
+
+      context.beginPath()
+      context.moveTo(...commands[0])
+      for (let i = 1; i < commands.length; i++){
+        context.lineTo(...commands[i])
+        context.stroke()
+      }
+
+  }
+
+  function fill([X,Y], options={}){
+    const {color=canvasInfo.current["color"]} = options
+
     const cxt = cxtRef.current
-    const startImage = cxt.getImageData(startX, startY,1,1)
+
+    // store starting color
+    const startImage = cxt.getImageData(X, Y,1,1)
     const startColor = startImage.data
 
+    // get computed fill color 
     cxt.fillStyle = color
-    cxt.fillRect(startX,startY,1,1)
-    const fillColor = cxt.getImageData(startX,startY,1,1).data
-    cxt.putImageData(startImage,startX,startY)
+    cxt.fillRect(X,Y,1,1)
+    const fillColor = cxt.getImageData(X,Y,1,1).data
+    cxt.putImageData(startImage,X,Y)
+
 
     const canvasImage = cxt.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
     const canvasData = canvasImage.data
 
+    //bfs fill
     const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
     const pixelQueue = new Queue()
-    pixelQueue.enqueue([startX,startY])
+    pixelQueue.enqueue([X,Y])
     const tolerance = 70
+
     while (!pixelQueue.isEmpty()){
       const [x, y] = pixelQueue.dequeue()
       const val = 4*(x + y * canvasRef.current.width)
@@ -248,33 +265,36 @@ function Whiteboard(){
       })
     }
     cxt.putImageData(canvasImage,0,0)
-    if (send){
+
+    if (Object.keys(options).length == 0){
       handleCanvasAction(canvasImage)
       sendJsonMessage({
         "origin": "whiteboard",
         "type": "fill",
         "username": username,
-        "data": [startX,startY],
+        "data": [X,Y],
         "metadata":{
-          "color": canvasInfo.current["color"],
-          "lineWidth": canvasInfo.current["lineWidth"]
+          "color": canvasInfo.current["color"]
         }
       })
     }
   }
-  function clear(send=true){
-    const cxt = cxtRef.current
-    cxt.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
-    if (send){
-      handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
+
+  function clear(context, options={}){
+    const {clientClear = true} = options
+    console.log(context)
+    context.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
+
+    if (clientClear){
+      handleCanvasAction(context.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
       sendJsonMessage({
         "origin": "whiteboard",
         "type": "clear",
-        "username": username,
-        "metadata": canvasInfo.current
+        "username": username
       })
     }
   }
+
   function navigate(e){
     if (canvasInfo.current["type"] !== "navigate"){
       return
@@ -339,42 +359,34 @@ function Whiteboard(){
 
   function externalDraw(data){
     const cxt = hiddenCxt.current
-    let commands = data["data"]
-    data.type = (data.type === "isErasing" || data.type === "doneErasing") ? "erase" : (( data.type === "isDrawing" || data.type === "doneDrawing") ? "draw" : data.type)
 
-    const old = cxtRef.current.globalCompositeOperation
-    cxt.strokeStyle = data["metadata"]["color"]
-    cxt.lineWidth = data["metadata"]["lineWidth"]
-
+    if (data.type === "isErasing" || data.type === "doneErasing"){
+      data.type = "erase"
+    }else if (data.type === "isDrawing" || data.type === "doneDrawing"){
+      data.type = "draw"
+    }
 
     switch (data.type){
       case "draw":
-        cxt.beginPath()
-        cxt.moveTo(...commands[0])
-        for (let i = 1; i < commands.length; i++){
-          cxt.lineTo(...commands[i])
-          cxt.stroke()
-        }
+        draw(data["data"], cxt, false, data["metadata"])
+        cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         break
       case "erase":
-        cxt.beginPath()
-        cxt.moveTo(...commands[0])
-        for (let i = 1; i < commands.length; i++){
-          cxt.lineTo(...commands[i])
-          cxt.stroke()
-        }
+        draw(data["data"], cxt, false, data["metadata"])
+
+        const storeOp = cxtRef.current.globalCompositeOperation 
         cxtRef.current.globalCompositeOperation = "destination-out"
+        cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
+        cxtRef.current.globalCompositeOperation = storeOp
         break
       case "fill":
-        fill(...commands,data["metadata"]["color"],false)
+        fill(data["data"], data["metadata"])
         break
       case "clear":
-        clear(false)
+        clear(cxtRef.current, {clientClear: false})
         break
     }
-    cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
-    cxtRef.current.globalCompositeOperation = old
-    cxt.clearRect(0,0,canvasRef.current.width,canvasRef.current.height)
+    clear(cxt, {clientClear: false})
   }
 
 
@@ -388,14 +400,14 @@ function Whiteboard(){
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable}>
             <section className={styles.canvasArea} onMouseDown={navigate}>
-              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={draw}
+              <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startStroke}
               onClick={e=>{
                 const rect = canvasRef.current.getBoundingClientRect()
-                canvasInfo.current["type"] === "fill" && fill(e.clientX-rect.left, e.clientY-rect.top, canvasInfo.current["color"])
+                canvasInfo.current["type"] === "fill" && fill([Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])])
                 }}/>
             </section>
           </div>
-          <button className={styles.clearButton} onClick={clear}>clear</button>
+          <button className={styles.clearButton} onClick={()=>clear(cxtRef.current)}>clear</button>
           <span className={styles.reverseButtons}>
             <button className={styles.undoButton} onClick={undo}>undo</button>
             <button className={styles.redoButton} onClick={redo}>redo</button>
