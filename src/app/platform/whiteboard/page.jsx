@@ -155,7 +155,7 @@ function Whiteboard(){
     }
 
     function onReleaseStroke(e){
-      sendStroke()
+      requestAnimationFrame(sendStroke)
       handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
 
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
@@ -183,7 +183,6 @@ function Whiteboard(){
       context.lineWidth = lineWidth
       context.strokeStyle = color
       context.globalCompositeOperation = erase ? "destination-out" : "source-over"
-      console.log(context.globalCompositeOperation, erase)
       context.beginPath()
       context.moveTo(...commands[0])
       for (let i = 1; i < commands.length; i++){
@@ -384,7 +383,6 @@ function Whiteboard(){
     }
     const action = data.type in mapActions ? mapActions[data.type] : data.type
     const storeOp = cxtRef.current.globalCompositeOperation 
-
     switch (action){
       case "draw":
         draw(data["data"], cxt, false, data["metadata"])
@@ -412,7 +410,6 @@ function Whiteboard(){
         break
       case "undo":
         undo({clientUndo: false})
-        console.log("undid")
         break
       case "redo":
         redo({clientRedo: false})

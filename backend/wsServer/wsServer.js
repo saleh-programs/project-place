@@ -3,11 +3,13 @@ const { WebSocketServer } = require("ws")
 const url = require("url")
 const uuidv4 = require("uuid").v4
 
-const {createCanvas} = require("canvas")
+const {createCanvas, loadImage} = require("canvas")
 const path = require('path');
 const Queue = require("./Queue.js")
 
-const { storeMessageReq, getMessagesReq, addInstructionReq, updateCanvasReq, getRoomUsersReq } = require("../requests.js")
+const { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasReq, updateInstructionsReq, getCanvasReq, getInstructionsReq } = require("../requests.js")
+const fs  = require("fs")
+const { buffer } = require("stream/consumers")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -26,22 +28,6 @@ const rooms = {}
   "metadata": user's color/ stroke size/ draw status(isDraw/doneDraw)
 }
  */
-function handleMessage(data, uuid){
-  const parsedData = JSON.parse(data.toString())
-
-  switch (parsedData.origin){
-    case "chat":
-      broadcastMessage(parsedData, uuid)
-      break
-    case "whiteboard":
-      broadcastWhiteboard(parsedData, uuid)
-      break
-    case "user":
-      broadcastUser(parsedData, uuid)
-      break
-  }
-}
-
 
 wsServer.on("connection", (connection, request)=>{
   console.log("made connection")
@@ -50,22 +36,6 @@ wsServer.on("connection", (connection, request)=>{
   const uuid = uuidv4()
 
   connections[uuid] = connection
-
-  if (roomID in rooms){
-    rooms[roomID]["connections"].push(connection)
-  }else{
-    const newCanvas = createCanvas(1000,1000)
-    newCanvas.getContext("2d").fillStyle = "white"
-    newCanvas.getContext("2d").fillRect(0,0,1000,1000)
-    rooms[roomID] = {
-      "connections": [connection],
-      "canvas": newCanvas,
-      "operations": [],
-      "currOp": -1
-
-    }
-  }
-
   sendServerInfo(connection, roomID)
   
   users[uuid] = {
@@ -81,6 +51,23 @@ wsServer.on("connection", (connection, request)=>{
 function handleClose(uuid){
   rooms[users[uuid].roomID]["connections"] = rooms[users[uuid].roomID]["connections"].filter(item => item !== connections[uuid])
   delete connections[uuid]
+}
+
+
+function handleMessage(data, uuid){
+  const parsedData = JSON.parse(data.toString())
+
+  switch (parsedData.origin){
+    case "chat":
+      broadcastMessage(parsedData, uuid)
+      break
+    case "whiteboard":
+      broadcastWhiteboard(parsedData, uuid)
+      break
+    case "user":
+      broadcastUser(parsedData, uuid)
+      break
+  }
 }
 
 //broadcast functions
@@ -109,6 +96,7 @@ function broadcastWhiteboard(data, uuid){
 
     if (data.type === "undo"){
       rooms[roomID]["currOp"] -= 1
+      clear(rooms[roomID]["canvas"])
       for (let i = 0; i < currOp; i++){
         updateServerCanvas(operations[i], roomID)
       }
@@ -127,9 +115,12 @@ function broadcastWhiteboard(data, uuid){
       updateServerCanvas(data, roomID)
     }
 
-    const buffer = rooms[users[uuid].roomID]["canvas"].toBuffer("image/png")
-    updateCanvasReq(buffer,users[uuid].roomID)
+    const buffer = rooms[roomID]["canvas"].toBuffer("image/png")
+    updateCanvasReq(buffer,roomID)
+    fs.writeFile("myCanvasdew.png", buffer, err => err && console.error(err))
+    
   })
+  console.log("hello")
 
   // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{ 
@@ -138,11 +129,18 @@ function broadcastWhiteboard(data, uuid){
      }
   })
 }
+
+
 function broadcastUser(data, uuid){
   // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
     conn.send(JSON.stringify(data))
   })}
+
+
+
+
+
 
 
 
@@ -156,16 +154,52 @@ async function getMessages(connection, roomID) {
   })) 
 }
 async function sendServerInfo(connection, roomID) {
+  const roomHistories = [getRoomUsersReq(roomID), getMessagesReq(roomID)]
+
+  if (roomID in rooms){
+    rooms[roomID]["connections"].push(connection)
+    roomHistories.push(rooms[roomID]["canvas"])
+    roomHistories.push(rooms[roomID]["operations"])
+  }else{
+    const canvas = createCanvas(1000,1000)
+    rooms[roomID] = {
+      "connections": [connection],
+      "canvas": canvas,
+      "operations": []
+    }
+    roomHistories.push(
+      getCanvasReq(roomID)
+      .then(buffer => loadImage(buffer))
+      .then(img => {
+        canvas.getContext("2d").drawImage(img,0,0);
+        rooms[roomID]["canvas"] = canvas;
+        return canvas
+      }))
+    roomHistories.push(
+      getInstructionsReq(roomID)
+      .then(instructions => {
+        rooms[roomID]["operations"] = instructions;
+        return instructions
+      })
+    )
+  }
+  const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
+  const opsBuffer = Buffer.from(JSON.stringify(instructions), "utf-8")
+  const canvasBuffer = canvas.toBuffer("image/png")
+  const canvasInfo = Buffer.concat([Buffer.alloc(4), opsBuffer, canvasBuffer])
+  canvasInfo.writeUInt32BE(opsBuffer.length, 0)
+
   connection.send(JSON.stringify({
     "origin": "user",
     "type": "getUsers",
-    "data": await getRoomUsersReq(roomID)
+    "data": roomUsers
   }))
   connection.send(JSON.stringify({
     "origin": "chat",
     "type": "chatHistory",
-    "data": await getMessagesReq(roomID)
+    "data": chatHistory
   }))
+  connection.send(canvasInfo)
 }
 
 // Drawing
@@ -230,18 +264,18 @@ function updateServerCanvas(data, roomID){
     cxt.putImageData(startImage,X,Y)
 
 
-    const canvasImage = cxt.getImageData(0,0,canvasRef.current.width,canvasRef.current.height)
+    const canvasImage = cxt.getImageData(0,0,canvas.width,canvas.height)
     const canvasData = canvasImage.data
 
     //bfs fill
-    const visited = new Uint8Array(canvasRef.current.width * canvasRef.current.height)
+    const visited = new Uint8Array(canvas.width * canvas.height)
     const pixelQueue = new Queue()
     pixelQueue.enqueue([X,Y])
     const tolerance = 70
 
     while (!pixelQueue.isEmpty()){
       const [x, y] = pixelQueue.dequeue()
-      const val = 4*(x + y * canvasRef.current.width)
+      const val = 4*(x + y * canvas.width)
       const currentColor = [
         canvasData[val],
         canvasData[val + 1],
@@ -270,10 +304,10 @@ function updateServerCanvas(data, roomID){
         [x-1,y],[x+1,y],
       ]
       neighbors.forEach((item)=>{
-        const isInCanvas = (item[0] >= 0 && item[0] < canvasRef.current.width) && (item[1] >=0 && item[1] < canvasRef.current.height);
-        if (!visited[item[0] + item[1] * canvasRef.current.width] && isInCanvas){
+        const isInCanvas = (item[0] >= 0 && item[0] < canvas.width) && (item[1] >=0 && item[1] < canvas.height);
+        if (!visited[item[0] + item[1] * canvas.width] && isInCanvas){
           pixelQueue.enqueue(item);
-          visited[item[0] + item[1] * canvasRef.current.width] = 1
+          visited[item[0] + item[1] * canvas.width] = 1
         }
       })
     }

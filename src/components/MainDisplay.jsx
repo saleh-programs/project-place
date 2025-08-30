@@ -20,7 +20,7 @@ function MainDisplay({children, username, userInfoInitial}){
       "username": username,
       "roomID": roomID
     },
-    onMessage:(event)=>{
+    onMessage:(event)=>{ork
       const data = JSON.parse(event.data)
       switch (data.origin){
         case "user":

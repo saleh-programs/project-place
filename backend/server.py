@@ -87,6 +87,7 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS canvases (
       id INT AUTO_INCREMENT PRIMARY KEY,
       canvas BLOB,
+      instructions JSON,
       roomID VARCHAR(10)
     )
     '''
@@ -217,31 +218,6 @@ def getRoomUsers():
   except Exception as e:
     return jsonify({"success":False,"message": "Failed to get room users"}), 500
 
-# # Adds an instruction to the canvas 
-# @app.route("/addInstruction", methods=["POST"])
-# def addInstruction():
-#   try:
-#     data = request.get_json()
-#     with AccessDatabase() as cursor:
-#       cursor.execute("INSERT INTO canvasInstructions (instruction, roomID) VALUES (%s, %s)", (json.dumps(data["instruction"]), data["roomID"]))
-#     return {"success": True}, 200
-#   except Exception as e:
-#     print(e)
-#     return {"success": False, "message": "failed to add instruction to canvas"}, 500
-  
-# # Retrieves all instructions for canvas (for reconstruction)
-# @app.route("/getInstructions", methods=["POST"])
-# def getInstructions():
-#   try:
-#     data = request.get_json()
-#     with AccessDatabase() as cursor:
-#       cursor.execute("SELECT instruction from canvasInstructions WHERE roomID = %s", (data["roomID"],))
-#       instructions = [json.loads(each[0]) for each in cursor.fetchall()]
-#     return {"success": True, "data": instructions}, 200
-#   except Exception as e:
-#     print(e)
-#     return {"success": False, "message": "failed to get instructions for canvas"}, 500
-
 # Updates canvas image. Receives roomID as query param and sends canvasdata as bytes
 @app.route("/updateCanvas", methods=["POST"])
 def updateCanvas():
@@ -255,12 +231,25 @@ def updateCanvas():
       if exists:
         cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
       else:
-        cursor.execute("INSERT INTO canvases (canvas, roomID) VALUES (%s, %s)", (canvasBytes, roomID))
+        cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]",roomID))
 
     return {"success": True}, 200
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to update canvas data"}, 500
+
+# Update instructions for a canvas
+@app.route("/updateInstructions", methods=["POST"])
+def updateInstructions():
+  try:
+    roomID = request.args.get("roomID")
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (data["instructions"], roomID))
+    return {"success": True}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to update instructions"}, 500
 
 # gets canvas data for new connections joining
 @app.route("/getCanvas")
@@ -274,7 +263,20 @@ def getCanvas():
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to get canvas data"}, 500
-  
+
+# gets Instructions for a canvas
+@app.route("/getInstructions")
+def getInstructions():
+  try:
+    roomID = request.args.get("roomID")
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
+      instructions = cursor.fetchone()[0]
+    return {"success": True, "data": instructions}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to get canvas data"}, 500
+
 # getUserInfo. Get site's unique user info, not Auth0's general user info
 @app.route("/getUserInfo", methods=["POST"])
 def getUserInfo():

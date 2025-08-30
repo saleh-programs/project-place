@@ -224,6 +224,23 @@ async function updateCanvasReq(canvasBuffer,roomID){
   }
 }
 
+async function updateInstructionsReq(instructions, roomID) {
+  try{
+    const response = await fetch(baseurl + "updateInstructions" + `?roomID=${roomID}`, {
+      "method": "POST",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify(instructions)
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data
+  }catch (err){
+    console.error(err)
+    return null
+  }
+}
 async function getCanvasReq(roomID){
   try{
     const response = await fetch(baseurl + "getCanvas" + `?roomID=${roomID}`, {
@@ -232,8 +249,23 @@ async function getCanvasReq(roomID){
     if (response.status !== 200){
       throw new Error(data.message || "req failed")
     }
-    const canvasBlob = await response.blob() 
-    return canvasBlob
+    const webBuffer = await response.arrayBuffer() 
+    return Buffer.from(webBuffer)
+  }catch(err){
+    console.error(err)
+    return null
+  }
+}
+async function getInstructionsReq(roomID){
+  try{
+    const response = await fetch(baseurl + "getInstructions" + `?roomID=${roomID}`, {
+      "method": "GET",
+    })
+    const data = await response.json()
+    if (!data.success){
+      throw new Error(data.message || "req failed")
+    }
+    return data.data
   }catch(err){
     console.error(err)
     return null
@@ -285,7 +317,7 @@ async function addRoomUserReq(username, roomID) {
     return null
   }
 }
-export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
+export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateInstructionsReq, getInstructionsReq,
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
   updateUsernameReq, getCanvasReq, updateCanvasReq}
