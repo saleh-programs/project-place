@@ -224,14 +224,13 @@ async function updateCanvasReq(canvasBuffer,roomID){
   }
 }
 
-async function getCanvas(roomID){
+async function getCanvasReq(roomID){
   try{
     const response = await fetch(baseurl + "getCanvas" + `?roomID=${roomID}`, {
       "method": "GET",
     })
     if (response.status !== 200){
-      //fix later
-      return null
+      throw new Error(data.message || "req failed")
     }
     const canvasBlob = await response.blob() 
     return canvasBlob
@@ -289,4 +288,4 @@ async function addRoomUserReq(username, roomID) {
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq,
   createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, addInstructionReq, getInstructions, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
-  updateUsernameReq, getCanvas, updateCanvasReq}
+  updateUsernameReq, getCanvasReq, updateCanvasReq}

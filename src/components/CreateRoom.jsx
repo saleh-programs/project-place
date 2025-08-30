@@ -1,7 +1,7 @@
 import { useState } from "react"
 import styles from "styles/components/CreateRoom.module.css"
 
-import { createRoomReq } from "backend/requests"
+import { createRoomReq, updateCanvasReq } from "backend/requests"
 
 function CreateRoom({setIsCreatingRoom, setRoomID, username}){
   const [newRoomName, setNewRoomName] = useState("")
@@ -9,6 +9,12 @@ function CreateRoom({setIsCreatingRoom, setRoomID, username}){
   async function handleRoomCreation(){
     const res = await createRoomReq(newRoomName, username)
     if (res){
+      const canvas = document.createElement("canvas")
+      canvas.width = 1000
+      canvas.height = 1000
+      const blob = await new Promise((resolve)=>canvas.toBlob(resolve, "image/png"))
+
+      updateCanvasReq(blob,res)
       setNewRoomName("")
       setRoomID(res)
       setIsCreatingRoom(false)

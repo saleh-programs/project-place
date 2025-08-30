@@ -2,10 +2,9 @@
 import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
-import { getCanvas, getInstructions, addUndoReq, addRedoReq, getUndoReq, getRedoReq } from "backend/requests"
+import { getCanvasReq, getInstructions, addUndoReq, addRedoReq, getUndoReq, getRedoReq } from "backend/requests"
 import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
-import { resolve } from "styled-jsx/css"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
@@ -53,20 +52,18 @@ function Whiteboard(){
       hiddenCanvasRef.current.height = canvasRef.current.height
       hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
 
-      handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
-      // reconstructCanvas(roomID)
+      reconstructCanvas(roomID)
     }
   },[roomID])
 
-  // //matbe in future we can 
-  // async function reconstructCanvas(roomID) {
-  //   const response = await getCanvas(roomID)
-  //   if (response){
-  //     const img = await createImageBitmap(response)
-  //     const whiteboard = canvasRef.current.getContext("2d")
-  //     whiteboard.drawImage(img,0,0)
-  //   }
-  // }
+  async function reconstructCanvas(roomID) {
+    const response = await getCanvasReq(roomID)
+    if (response){
+      const img = await createImageBitmap(response)
+      cxtRef.current.drawImage(img,0,0)
+    }
+    handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
+  }
 
   function sendBatchStrokes(){
     strokes.current["batchStroke"].unshift(startStrokePoint.current)
@@ -126,14 +123,9 @@ function Whiteboard(){
       }
     }
   }
-  function handleCanvasAction(state){
-      undoStates.current.push(state)
-      undoStates.current.length > 10 && undoStates.current.shift()
-      redoStates.current = []
-  }
 
   function startStroke(event){
-    if (canvasInfo.current["type"] === "navigate"){
+    if (canvasInfo.current["type"] !== "draw" && canvasInfo.current["type"] !== "erase"){
       return
     }
     const cxt = cxtRef.current
@@ -191,7 +183,7 @@ function Whiteboard(){
       context.lineWidth = lineWidth
       context.strokeStyle = color
       context.globalCompositeOperation = erase ? "destination-out" : "source-over"
-
+      console.log(context.globalCompositeOperation, erase)
       context.beginPath()
       context.moveTo(...commands[0])
       for (let i = 1; i < commands.length; i++){
@@ -201,10 +193,8 @@ function Whiteboard(){
 
   }
 
-  function fill([X,Y], options={}){
+  function fill([X,Y], cxt, options={}){
     const {color=canvasInfo.current["color"]} = options
-
-    const cxt = cxtRef.current
 
     // store starting color
     const startImage = cxt.getImageData(X, Y,1,1)
@@ -282,7 +272,6 @@ function Whiteboard(){
 
   function clear(context, options={}){
     const {clientClear = true} = options
-    console.log(context)
     context.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
 
     if (clientClear){
@@ -290,9 +279,50 @@ function Whiteboard(){
       sendJsonMessage({
         "origin": "whiteboard",
         "type": "clear",
-        "username": username
+        "username": username,
+        "metadata": {}
       })
     }
+  }
+  function undo(options = {}){
+    const {clientUndo = true} = options 
+    const cxt = cxtRef.current
+    if (undoStates.current.length > 1){
+      redoStates.current.push(undoStates.current.pop())
+      cxt.putImageData(undoStates.current.at(-1), 0, 0)
+      if (clientUndo){
+        sendJsonMessage({
+          "origin": "whiteboard",
+          "type": "undo",
+          "username": username,
+          "metadata": {}
+        })
+      }
+    }
+
+  }
+  function redo(options={}){
+    const {clientRedo = true} = options 
+    const cxt = cxtRef.current
+    if (redoStates.current.length > 0){
+      undoStates.current.push(redoStates.current.pop())
+      cxt.putImageData(undoStates.current.at(-1), 0, 0)
+      if (clientRedo){
+        sendJsonMessage({
+          "origin": "whiteboard",
+          "type": "redo",
+          "username": username,
+          "metadata": {}
+        })
+      }
+    }
+
+  }
+
+  function handleCanvasAction(state){
+    undoStates.current.push(state)
+    undoStates.current.length > 10 && undoStates.current.shift()
+    redoStates.current = []
   }
 
   function navigate(e){
@@ -341,54 +371,56 @@ function Whiteboard(){
     canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
     canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
-  function undo(){
-    const cxt = cxtRef.current
-    if (undoStates.current.length > 1){
-      redoStates.current.push(undoStates.current.pop())
-      cxt.putImageData(undoStates.current.at(-1), 0, 0)
-    }
-  }
-  function redo(){
-    const cxt = cxtRef.current
-    if (redoStates.current.length > 0){
-      undoStates.current.push(redoStates.current.pop())
-      cxt.putImageData(undoStates.current.at(-1), 0, 0)
-    }
-  }
 
 
   function externalDraw(data){
     const cxt = hiddenCxt.current
 
-    if (data.type === "isErasing" || data.type === "doneErasing"){
-      data.type = "erase"
-    }else if (data.type === "isDrawing" || data.type === "doneDrawing"){
-      data.type = "draw"
+    const mapActions = {
+      "isErasing": "erase",
+      "doneErasing": "erase",
+      "isDrawing": "draw",
+      "doneDrawing": "draw"
     }
+    const action = data.type in mapActions ? mapActions[data.type] : data.type
+    const storeOp = cxtRef.current.globalCompositeOperation 
 
-    switch (data.type){
+    switch (action){
       case "draw":
         draw(data["data"], cxt, false, data["metadata"])
+
+        cxtRef.current.globalCompositeOperation = "source-over"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
+        cxtRef.current.globalCompositeOperation = storeOp
+        data.type == "doneDrawing" && handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
         break
       case "erase":
         draw(data["data"], cxt, false, data["metadata"])
 
-        const storeOp = cxtRef.current.globalCompositeOperation 
         cxtRef.current.globalCompositeOperation = "destination-out"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         cxtRef.current.globalCompositeOperation = storeOp
+        data.type == "doneErasing" && handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
         break
       case "fill":
-        fill(data["data"], data["metadata"])
+        fill(data["data"],cxtRef.current, data["metadata"])
+        handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
         break
       case "clear":
         clear(cxtRef.current, {clientClear: false})
+        handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
+        break
+      case "undo":
+        undo({clientUndo: false})
+        console.log("undid")
+        break
+      case "redo":
+        redo({clientRedo: false})
         break
     }
     clear(cxt, {clientClear: false})
   }
-
+ 
 
   return (
     <div className={styles.whiteboardPage}>
@@ -403,14 +435,14 @@ function Whiteboard(){
               <canvas ref={canvasRef} width={1000} height={1000} onMouseDown={startStroke}
               onClick={e=>{
                 const rect = canvasRef.current.getBoundingClientRect()
-                canvasInfo.current["type"] === "fill" && fill([Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])])
+                canvasInfo.current["type"] === "fill" && fill([Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])], cxtRef.current)
                 }}/>
             </section>
           </div>
           <button className={styles.clearButton} onClick={()=>clear(cxtRef.current)}>clear</button>
           <span className={styles.reverseButtons}>
-            <button className={styles.undoButton} onClick={undo}>undo</button>
-            <button className={styles.redoButton} onClick={redo}>redo</button>
+            <button className={styles.undoButton} onClick={()=>undo()}>undo</button>
+            <button className={styles.redoButton} onClick={()=>redo()}>redo</button>
           </span>
         </div>
         <div className={styles.tools}>

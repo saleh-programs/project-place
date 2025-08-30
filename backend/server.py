@@ -249,7 +249,7 @@ def updateCanvas():
     roomID = request.args.get("roomID")
     canvasBytes = request.get_data()
     with AccessDatabase() as cursor:
-      cursor.execute("SELECT 1 FROM canvases where roomID = %s",(roomID,))
+      cursor.execute("SELECT 1 FROM canvases WHERE roomID = %s",(roomID,))
       exists = cursor.fetchone() is not None
 
       if exists:
@@ -268,15 +268,12 @@ def getCanvas():
   try:
     roomID = request.args.get("roomID")
     with AccessDatabase() as cursor:
-      cursor.execute("SELECT canvas FROM canvases where roomID = %s",(roomID,))
-      canvasBytes = cursor.fetchone()
-      if canvasBytes is None:
-        return {"success": False, "message": "failed to update canvas data"}, 500
-      canvasBytes = canvasBytes[0]
+      cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s",(roomID,))
+      canvasBytes = cursor.fetchone()[0]
     return Response(canvasBytes, mimetype='application/octet-stream', status=200)
   except Exception as e:
     print(e)
-    return {"success": False, "message": "failed to update canvas data"}, 500
+    return {"success": False, "message": "failed to get canvas data"}, 500
   
 # getUserInfo. Get site's unique user info, not Auth0's general user info
 @app.route("/getUserInfo", methods=["POST"])

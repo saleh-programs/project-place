@@ -11,10 +11,12 @@ class Queue {
   constructor() {
     this.head = null
     this.tail = null
+    this.size = 0
   }
 
   enqueue(data){
     const newValue = new Node(data)
+    this.size += 1
     if (this.head === null){
       this.head = newValue
       this.tail = newValue
@@ -28,6 +30,7 @@ class Queue {
     if (this.head === null){
       return null
     }
+    this.size -= 1
     if (this.head === this.tail){
       const value = this.tail.data
       this.head = null
