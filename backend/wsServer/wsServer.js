@@ -48,12 +48,17 @@ wsServer.on("connection", (connection, request)=>{
   connection.on("close",()=>handleClose(uuid))
 })
 
+// Handle new messages / close
 function handleClose(uuid){
-  rooms[users[uuid].roomID]["connections"] = rooms[users[uuid].roomID]["connections"].filter(item => item !== connections[uuid])
+  const roomID = users[uuid].roomID
+  rooms[roomID]["connections"] = rooms[users[uuid].roomID]["connections"].filter(item => item !== connections[uuid])
+  if (rooms[roomID]["connections"] == 0){
+    updateCanvasReq(rooms["roomID"]["snapshot"])
+    updateInstructionsReq(rooms["roomID"]["operations"])
+    delete rooms[roomID]
+  }
   delete connections[uuid]
 }
-
-
 function handleMessage(data, uuid){
   const parsedData = JSON.parse(data.toString())
 
@@ -82,77 +87,30 @@ async function broadcastMessage(data, uuid){
   })
 }
 function broadcastWhiteboard(data, uuid){
+  const roomID = users[uuid].roomID
 
   // Updates the server's canvas
   setImmediate(()=>{
-    const exclude = ["isDrawing", "isErasing"]
-    if (exclude.includes(data.type)){
-      return
-    }
-    const roomID = users[uuid].roomID
-    const {currOp, operations} = rooms[roomID]
-    console.log(currOp)
-    console.log(operations)
-
-    if (data.type === "undo"){
-      rooms[roomID]["currOp"] -= 1
-      clear(rooms[roomID]["canvas"])
-      for (let i = 0; i < currOp; i++){
-        updateServerCanvas(operations[i], roomID)
-      }
-    }else if (data.type === "redo"){
-      rooms[roomID]["currOp"] += 1
-      updateServerCanvas(operations[currOp+1], roomID)
-    }else{
-      rooms[roomID]["operations"] = operations.slice(0,currOp+1)
-      rooms[roomID]["operations"].push(data)
-      rooms[roomID]["currOp"] += 1
-
-      if (rooms[roomID]["operations"].length > 10){
-        rooms[roomID]["operations"].shift()
-        rooms[roomID]["currOp"] -= 1
-      }
-      updateServerCanvas(data, roomID)
-    }
-
-    const buffer = rooms[roomID]["canvas"].toBuffer("image/png")
-    updateCanvasReq(buffer,roomID)
-    fs.writeFile("myCanvasdew.png", buffer, err => err && console.error(err))
-    
+    handleCanvasAction(data, roomID)
   })
-  console.log("hello")
 
   // sends everyone data
-  rooms[users[uuid].roomID]["connections"].forEach(conn=>{ 
+  rooms[roomID]["connections"].forEach(conn=>{ 
     if (conn !== connections[uuid]){
       conn.send(JSON.stringify(data))
      }
   })
 }
 
-
 function broadcastUser(data, uuid){
   // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
     conn.send(JSON.stringify(data))
-  })}
-
-
-
-
-
+})}
 
 
 
 //utility functions
-
-async function getMessages(connection, roomID) {
-  connection.send(JSON.stringify({
-    "origin": "chat",
-    "type": "chatHistory",
-    "data": await getMessagesReq(roomID)
-  })) 
-}
 async function sendServerInfo(connection, roomID) {
   const roomHistories = [getRoomUsersReq(roomID), getMessagesReq(roomID)]
 
@@ -162,28 +120,30 @@ async function sendServerInfo(connection, roomID) {
     roomHistories.push(rooms[roomID]["operations"])
   }else{
     const canvas = createCanvas(1000,1000)
-    rooms[roomID] = {
-      "connections": [connection],
-      "canvas": canvas,
-      "operations": []
-    }
     roomHistories.push(
       getCanvasReq(roomID)
       .then(buffer => loadImage(buffer))
       .then(img => {
         canvas.getContext("2d").drawImage(img,0,0);
-        rooms[roomID]["canvas"] = canvas;
         return canvas
       }))
-    roomHistories.push(
-      getInstructionsReq(roomID)
-      .then(instructions => {
-        rooms[roomID]["operations"] = instructions;
-        return instructions
-      })
-    )
+    roomHistories.push(getInstructionsReq(roomID))
   }
   const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
+
+  if (!(roomID in rooms)){
+    rooms[roomID] = {
+      "connections": [connection],
+      "snapshot": canvas.getImageData(0,0,canvas.width, canvas.height),
+      "canvas": canvas,
+      "operations": instructions,
+      "latestOp": instructions.length - 1
+    }
+    for (let i = 0; i < instructions.length; i++){
+      updateServerCanvas(instructions[i], roomID)
+    }
+  }
+
   const opsBuffer = Buffer.from(JSON.stringify(instructions), "utf-8")
   const canvasBuffer = canvas.toBuffer("image/png")
   const canvasInfo = Buffer.concat([Buffer.alloc(4), opsBuffer, canvasBuffer])
@@ -202,7 +162,47 @@ async function sendServerInfo(connection, roomID) {
   connection.send(canvasInfo)
 }
 
-// Drawing
+// Canvas/Drawing
+function handleCanvasAction(data, roomID){
+  const exclude = ["isDrawing", "isErasing"]
+  if (exclude.includes(data.type)){
+    return
+  }
+  const room = rooms[roomID]
+
+  switch (data.type){
+    case "undo":
+      room["latestOp"] -= 1
+      room["canvas"].putImageData(room["snapshot"], 0, 0)
+      for (let i = 0; i <= room["latestOp"]; i++){
+        updateServerCanvas(room["operations"][i])
+      }
+      break
+    case "redo":
+      room["latestOp"] += 1
+      updateServerCanvas(room["operations"][room["latestOp"]])
+      break
+    default:
+      room["latestOp"] += 1
+      room["operations"] = room["operations"].slice(0, room["latestOp"])
+      room["operations"].push(data)
+
+      if (room["operations"].length > 10){
+        room["canvas"].putImageData(room["snapshot"], 0, 0)
+        for (let i = 0; i <= room["latestOp"]; i++){
+          updateServerCanvas(room["operations"][i], roomID)
+          if (i == 4){
+            room["snapshot"] = room["canvas"].getImageData(0,0,room["canvas"].width, room["canvas"].height)
+          }
+        }
+        room["operations"] = room["operations"].slice(5)
+        room["latestOp"] -= 5
+      }else{
+          updateServerCanvas(data, roomID)
+      }
+  }
+}
+
 function updateServerCanvas(data, roomID){
   const mainCanvas = rooms[roomID]["canvas"]
   const cxt = mainCanvas.getContext("2d")
@@ -222,102 +222,102 @@ function updateServerCanvas(data, roomID){
       break
   }
 }
-  function draw(commands, canvas, erase, options){
-      const context = canvas.getContext("2d")
-      const {
-        lineWidth, 
-        color, 
-        persistent=false} = options
+function draw(commands, canvas, erase, options){
+    const context = canvas.getContext("2d")
+    const {
+      lineWidth, 
+      color, 
+      persistent=false} = options
 
-      if (persistent){
-        for (let i = 0; i < commands.length; i++){
-          context.lineTo(...commands[i])
-          context.stroke()
-        }
-        return
-      }
-
-      context.lineWidth = lineWidth
-      context.strokeStyle = color
-      context.globalCompositeOperation = erase ? "destination-out" : "source-over"
-      context.beginPath()
-      context.moveTo(...commands[0])
-      for (let i = 1; i < commands.length; i++){
+    if (persistent){
+      for (let i = 0; i < commands.length; i++){
         context.lineTo(...commands[i])
         context.stroke()
       }
-
-  }
-
-  function fill([X,Y], canvas, options){
-    const cxt = canvas.getContext('2d')
-    const {color} = options
-
-    // store starting color
-    const startImage = cxt.getImageData(X, Y,1,1)
-    const startColor = startImage.data
-
-    // get computed fill color 
-    cxt.fillStyle = color
-    cxt.fillRect(X,Y,1,1)
-    const fillColor = cxt.getImageData(X,Y,1,1).data
-    cxt.putImageData(startImage,X,Y)
-
-
-    const canvasImage = cxt.getImageData(0,0,canvas.width,canvas.height)
-    const canvasData = canvasImage.data
-
-    //bfs fill
-    const visited = new Uint8Array(canvas.width * canvas.height)
-    const pixelQueue = new Queue()
-    pixelQueue.enqueue([X,Y])
-    const tolerance = 70
-
-    while (!pixelQueue.isEmpty()){
-      const [x, y] = pixelQueue.dequeue()
-      const val = 4*(x + y * canvas.width)
-      const currentColor = [
-        canvasData[val],
-        canvasData[val + 1],
-        canvasData[val + 2],
-        canvasData[val + 3]
-      ]
-
-      const RGBdistance = 
-        (currentColor[0] - startColor[0])**2 +
-        (currentColor[1] - startColor[1])**2 +
-        (currentColor[2] - startColor[2])**2 +
-        (currentColor[3] - startColor[3])**2 
-
-
-      const matchesColor = RGBdistance < tolerance**2
-      if (!matchesColor){
-        continue
-      }
-      canvasData[val] = fillColor[0]
-      canvasData[val + 1] = fillColor[1]
-      canvasData[val + 2] = fillColor[2]
-      canvasData[val + 3] = fillColor[3]
-
-      const neighbors = [
-        [x,y-1],[x,y+1],
-        [x-1,y],[x+1,y],
-      ]
-      neighbors.forEach((item)=>{
-        const isInCanvas = (item[0] >= 0 && item[0] < canvas.width) && (item[1] >=0 && item[1] < canvas.height);
-        if (!visited[item[0] + item[1] * canvas.width] && isInCanvas){
-          pixelQueue.enqueue(item);
-          visited[item[0] + item[1] * canvas.width] = 1
-        }
-      })
+      return
     }
-    cxt.putImageData(canvasImage,0,0)
-  }
 
-  function clear(canvas){
-    const context = canvas.getContext("2d")
-    context.clearRect(0,0,canvas.width, canvas.height)
+    context.lineWidth = lineWidth
+    context.strokeStyle = color
+    context.globalCompositeOperation = erase ? "destination-out" : "source-over"
+    context.beginPath()
+    context.moveTo(...commands[0])
+    for (let i = 1; i < commands.length; i++){
+      context.lineTo(...commands[i])
+      context.stroke()
+    }
+
+}
+
+function fill([X,Y], canvas, options){
+  const cxt = canvas.getContext('2d')
+  const {color} = options
+
+  // store starting color
+  const startImage = cxt.getImageData(X, Y,1,1)
+  const startColor = startImage.data
+
+  // get computed fill color 
+  cxt.fillStyle = color
+  cxt.fillRect(X,Y,1,1)
+  const fillColor = cxt.getImageData(X,Y,1,1).data
+  cxt.putImageData(startImage,X,Y)
+
+
+  const canvasImage = cxt.getImageData(0,0,canvas.width,canvas.height)
+  const canvasData = canvasImage.data
+
+  //bfs fill
+  const visited = new Uint8Array(canvas.width * canvas.height)
+  const pixelQueue = new Queue()
+  pixelQueue.enqueue([X,Y])
+  const tolerance = 70
+
+  while (!pixelQueue.isEmpty()){
+    const [x, y] = pixelQueue.dequeue()
+    const val = 4*(x + y * canvas.width)
+    const currentColor = [
+      canvasData[val],
+      canvasData[val + 1],
+      canvasData[val + 2],
+      canvasData[val + 3]
+    ]
+
+    const RGBdistance = 
+      (currentColor[0] - startColor[0])**2 +
+      (currentColor[1] - startColor[1])**2 +
+      (currentColor[2] - startColor[2])**2 +
+      (currentColor[3] - startColor[3])**2 
+
+
+    const matchesColor = RGBdistance < tolerance**2
+    if (!matchesColor){
+      continue
+    }
+    canvasData[val] = fillColor[0]
+    canvasData[val + 1] = fillColor[1]
+    canvasData[val + 2] = fillColor[2]
+    canvasData[val + 3] = fillColor[3]
+
+    const neighbors = [
+      [x,y-1],[x,y+1],
+      [x-1,y],[x+1,y],
+    ]
+    neighbors.forEach((item)=>{
+      const isInCanvas = (item[0] >= 0 && item[0] < canvas.width) && (item[1] >=0 && item[1] < canvas.height);
+      if (!visited[item[0] + item[1] * canvas.width] && isInCanvas){
+        pixelQueue.enqueue(item);
+        visited[item[0] + item[1] * canvas.width] = 1
+      }
+    })
   }
+  cxt.putImageData(canvasImage,0,0)
+}
+
+function clear(canvas){
+  const context = canvas.getContext("2d")
+  context.clearRect(0,0,canvas.width, canvas.height)
+}
 
 
 httpServer.listen(8000,()=>{

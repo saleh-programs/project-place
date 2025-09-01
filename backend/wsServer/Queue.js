@@ -15,8 +15,8 @@ class Queue {
   }
 
   enqueue(data){
-    const newValue = new Node(data)
     this.size += 1
+    const newValue = new Node(data)
     if (this.head === null){
       this.head = newValue
       this.tail = newValue
