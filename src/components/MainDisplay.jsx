@@ -9,13 +9,14 @@ import Sidebar from "src/components/Sidebar"
 function MainDisplay({children, username, userInfoInitial}){
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
-  const savedCanvasRef = useRef(document.createElement("canvas"))
-  const canvasInstructions = useRef([])
-  savedCanvasRef.current.width = 1000
-  savedCanvasRef.current.height = 1000
+  const savedCanvasInfoRef = useRef({
+    "snapshot": null,
+    "operations": [],
+    "latestOp": -1
+  })
 
-  const externalDrawRef = useRef((param1)=>{})
   const externalChatRef = useRef((param1)=>{})
+  const externalWhiteboardRef = useRef((param1)=>{})
 
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
@@ -40,7 +41,7 @@ function MainDisplay({children, username, userInfoInitial}){
           externalChatRef.current(data)
           break
         case "whiteboard":
-          externalDrawRef.current(data)
+          externalWhiteboardRef.current(data)
           break
       }
     }
@@ -48,8 +49,8 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage, savedCanvasRef, canvasInstructions,
-    externalDrawRef,externalChatRef,
+    sendJsonMessage, savedCanvasInfoRef,
+    externalWhiteboardRef,externalChatRef,
     roomID, setRoomID,
     messages, setMessages
   }
@@ -60,12 +61,16 @@ function MainDisplay({children, username, userInfoInitial}){
     const view = new DataView(canvasBuffer)
     const opsLen = view.getUint32(0, false)
 
-    const currIndex = view.getUint8(4)
-    const operations = JSON.parse(new TextDecoder().decode(canvasBuffer.slice(4,4+opsLen)))
-    const snapshot = canvasBuffer.slice(4+opsLen)
+    savedCanvasInfoRef.current["latestOp"] = view.getUint8(4)
+    savedCanvasInfoRef.current["operations"] = JSON.parse(new TextDecoder().decode(canvasBuffer.slice(5,5+opsLen)))
 
-    const img = await createImageBitmap(new Blob([snapshot], {"type": "image/png"}))
-    savedCanvasRef.current.getContext("2d").drawImage(img, 0, 0)
+    const img = await createImageBitmap(new Blob([canvasBuffer.slice(5+opsLen)], {"type": "image/png"}))
+    
+    const tempCanvas = Object.assign(document.createElement("canvas"), {"width":1000, "height":1000})
+    const tempCxt = tempCanvas.getContext("2d")
+    tempCxt.drawImage(img, 0, 0)
+    savedCanvasInfoRef.current["snapshot"] = tempCxt.getImageData(0,0,1000,1000)
+
     img.close()
   }
 

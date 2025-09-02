@@ -51,9 +51,10 @@ wsServer.on("connection", (connection, request)=>{
 // Handle new messages / close
 function handleClose(uuid){
   const roomID = users[uuid].roomID
-  rooms[roomID]["connections"] = rooms[users[uuid].roomID]["connections"].filter(item => item !== connections[uuid])
+  rooms[roomID]["connections"] = rooms[roomID]["connections"].filter(item => item !== connections[uuid])
   if (rooms[roomID]["connections"] == 0){
-    updateCanvasReq(rooms["roomID"]["snapshot"])
+    const savedCnvasBuffer = rooms[roomID]["canvas"].putImageData(rooms[roomID]["snapshot"]).toBuffer("image/png")
+    updateCanvasReq(savedCnvasBuffer)
     updateInstructionsReq(rooms["roomID"]["operations"])
     delete rooms[roomID]
   }
@@ -81,25 +82,18 @@ async function broadcastMessage(data, uuid){
   const {origin, type, ...msgToStore} = data
   await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]})
 
-  // sends everyone the data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
     conn.send(JSON.stringify(data))
   })
 }
 function broadcastWhiteboard(data, uuid){
-  const roomID = users[uuid].roomID
-
-  // Updates the server's canvas
-  setImmediate(()=>{
-    handleCanvasAction(data, roomID)
-  })
-
-  // sends everyone data
+  const roomID = users[uuid].roomID  
   rooms[roomID]["connections"].forEach(conn=>{ 
     if (conn !== connections[uuid]){
       conn.send(JSON.stringify(data))
      }
   })
+  handleCanvasAction(data, roomID)
 }
 
 function broadcastUser(data, uuid){
@@ -113,12 +107,14 @@ function broadcastUser(data, uuid){
 //utility functions
 async function sendServerInfo(connection, roomID) {
   const roomHistories = [getRoomUsersReq(roomID), getMessagesReq(roomID)]
+  const initializing = false
 
   if (roomID in rooms){
     rooms[roomID]["connections"].push(connection)
     roomHistories.push(rooms[roomID]["canvas"])
     roomHistories.push(rooms[roomID]["operations"])
   }else{
+    initializing = true
     const canvas = createCanvas(1000,1000)
     roomHistories.push(
       getCanvasReq(roomID)
@@ -131,7 +127,7 @@ async function sendServerInfo(connection, roomID) {
   }
   const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
 
-  if (!(roomID in rooms)){
+  if (initializing){
     rooms[roomID] = {
       "connections": [connection],
       "snapshot": canvas.getImageData(0,0,canvas.width, canvas.height),
@@ -139,12 +135,9 @@ async function sendServerInfo(connection, roomID) {
       "operations": instructions,
       "latestOp": instructions.length - 1
     }
-    for (let i = 0; i < instructions.length; i++){
-      updateServerCanvas(instructions[i], roomID)
-    }
   }
 
-  const opsBuffer = Buffer.from(JSON.stringify(instructions), "utf-8")
+  const opsBuffer = Buffer.from(JSON.stringify(instructions))
   const canvasBuffer = canvas.toBuffer("image/png")
   const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
   canvasInfo.writeUInt32BE(opsBuffer.length, 0)
@@ -161,6 +154,7 @@ async function sendServerInfo(connection, roomID) {
     "data": chatHistory
   }))
   connection.send(canvasInfo)
+  initializing && redrawCanvas(roomID)
 }
 
 // Canvas/Drawing
@@ -175,9 +169,7 @@ function handleCanvasAction(data, roomID){
     case "undo":
       room["latestOp"] -= 1
       room["canvas"].putImageData(room["snapshot"], 0, 0)
-      for (let i = 0; i <= room["latestOp"]; i++){
-        updateServerCanvas(room["operations"][i])
-      }
+      redrawCanvas(roomID)
       break
     case "redo":
       room["latestOp"] += 1
@@ -197,12 +189,20 @@ function handleCanvasAction(data, roomID){
           }
         }
         room["operations"] = room["operations"].slice(5)
-        room["latestOp"] -= 5
+        room["latestOp"] = 5
       }else{
           updateServerCanvas(data, roomID)
       }
   }
 }
+
+function redrawCanvas(roomID){
+  rooms[roomID]["canvas"].putImageData(rooms[roomID]["snapshot"],0,0)
+  for (let i = 0; i <= rooms[roomID]["latestOp"]; i++){
+    updateServerCanvas(rooms[roomID]["operations"][i], roomID)
+  }
+}
+
 
 function updateServerCanvas(data, roomID){
   const mainCanvas = rooms[roomID]["canvas"]
@@ -249,7 +249,6 @@ function draw(commands, canvas, erase, options){
     }
 
 }
-
 function fill([X,Y], canvas, options){
   const cxt = canvas.getContext('2d')
   const {color} = options
@@ -314,7 +313,6 @@ function fill([X,Y], canvas, options){
   }
   cxt.putImageData(canvasImage,0,0)
 }
-
 function clear(canvas){
   const context = canvas.getContext("2d")
   context.clearRect(0,0,canvas.width, canvas.height)

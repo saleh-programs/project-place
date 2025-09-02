@@ -4,9 +4,10 @@ import ThemeContext from "src/assets/ThemeContext"
 
 import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
+import { updateCanvasReq } from "backend/requests"
 
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalDrawRef, username, savedCanvasRef, canvasInstructions } = useContext(ThemeContext)
+  const {sendJsonMessage, roomID, externalDrawRef, username, savedCanvasInfoRef} = useContext(ThemeContext)
 
   const canvasInfo = useRef({
     "type": "idle",
@@ -17,18 +18,16 @@ function Whiteboard(){
     "translateY": 0,
     "compositionType": "source-over"
   })
+
+  const startStrokePoint = useRef(null)
   const strokes = useRef({
     "fullStroke": [],
     "batchStroke": []
   })
-  const startStrokePoint = useRef(null)
   const canvasRef = useRef(null)
   const cxtRef = useRef(null)
   const hiddenCanvasRef = useRef(null)
   const hiddenCxt = useRef(null)
-
-  const undoStates = useRef([])
-  const redoStates = useRef([])
 
   const colors = [
     "black","white","gray","red","green","orange","blue", "cyan",
@@ -36,25 +35,43 @@ function Whiteboard(){
   ]
 
   useEffect(()=>{  
-    externalDrawRef.current = externalDraw 
+    externalWhiteboardRef.current = externalWhiteboard
 
   return ()=>{
-    externalDrawRef.current = (param1) => {}
+    externalWhiteboardRef.current = (param1) => {}
   }
   },[])
 
   useEffect(()=>{
     if (roomID){
       cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
-      hiddenCanvasRef.current = document.createElement("canvas")
-      hiddenCanvasRef.current.width = canvasRef.current.width
-      hiddenCanvasRef.current.height = canvasRef.current.height
-      hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
+      hiddenCanvasRef.current = Object.assign(document.createElement("canvas"), {
+        "width":canvasRef.current.width, 
+        "height": canvasRef.current.width
+      })
+      hiddenCxt.current = hiddenCanvasRef.current.getContext("2d", {willReadFrequently: true})
 
-      cxtRef.current.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
-      cxtRef.current.drawImage(savedCanvasRef.current,0,0)
+      savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
     }
   },[roomID])
+
+  function externalWhiteboard(data){
+    /* when data.type differentiates canvas actions
+    from other things we want to do on the whiteboard 
+    page, this function will be  alot more meaningful*/
+    handleCanvasAction(data)
+  }
+
+  function redrawCanvas(){
+    if (!savedCanvasInfoRef.current["snapshot"]){
+      return
+    }
+    cxtRef.current.putImageData(savedCanvasInfoRef.current["snapshot"],0,0)
+    for (let i = 0; i <= savedCanvasInfoRef.current["latestOp"]; i++){
+      updateCanvas(savedCanvasInfoRef.current["operations"][i])
+    }
+  }
+
   function sendBatchStrokes(){
     strokes.current["batchStroke"].unshift(startStrokePoint.current)
     startStrokePoint.current = strokes.current["batchStroke"].at(-1) 
@@ -75,8 +92,7 @@ function Whiteboard(){
 
   function sendStroke(){
     const {type, color, lineWidth} = canvasInfo.current
-
-    sendJsonMessage({
+    const update = {
       "origin": "whiteboard",
       "type": type === "draw" ? "doneDrawing" : "doneErasing",
       "username": username,
@@ -85,7 +101,9 @@ function Whiteboard(){
         "color": color,
         "lineWidth": lineWidth
       }
-    })
+    }
+    sendJsonMessage(update)
+    handleCanvasAction(update)
     strokes.current["fullStroke"] = []
   }
 
@@ -146,7 +164,6 @@ function Whiteboard(){
 
     function onReleaseStroke(e){
       requestAnimationFrame(sendStroke)
-      handleCanvasAction(cxt.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
 
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
       document.removeEventListener("mouseup", onReleaseStroke) 
@@ -179,7 +196,6 @@ function Whiteboard(){
         context.lineTo(...commands[i])
         context.stroke()
       }
-
   }
 
   function fill([X,Y], cxt, options={}){
@@ -246,8 +262,7 @@ function Whiteboard(){
     cxt.putImageData(canvasImage,0,0)
 
     if (Object.keys(options).length == 0){
-      handleCanvasAction(canvasImage)
-      sendJsonMessage({
+      const update = {
         "origin": "whiteboard",
         "type": "fill",
         "username": username,
@@ -255,7 +270,9 @@ function Whiteboard(){
         "metadata":{
           "color": canvasInfo.current["color"]
         }
-      })
+      }
+      sendJsonMessage(update)
+      handleCanvasAction(update)
     }
   }
 
@@ -264,83 +281,43 @@ function Whiteboard(){
     context.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
 
     if (clientClear){
-      handleCanvasAction(context.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
-      sendJsonMessage({
+      const update = {
         "origin": "whiteboard",
         "type": "clear",
         "username": username,
         "metadata": {}
-      })
-    }
-  }
-  function undo(options = {}){
-    const {clientUndo = true} = options 
-    const cxt = cxtRef.current
-    if (undoStates.current.length > 1){
-      redoStates.current.push(undoStates.current.pop())
-      cxt.putImageData(undoStates.current.at(-1), 0, 0)
-      if (clientUndo){
-        sendJsonMessage({
-          "origin": "whiteboard",
-          "type": "undo",
-          "username": username,
-          "metadata": {}
-        })
       }
+      sendJsonMessage(update)
+      handleCanvasAction(update)
     }
-
   }
-  function redo(options={}){
-    const {clientRedo = true} = options 
-    const cxt = cxtRef.current
-    if (redoStates.current.length > 0){
-      undoStates.current.push(redoStates.current.pop())
-      cxt.putImageData(undoStates.current.at(-1), 0, 0)
-      if (clientRedo){
-        sendJsonMessage({
+  function undo(){
+    if (savedCanvasInfoRef.current["latestOp"] >= 0){
+      const update = {
+        "origin": "whiteboard",
+        "type": "undo",
+        "username": username,
+        "metadata": {}
+      }
+      sendJsonMessage(update)
+      handleCanvasAction(update)
+      redrawCanvas()
+    }
+  }
+  function redo(){
+    if (savedCanvasInfoRef.current["latestOp"] < savedCanvasInfoRef.current["operations"].length-1){
+      const update = {
           "origin": "whiteboard",
           "type": "redo",
           "username": username,
           "metadata": {}
-        })
-      }
-    }
-
-  }
-  // Canvas/Drawing
-  function handleCanvasAction(data){
-    switch (data.type){
-      case "undo":
-        room["latestOp"] -= 1
-        room["canvas"].putImageData(room["snapshot"], 0, 0)
-        for (let i = 0; i <= room["latestOp"]; i++){
-          updateServerCanvas(room["operations"][i])
-        }
-        break
-      case "redo":
-        room["latestOp"] += 1
-        updateServerCanvas(room["operations"][room["latestOp"]])
-        break
-      default:
-        room["latestOp"] += 1
-        room["operations"] = room["operations"].slice(0, room["latestOp"])
-        room["operations"].push(data)
-
-        if (room["operations"].length > 10){
-          room["canvas"].putImageData(room["snapshot"], 0, 0)
-          for (let i = 0; i <= room["latestOp"]; i++){
-            updateServerCanvas(room["operations"][i], roomID)
-            if (i == 4){
-              room["snapshot"] = room["canvas"].getImageData(0,0,room["canvas"].width, room["canvas"].height)
-            }
-          }
-          room["operations"] = room["operations"].slice(5)
-          room["latestOp"] -= 5
-        }else{
-            updateServerCanvas(data, roomID)
-        }
+        }  
+      sendJsonMessage(update)
+      handleCanvasAction(update)
+      redrawCanvas()
     }
   }
+
 
   function navigate(e){
     if (canvasInfo.current["type"] !== "navigate"){
@@ -389,16 +366,52 @@ function Whiteboard(){
     canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
 
+  // Canvas/Drawing
+  function handleCanvasAction(data, client=true){
+    const state = savedCanvasInfoRef.current
+    switch (data.type){ 
+      case "undo":
+        state["latestOp"] -= 1
+        !client && redrawCanvas()
+        break
+      case "redo":
+        state["latestOp"] += 1
+        !client && updateCanvas(state["operations"][state["latestOp"]])
+        break
+      case "isDrawing":
+        !client && updateCanvas(data)
+      case "isErasing":
+        !client && updateCanvas(data)
+      default:
+        state["latestOp"] += 1
+        state["operations"] = state["operations"].slice(0, state["latestOp"])
+        state["operations"].push(data)
 
-  function externalDraw(data){
+        if (state["operations"].length > 10){
+          state["canvas"].putImageData(state["snapshot"], 0, 0)
+          for (let i = 0; i <= state["latestOp"]; i++){
+            updateCanvas(state["operations"][i])
+            if (i == 4){
+              state["snapshot"] = state["canvas"].getImageData(0,0,state["canvas"].width, state["canvas"].height)
+            }
+          }
+          state["operations"] = state["operations"].slice(5)
+          state["latestOp"] = 5
+        }else{
+            !client && updateCanvas(data)
+        }
+    }
+  }
+
+  function updateCanvas(data){
     const cxt = hiddenCxt.current
-
     const mapActions = {
       "isErasing": "erase",
       "doneErasing": "erase",
       "isDrawing": "draw",
       "doneDrawing": "draw"
     }
+
     const action = data.type in mapActions ? mapActions[data.type] : data.type
     const storeOp = cxtRef.current.globalCompositeOperation 
     switch (action){
@@ -408,7 +421,6 @@ function Whiteboard(){
         cxtRef.current.globalCompositeOperation = "source-over"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         cxtRef.current.globalCompositeOperation = storeOp
-        data.type == "doneDrawing" && handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
         break
       case "erase":
         draw(data["data"], cxt, false, data["metadata"])
@@ -416,25 +428,19 @@ function Whiteboard(){
         cxtRef.current.globalCompositeOperation = "destination-out"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         cxtRef.current.globalCompositeOperation = storeOp
-        data.type == "doneErasing" && handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
         break
       case "fill":
         fill(data["data"],cxtRef.current, data["metadata"])
-        handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
         break
       case "clear":
         clear(cxtRef.current, {clientClear: false})
-        handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
-        break
-      case "undo":
-        undo({clientUndo: false})
-        break
-      case "redo":
-        redo({clientRedo: false})
         break
     }
     clear(cxt, {clientClear: false})
   }
+
+
+
  
 
   return (
@@ -456,8 +462,8 @@ function Whiteboard(){
           </div>
           <button className={styles.clearButton} onClick={()=>clear(cxtRef.current)}>clear</button>
           <span className={styles.reverseButtons}>
-            <button className={styles.undoButton} onClick={()=>undo()}>undo</button>
-            <button className={styles.redoButton} onClick={()=>redo()}>redo</button>
+            <button className={styles.undoButton} onClick={undo}>undo</button>
+            <button className={styles.redoButton} onClick={redo}>redo</button>
           </span>
         </div>
         <div className={styles.tools}>
