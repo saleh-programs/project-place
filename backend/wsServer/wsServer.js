@@ -146,8 +146,9 @@ async function sendServerInfo(connection, roomID) {
 
   const opsBuffer = Buffer.from(JSON.stringify(instructions), "utf-8")
   const canvasBuffer = canvas.toBuffer("image/png")
-  const canvasInfo = Buffer.concat([Buffer.alloc(4), opsBuffer, canvasBuffer])
+  const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
   canvasInfo.writeUInt32BE(opsBuffer.length, 0)
+  canvasInfo.writeUInt8(rooms[roomID]["latestOp"], 4)
 
   connection.send(JSON.stringify({
     "origin": "user",

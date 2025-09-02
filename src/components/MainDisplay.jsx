@@ -9,6 +9,11 @@ import Sidebar from "src/components/Sidebar"
 function MainDisplay({children, username, userInfoInitial}){
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
+  const savedCanvasRef = useRef(document.createElement("canvas"))
+  const canvasInstructions = useRef([])
+  savedCanvasRef.current.width = 1000
+  savedCanvasRef.current.height = 1000
+
   const externalDrawRef = useRef((param1)=>{})
   const externalChatRef = useRef((param1)=>{})
 
@@ -20,7 +25,12 @@ function MainDisplay({children, username, userInfoInitial}){
       "username": username,
       "roomID": roomID
     },
-    onMessage:(event)=>{ork
+    onMessage:(event)=>{
+      if (event.data instanceof Blob){
+        reconstructCanvas(event.data)
+        return
+      }
+
       const data = JSON.parse(event.data)
       switch (data.origin){
         case "user":
@@ -38,10 +48,25 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage,
+    sendJsonMessage, savedCanvasRef, canvasInstructions,
     externalDrawRef,externalChatRef,
     roomID, setRoomID,
     messages, setMessages
+  }
+
+  async function reconstructCanvas(data){
+    const canvasBuffer = await data.arrayBuffer()
+
+    const view = new DataView(canvasBuffer)
+    const opsLen = view.getUint32(0, false)
+
+    const currIndex = view.getUint8(4)
+    const operations = JSON.parse(new TextDecoder().decode(canvasBuffer.slice(4,4+opsLen)))
+    const snapshot = canvasBuffer.slice(4+opsLen)
+
+    const img = await createImageBitmap(new Blob([snapshot], {"type": "image/png"}))
+    savedCanvasRef.current.getContext("2d").drawImage(img, 0, 0)
+    img.close()
   }
 
   function updateUserStates(data){

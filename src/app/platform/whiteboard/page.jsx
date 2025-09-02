@@ -2,12 +2,11 @@
 import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
-import { getCanvasReq, getInstructions, addUndoReq, addRedoReq, getUndoReq, getRedoReq } from "backend/requests"
 import Queue from "src/assets/Queue"
 import styles from "styles/platform/Whiteboard.module.css"
 
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalDrawRef, username } = useContext(ThemeContext)
+  const {sendJsonMessage, roomID, externalDrawRef, username, savedCanvasRef, canvasInstructions } = useContext(ThemeContext)
 
   const canvasInfo = useRef({
     "type": "idle",
@@ -52,19 +51,10 @@ function Whiteboard(){
       hiddenCanvasRef.current.height = canvasRef.current.height
       hiddenCxt.current = hiddenCanvasRef.current.getContext("2d")
 
-      reconstructCanvas(roomID)
+      cxtRef.current.clearRect(0,0,canvasRef.current.width, canvasRef.current.height)
+      cxtRef.current.drawImage(savedCanvasRef.current,0,0)
     }
   },[roomID])
-
-  async function reconstructCanvas(roomID) {
-    const response = await getCanvasReq(roomID)
-    if (response){
-      const img = await createImageBitmap(response)
-      cxtRef.current.drawImage(img,0,0)
-    }
-    handleCanvasAction(cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height))
-  }
-
   function sendBatchStrokes(){
     strokes.current["batchStroke"].unshift(startStrokePoint.current)
     startStrokePoint.current = strokes.current["batchStroke"].at(-1) 
@@ -317,11 +307,39 @@ function Whiteboard(){
     }
 
   }
+  // Canvas/Drawing
+  function handleCanvasAction(data){
+    switch (data.type){
+      case "undo":
+        room["latestOp"] -= 1
+        room["canvas"].putImageData(room["snapshot"], 0, 0)
+        for (let i = 0; i <= room["latestOp"]; i++){
+          updateServerCanvas(room["operations"][i])
+        }
+        break
+      case "redo":
+        room["latestOp"] += 1
+        updateServerCanvas(room["operations"][room["latestOp"]])
+        break
+      default:
+        room["latestOp"] += 1
+        room["operations"] = room["operations"].slice(0, room["latestOp"])
+        room["operations"].push(data)
 
-  function handleCanvasAction(state){
-    undoStates.current.push(state)
-    undoStates.current.length > 10 && undoStates.current.shift()
-    redoStates.current = []
+        if (room["operations"].length > 10){
+          room["canvas"].putImageData(room["snapshot"], 0, 0)
+          for (let i = 0; i <= room["latestOp"]; i++){
+            updateServerCanvas(room["operations"][i], roomID)
+            if (i == 4){
+              room["snapshot"] = room["canvas"].getImageData(0,0,room["canvas"].width, room["canvas"].height)
+            }
+          }
+          room["operations"] = room["operations"].slice(5)
+          room["latestOp"] -= 5
+        }else{
+            updateServerCanvas(data, roomID)
+        }
+    }
   }
 
   function navigate(e){
