@@ -61,7 +61,7 @@ function MainDisplay({children, username, userInfoInitial}){
     const view = new DataView(canvasBuffer)
     const opsLen = view.getUint32(0, false)
 
-    savedCanvasInfoRef.current["latestOp"] = view.getUint8(4)
+    savedCanvasInfoRef.current["latestOp"] = view.getInt8(4)
     savedCanvasInfoRef.current["operations"] = JSON.parse(new TextDecoder().decode(canvasBuffer.slice(5,5+opsLen)))
 
     const img = await createImageBitmap(new Blob([canvasBuffer.slice(5+opsLen)], {"type": "image/png"}))
@@ -70,8 +70,9 @@ function MainDisplay({children, username, userInfoInitial}){
     const tempCxt = tempCanvas.getContext("2d")
     tempCxt.drawImage(img, 0, 0)
     savedCanvasInfoRef.current["snapshot"] = tempCxt.getImageData(0,0,1000,1000)
-
     img.close()
+
+    externalWhiteboardRef.current("restoreCanvas")
   }
 
   function updateUserStates(data){

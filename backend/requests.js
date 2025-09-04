@@ -73,41 +73,6 @@ async function getMessagesReq(roomID) {
   }
 }
 
-async function addInstructionReq(instruction, roomID) {
-  try{
-    const response = await fetch(baseurl + "addInstruction",{
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "body": JSON.stringify({"instruction": instruction, "roomID": roomID})
-    })
-    const data = await response.json()
-    if (!data.success){
-      throw new Error(data.message ||"req failed")
-    }
-    return data
-  }catch(err){
-    console.error(err)
-    return null
-  }
-}
-
-async function getInstructions(roomID) {
-  try{
-    const response = await fetch(baseurl + "getInstructions",{
-      "method": "POST",
-      "headers": {"Content-Type": "application/json"},
-      "body": JSON.stringify({"roomID": roomID})
-    })
-    const data = await response.json()
-    if (!data.success){
-      throw new Error(data.message ||"req failed")
-    }
-    return data.data
-  }catch(err){
-    console.error(err)
-    return null
-  }
-}
 
 async function getSessionUserInfoReq(sessionToken=null) {
   try{

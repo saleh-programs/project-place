@@ -7,7 +7,7 @@ import styles from "styles/platform/Whiteboard.module.css"
 import { updateCanvasReq } from "backend/requests"
 
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalDrawRef, username, savedCanvasInfoRef} = useContext(ThemeContext)
+  const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRef} = useContext(ThemeContext)
 
   const canvasInfo = useRef({
     "type": "idle",
@@ -34,6 +34,7 @@ function Whiteboard(){
     "yellow", "purple", "brown", "pink"
   ]
 
+  const badtimer = useRef(null)
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
 
@@ -59,6 +60,10 @@ function Whiteboard(){
     /* when data.type differentiates canvas actions
     from other things we want to do on the whiteboard 
     page, this function will be  alot more meaningful*/
+    if (data === "restoreCanvas"){
+      savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
+      return
+    }
     handleCanvasAction(data)
   }
 
@@ -67,6 +72,7 @@ function Whiteboard(){
       return
     }
     cxtRef.current.putImageData(savedCanvasInfoRef.current["snapshot"],0,0)
+    console.log(savedCanvasInfoRef.current)
     for (let i = 0; i <= savedCanvasInfoRef.current["latestOp"]; i++){
       updateCanvas(savedCanvasInfoRef.current["operations"][i])
     }
@@ -160,7 +166,8 @@ function Whiteboard(){
           done = false
         })  
       } 
-    }
+    }     
+
 
     function onReleaseStroke(e){
       requestAnimationFrame(sendStroke)
@@ -178,7 +185,7 @@ function Whiteboard(){
         lineWidth=canvasInfo.current["lineWidth"], 
         color=canvasInfo.current["color"], 
         persistent=false} = options
-
+      
       if (persistent){
         for (let i = 0; i < commands.length; i++){
           context.lineTo(...commands[i])
@@ -186,7 +193,6 @@ function Whiteboard(){
         }
         return
       }
-
       context.lineWidth = lineWidth
       context.strokeStyle = color
       context.globalCompositeOperation = erase ? "destination-out" : "source-over"
@@ -388,11 +394,11 @@ function Whiteboard(){
         state["operations"].push(data)
 
         if (state["operations"].length > 10){
-          state["canvas"].putImageData(state["snapshot"], 0, 0)
+          cxtRef.current.putImageData(state["snapshot"], 0, 0)
           for (let i = 0; i <= state["latestOp"]; i++){
             updateCanvas(state["operations"][i])
             if (i == 4){
-              state["snapshot"] = state["canvas"].getImageData(0,0,state["canvas"].width, state["canvas"].height)
+              state["snapshot"] = cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height)
             }
           }
           state["operations"] = state["operations"].slice(5)
@@ -437,6 +443,7 @@ function Whiteboard(){
         break
     }
     clear(cxt, {clientClear: false})
+    
   }
 
 

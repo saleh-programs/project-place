@@ -53,9 +53,10 @@ function handleClose(uuid){
   const roomID = users[uuid].roomID
   rooms[roomID]["connections"] = rooms[roomID]["connections"].filter(item => item !== connections[uuid])
   if (rooms[roomID]["connections"] == 0){
-    const savedCnvasBuffer = rooms[roomID]["canvas"].putImageData(rooms[roomID]["snapshot"]).toBuffer("image/png")
-    updateCanvasReq(savedCnvasBuffer)
-    updateInstructionsReq(rooms["roomID"]["operations"])
+    rooms[roomID]["canvas"].getContext("2d").putImageData(rooms[roomID]["snapshot"],0,0)
+    const savedCanvasBuffer = rooms[roomID]["canvas"].toBuffer("image/png")
+    updateCanvasReq(savedCanvasBuffer, roomID)
+    updateInstructionsReq(rooms[roomID]["operations"], roomID)
     delete rooms[roomID]
   }
   delete connections[uuid]
@@ -107,7 +108,7 @@ function broadcastUser(data, uuid){
 //utility functions
 async function sendServerInfo(connection, roomID) {
   const roomHistories = [getRoomUsersReq(roomID), getMessagesReq(roomID)]
-  const initializing = false
+  let initializing = false
 
   if (roomID in rooms){
     rooms[roomID]["connections"].push(connection)
@@ -126,11 +127,14 @@ async function sendServerInfo(connection, roomID) {
     roomHistories.push(getInstructionsReq(roomID))
   }
   const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
-
+  console.log(roomUsers)
+  console.log(chatHistory)
+  console.log(canvas)
+  console.log(instructions, typeof instructions)
   if (initializing){
     rooms[roomID] = {
       "connections": [connection],
-      "snapshot": canvas.getImageData(0,0,canvas.width, canvas.height),
+      "snapshot": canvas.getContext("2d").getImageData(0,0,canvas.width, canvas.height),
       "canvas": canvas,
       "operations": instructions,
       "latestOp": instructions.length - 1
@@ -141,7 +145,7 @@ async function sendServerInfo(connection, roomID) {
   const canvasBuffer = canvas.toBuffer("image/png")
   const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
   canvasInfo.writeUInt32BE(opsBuffer.length, 0)
-  canvasInfo.writeUInt8(rooms[roomID]["latestOp"], 4)
+  canvasInfo.writeInt8(rooms[roomID]["latestOp"], 4)
 
   connection.send(JSON.stringify({
     "origin": "user",
@@ -168,12 +172,12 @@ function handleCanvasAction(data, roomID){
   switch (data.type){
     case "undo":
       room["latestOp"] -= 1
-      room["canvas"].putImageData(room["snapshot"], 0, 0)
+      room["canvas"].getContext("2d").putImageData(room["snapshot"], 0, 0)
       redrawCanvas(roomID)
       break
     case "redo":
       room["latestOp"] += 1
-      updateServerCanvas(room["operations"][room["latestOp"]])
+      updateServerCanvas(room["operations"][room["latestOp"]], roomID)
       break
     default:
       room["latestOp"] += 1
@@ -181,11 +185,11 @@ function handleCanvasAction(data, roomID){
       room["operations"].push(data)
 
       if (room["operations"].length > 10){
-        room["canvas"].putImageData(room["snapshot"], 0, 0)
+        room["canvas"].getContext("2d").putImageData(room["snapshot"], 0, 0)
         for (let i = 0; i <= room["latestOp"]; i++){
           updateServerCanvas(room["operations"][i], roomID)
           if (i == 4){
-            room["snapshot"] = room["canvas"].getImageData(0,0,room["canvas"].width, room["canvas"].height)
+            room["snapshot"] = room["canvas"].getContext("2d").getImageData(0,0,room["canvas"].width, room["canvas"].height)
           }
         }
         room["operations"] = room["operations"].slice(5)
@@ -197,7 +201,7 @@ function handleCanvasAction(data, roomID){
 }
 
 function redrawCanvas(roomID){
-  rooms[roomID]["canvas"].putImageData(rooms[roomID]["snapshot"],0,0)
+  rooms[roomID]["canvas"].getContext("2d").putImageData(rooms[roomID]["snapshot"],0,0)
   for (let i = 0; i <= rooms[roomID]["latestOp"]; i++){
     updateServerCanvas(rooms[roomID]["operations"][i], roomID)
   }
@@ -206,7 +210,6 @@ function redrawCanvas(roomID){
 
 function updateServerCanvas(data, roomID){
   const mainCanvas = rooms[roomID]["canvas"]
-  const cxt = mainCanvas.getContext("2d")
     
   switch (data.type){
     case "doneDrawing":
@@ -241,13 +244,13 @@ function draw(commands, canvas, erase, options){
     context.lineWidth = lineWidth
     context.strokeStyle = color
     context.globalCompositeOperation = erase ? "destination-out" : "source-over"
+
     context.beginPath()
     context.moveTo(...commands[0])
     for (let i = 1; i < commands.length; i++){
       context.lineTo(...commands[i])
       context.stroke()
     }
-
 }
 function fill([X,Y], canvas, options){
   const cxt = canvas.getContext('2d')

@@ -245,7 +245,7 @@ def updateInstructions():
     roomID = request.args.get("roomID")
     data = request.get_json()
     with AccessDatabase() as cursor:
-      cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (data["instructions"], roomID))
+      cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(data), roomID))
     return {"success": True}, 200
   except Exception as e:
     print(e)
@@ -272,7 +272,7 @@ def getInstructions():
     with AccessDatabase() as cursor:
       cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
       instructions = cursor.fetchone()[0]
-    return {"success": True, "data": instructions}, 200
+    return {"success": True, "data": json.loads(instructions)}, 200
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to get canvas data"}, 500
