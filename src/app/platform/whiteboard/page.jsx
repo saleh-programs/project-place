@@ -159,15 +159,16 @@ function Whiteboard(){
     strokes.current["fullStroke"] = [startStrokePoint.current]
 
     const isErasing = canvasInfo.current["type"] == "erase"
+    let last = startStrokePoint.current
     draw([startStrokePoint.current], cxt, isErasing)
-
     let done = false
     function onMoveStroke(e){
       if(!done){
         done = true
         requestAnimationFrame(()=>{
           const scaledPos = [Math.round((e.clientX - rect.left) /canvasInfo.current["scale"]),Math.round((e.clientY - rect.top) /canvasInfo.current["scale"])]
-          draw([scaledPos], cxt, isErasing, {persistent: true})
+          draw([scaledPos], cxt, isErasing, {persistent: true, prev: last})
+          last = scaledPos
           strokes.current["batchStroke"].push(scaledPos)
           strokes.current["fullStroke"].push(scaledPos)
           sendBatchStrokes()   
@@ -193,11 +194,15 @@ function Whiteboard(){
       const {
         lineWidth=canvasInfo.current["lineWidth"], 
         color=canvasInfo.current["color"], 
+        prev = null,
         persistent=false} = options
       
       if (persistent){
+        let last = prev
         for (let i = 0; i < commands.length; i++){
-          context.lineTo(...commands[i])
+          const midpoint = [Math.round((commands[i][0] + last[0])/2),Math.round((commands[i][1] + last[1])/2)]
+          context.quadraticCurveTo(...last, ...midpoint)
+          last = commands[i]
         }
         context.stroke()
         return
@@ -208,7 +213,8 @@ function Whiteboard(){
       context.beginPath()
       context.moveTo(...commands[0])
       for (let i = 1; i < commands.length; i++){
-        context.lineTo(...commands[i])
+        const midpoint = [Math.round((commands[i][0] + commands[i-1][0])/2),Math.round((commands[i][1] + commands[i-1][1])/2)]
+        context.quadraticCurveTo(...commands[i-1],...midpoint)
       }
       context.stroke()
   }
