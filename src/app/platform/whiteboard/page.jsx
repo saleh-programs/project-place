@@ -52,6 +52,12 @@ function Whiteboard(){
       })
       hiddenCxt.current = hiddenCanvasRef.current.getContext("2d", {willReadFrequently: true})
 
+      const customizations = {
+        "lineCap": "round",
+        "lineJoin": "round"
+      }
+      Object.assign(cxtRef.current, customizations)
+      Object.assign(hiddenCxt.current, customizations)
       savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
     }
   },[roomID])
@@ -79,6 +85,10 @@ function Whiteboard(){
   }
 
   function sendBatchStrokes(){
+    if (strokes.current["batchStroke"].length == 0){
+      return
+    }
+
     strokes.current["batchStroke"].unshift(startStrokePoint.current)
     startStrokePoint.current = strokes.current["batchStroke"].at(-1) 
     const {type, color, lineWidth} = canvasInfo.current
@@ -148,8 +158,6 @@ function Whiteboard(){
     strokes.current["batchStroke"] = []
     strokes.current["fullStroke"] = [startStrokePoint.current]
 
-    const sendBatchStrokesThrottled = throttle(sendBatchStrokes)
-
     const isErasing = canvasInfo.current["type"] == "erase"
     draw([startStrokePoint.current], cxt, isErasing)
 
@@ -162,7 +170,7 @@ function Whiteboard(){
           draw([scaledPos], cxt, isErasing, {persistent: true})
           strokes.current["batchStroke"].push(scaledPos)
           strokes.current["fullStroke"].push(scaledPos)
-          sendBatchStrokesThrottled()   
+          sendBatchStrokes()   
           done = false
         })  
       } 
@@ -170,6 +178,7 @@ function Whiteboard(){
 
 
     function onReleaseStroke(e){
+      requestAnimationFrame(sendBatchStrokes)
       requestAnimationFrame(sendStroke)
 
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
@@ -189,8 +198,8 @@ function Whiteboard(){
       if (persistent){
         for (let i = 0; i < commands.length; i++){
           context.lineTo(...commands[i])
-          context.stroke()
         }
+        context.stroke()
         return
       }
       context.lineWidth = lineWidth
@@ -200,8 +209,8 @@ function Whiteboard(){
       context.moveTo(...commands[0])
       for (let i = 1; i < commands.length; i++){
         context.lineTo(...commands[i])
-        context.stroke()
       }
+      context.stroke()
   }
 
   function fill([X,Y], cxt, options={}){
@@ -394,6 +403,7 @@ function Whiteboard(){
         state["operations"].push(data)
 
         if (state["operations"].length > 10){
+          console.log("new snapshot")
           cxtRef.current.putImageData(state["snapshot"], 0, 0)
           for (let i = 0; i <= state["latestOp"]; i++){
             updateCanvas(state["operations"][i])
