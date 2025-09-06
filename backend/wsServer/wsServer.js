@@ -71,6 +71,9 @@ function handleMessage(data, uuid){
     case "whiteboard":
       broadcastWhiteboard(parsedData, uuid)
       break
+    case"videochat":
+      broadcastVideochat(parsedData, uuid)
+      break
     case "user":
       broadcastUser(parsedData, uuid)
       break
@@ -96,7 +99,14 @@ function broadcastWhiteboard(data, uuid){
   })
   handleCanvasAction(data, roomID)
 }
-
+function broadcastVideochat(data, uuid){
+  const roomID = users[uuid].roomID  
+  rooms[roomID]["connections"].forEach(conn => {
+    if (conn !== connections[uuid]){
+      conn.send(JSON.stringify(data))
+     }
+  })
+}
 function broadcastUser(data, uuid){
   // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{

@@ -51,7 +51,6 @@ function VideoChat(){
       event.candidate && offerCandidates.add(event.candidate.toJSON())
     }
 
-    // create offer (starts generating candidates)
     const offerDescription = await pc.createOffer()
     await pc.setLocalDescription(offerDescription)
 
@@ -61,7 +60,6 @@ function VideoChat(){
     }
     await callDoc.set({offer})
 
-    // sets up remote description once
     callDoc.onSnapshot(snapshot => {
       const data = snapshot.data()
       if (!pc.currentRemoteDescription && data?.answer){
@@ -69,7 +67,6 @@ function VideoChat(){
       }
     })
 
-    // add candidate to peer connection when answered
     answerCandidates.onSnapshot(snapshot => {
       snapshot.docChanges().forEach(change => {
         if (change.type === "added"){
