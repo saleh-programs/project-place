@@ -1,8 +1,10 @@
 "use client"
-import { useEffect, useRef } from "react"
+import { useContext, useEffect, useRef } from "react"
+import ThemeContext from "src/assets/ThemeContext"
 import styles from "styles/platform/VideoChat.module.css"
 
 function VideoChat(){
+  const {externalVideochatRef} = useContext(ThemeContext)
   const localCam = useRef(null)
   const remoteCam = useRef(null)
   const joinInput = useRef(null)
@@ -12,11 +14,18 @@ function VideoChat(){
     }],
     iceCandidatePoolSize: 10,
   }
-  const camInfo = useRef({
+  const camInfo = useRef({ 
     pc: new RTCPeerConnection(servers),
     localStream: null,
     remoteStream: null
   })
+
+  useEffect(()=>{
+    externalVideochatRef.current = externalVideochat
+    return ()=>{
+      externalVideochatRef.current = (param1) => {}
+    }
+  },[])
 
   async function startWebcam(){
     const pc = camInfo.current["pc"]
@@ -109,6 +118,9 @@ function VideoChat(){
     })
   }
 
+  function externalVideochat(data){
+
+  }
   return(
     <div className={styles.videochatPage}>
       <h1 className={styles.title}>

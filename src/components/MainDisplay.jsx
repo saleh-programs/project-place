@@ -17,6 +17,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const externalChatRef = useRef((param1)=>{})
   const externalWhiteboardRef = useRef((param1)=>{})
+  const externalVideochatRef = useRef((param1)=>{})
 
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
@@ -43,6 +44,9 @@ function MainDisplay({children, username, userInfoInitial}){
         case "whiteboard":
           externalWhiteboardRef.current(data)
           break
+        case "videochat":
+          externalVideochatRef.current(data)
+          break
       }
     }
   },roomID !== "")
@@ -50,7 +54,7 @@ function MainDisplay({children, username, userInfoInitial}){
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
     sendJsonMessage, savedCanvasInfoRef,
-    externalWhiteboardRef,externalChatRef,
+    externalWhiteboardRef,externalChatRef, externalVideochatRef,
     roomID, setRoomID,
     messages, setMessages
   }
