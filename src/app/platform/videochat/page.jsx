@@ -4,7 +4,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import styles from "styles/platform/VideoChat.module.css"
 
 function VideoChat(){
-  const {externalVideochatRef} = useContext(ThemeContext)
+  const {externalVideochatRef, sendJ} = useContext(ThemeContext)
   const localCam = useRef(null)
   const remoteCam = useRef(null)
   const joinInput = useRef(null)
@@ -49,15 +49,18 @@ function VideoChat(){
 
   async function makeCall(){
     const {pc} = camInfo.current
-
-    const callDoc = firestore.collection("calls").doc()
-    const offerCandidates = callDoc.collection("offerCandidates")
-    const answerCandidates = callDoc.collection("answerCandidates")
-
     joinInput.value = callDoc.id
     
     pc.onicecandidate = event => {
-      event.candidate && offerCandidates.add(event.candidate.toJSON())
+      if (!event.candidate){
+        return
+      }
+      const data = {
+        "origin": "videochat",
+        "type": "stunCandidate",
+        "data": event.candidate.toJSON()}
+      }
+      sendJsonMessage(data)
     }
 
     const offerDescription = await pc.createOffer()
@@ -67,59 +70,53 @@ function VideoChat(){
       sdp: offerDescription.sdp,
       type: offerDescription.type
     }
-    await callDoc.set({offer})
-
-    callDoc.onSnapshot(snapshot => {
-      const data = snapshot.data()
-      if (!pc.currentRemoteDescription && data?.answer){
-        pc.setRemoteDescription(new RTCSessionDescription(data.answer))
-      }
-    })
-
-    answerCandidates.onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === "added"){
-          pc.addIceCandidate(new RTCIceCandidate(change.doc.data()))
-        }    
-      })
+    sendJsonMessage({
+      "origin": "videochat",
+      "type": "RTCsession",
+      "data": offer
     })
   }
 
-  async function answerCall(){
-    const {pc} = camInfo.current
-    const callID = joinInput.current.value
-    const callDoc = firestore.collection("calls").doc(callID)
-    const answerCandidates = callDoc.collection("answerCandidates")
-    const offerCandidates = callDoc.collection("offerCandidates")
-
-    pc.onicecandidate = event => {
-      event.candidate && answerCandidates.add(event.candidate.toJSON())
-    }
-    const callData = (await callDoc.get()).data()
-
-    const offerDescription = callData.offer
-    await pc.setRemoteDescription(new RTCSessionDescription(offerDescription))
-
-    const answerDescription = await pc.createAnswer()
-    await pc.setLocalDescription(answerDescription)
-
-    const answer = {
-      type: answerDescription.type,
-      sdp: answerDescription.sdp 
-    }
-    await callDoc.update({answer})
-
-    offerCandidates.onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === "added"){
-          pc.addIceCandidate(new RTCIceCandidate(change.doc().data()))
-        }
-      })
-    })
-  }
 
   function externalVideochat(data){
+    const {pc} = camInfo.current
+    switch(data.type){
+      case "RTCsession":
+        if (!pc.currentRemoteDescription){
+          pc.setRemoteDescription(new RTCSessionDescription(data.data))
+        }
 
+        // if (im sending an answer), else (I got an answer)
+        if (!pc.setLocalDescription){
+          pc.onicecandidate = event => {
+            if (!event.candidate){
+              return
+            }
+            const data = {
+              "origin": "videochat",
+              "type": "stunCandidate",
+              "data": event.candidate.toJSON()}
+            }
+            sendJsonMessage(data)
+          }
+          const answerDescription = await pc.createAnswer()
+          await pc.setLocalDescription(answerDescription)
+          const answer = {
+            type: answerDescription.type,
+            sdp: answerDescription.sdp 
+          }
+          const data = {
+            "origin": "videochat",
+            "type": "RTCsession",
+            "data": answer
+          }
+          sendJsonMessage(data)
+        }
+        break
+      case "stunCandidate":
+        pc.addIceCandidate(new RTCIceCandidate(data.data))
+        break
+    }
   }
   return(
     <div className={styles.videochatPage}>
