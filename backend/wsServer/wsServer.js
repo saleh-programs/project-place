@@ -8,8 +8,7 @@ const path = require('path');
 const Queue = require("./Queue.js")
 
 const { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasReq, updateInstructionsReq, getCanvasReq, getInstructionsReq } = require("../requests.js")
-const fs  = require("fs")
-const { buffer } = require("stream/consumers")
+const { RTCPeerConnection } = require("wrtc")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -17,6 +16,12 @@ const wsServer = new WebSocketServer({server: httpServer})
 const connections = {}
 const users = {}
 const rooms = {}
+const servers = {
+  iceServers: [{
+    urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]
+  }],
+  iceCandidatePoolSize: 10,
+}
 
 // any message layout:
 /*
@@ -40,7 +45,9 @@ wsServer.on("connection", (connection, request)=>{
   
   users[uuid] = {
     username: username,
-    roomID: roomID
+    roomID: roomID,
+    RTClink: null,
+    haveClientTracks: false
   }
 
   
@@ -99,14 +106,85 @@ function broadcastWhiteboard(data, uuid){
   })
   handleCanvasAction(data, roomID)
 }
-function broadcastVideochat(data, uuid){
-  const roomID = users[uuid].roomID  
-  rooms[roomID]["connections"].forEach(conn => {
-    if (conn !== connections[uuid]){
-      conn.send(JSON.stringify(data))
-     }
-  })
+
+async function broadcastVideochat(data, uuid){
+  // Let's say this is where we'll later handle peer to peer
+  // const roomID = users[uuid].roomID  
+  // rooms[roomID]["connections"].forEach(conn => {
+  //   if (conn !== connections[uuid]){
+  //     conn.send(JSON.stringify(data))
+  //    }
+  // })
+
+  const roomID = users[uuid]["roomID"]
+  const peers = rooms[roomID]["groupCallConnections"]
+  // handling group calls
+  let pc;
+  switch(data.type){
+    case "clientOffer":
+      pc = new RTCPeerConnection(servers)
+      await pc.setRemoteDescription(new RTCSessionDescription(data.data))
+      
+      pc.onicecandidate = event=>{
+        if (!event.candidate){
+          return
+        }
+        connections[uuid].send({
+          "origin": "videochat",
+          "type": "serverCandidate",
+          "data": event.candidate.toJSON()
+        })
+      }
+
+      const serverAnswerDescription = await pc.createAnswer()
+      await pc.setLocalDescription(serverAnswerDescription)
+
+
+      const serverAnswer = {
+        sdp: serverAnswerDescription.sdp,
+        type: serverAnswerDescription.type
+      }
+      connections[uuid].send({
+        "origin": "videochat",
+        "type": "serverAnswer",
+        "data": serverAnswer
+      })
+      
+      pc.ontrack = event => {
+        if (users[uuid].haveClientTracks){
+          return
+        }
+        users[uuid].haveClientTracks = true
+        event.streams[0].getTracks().forEach(track => {
+          for (let i = 0; i < peers.length; i++){
+            if (peers[i] === uuid){
+              continue
+            }
+            users[peers[i]]["RTClink"].addTrack(track)
+          }
+        })
+      }
+      for (let i = 0; i < peers.length; i++){
+        users[peers[i]]["RTClink"].getReceivers().forEach(r => {
+          if (r.track){
+            pc.addTrack(r.track)
+          }
+        })
+      }
+
+      users[uuid]["RTClink"] = pc
+      peers.push(uuid)
+
+      break
+    case "clientCandidate":
+      pc = users[uuid]["RTClink"]
+      if (pc.currentRemoteDescription){
+        users[uuid]["RTClink"].addIceCandidate(new RTCIceCandidate(data.data))
+      }
+      break
+  } 
 }
+
 function broadcastUser(data, uuid){
   // sends everyone data
   rooms[users[uuid].roomID]["connections"].forEach(conn=>{
@@ -137,17 +215,15 @@ async function sendServerInfo(connection, roomID) {
     roomHistories.push(getInstructionsReq(roomID))
   }
   const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
-  console.log(roomUsers)
-  console.log(chatHistory)
-  console.log(canvas)
-  console.log(instructions, typeof instructions)
+
   if (initializing){
     rooms[roomID] = {
       "connections": [connection],
       "snapshot": canvas.getContext("2d").getImageData(0,0,canvas.width, canvas.height),
       "canvas": canvas,
       "operations": instructions,
-      "latestOp": instructions.length - 1
+      "latestOp": instructions.length - 1,
+      "groupCallConnections": []
     }
   }
 

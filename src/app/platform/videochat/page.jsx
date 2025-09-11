@@ -83,7 +83,7 @@ function VideoChat(){
     switch(data.type){
       case "RTCsession":
         if (!pc.currentRemoteDescription){
-          pc.setRemoteDescription(new RTCSessionDescription(data.data))
+          await pc.setRemoteDescription(new RTCSessionDescription(data.data))
         }
 
         // if (im sending an answer), else (I got an answer)
