@@ -4,10 +4,9 @@ import ThemeContext from "src/assets/ThemeContext"
 import styles from "styles/platform/VideoChat.module.css"
 
 function VideoChat(){
-  const {externalVideochatRef, sendJ} = useContext(ThemeContext)
+  const {externalVideochatRef, sendJsonMessage} = useContext(ThemeContext)
   const localCam = useRef(null)
   const remoteCam = useRef(null)
-  const joinInput = useRef(null)
   const servers = {
     iceServers: [{
       urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]
@@ -49,7 +48,6 @@ function VideoChat(){
 
   async function makeCall(){
     const {pc} = camInfo.current
-    joinInput.value = callDoc.id
     
     pc.onicecandidate = event => {
       if (!event.candidate){
@@ -58,7 +56,7 @@ function VideoChat(){
       const data = {
         "origin": "videochat",
         "type": "stunCandidate",
-        "data": event.candidate.toJSON()}
+        "data": event.candidate.toJSON()
       }
       sendJsonMessage(data)
     }
@@ -76,10 +74,12 @@ function VideoChat(){
       "data": offer
     })
   }
+  
 
 
-  function externalVideochat(data){
+  async function externalVideochat(data){
     const {pc} = camInfo.current
+    console.log(data)
     switch(data.type){
       case "RTCsession":
         if (!pc.currentRemoteDescription){
@@ -87,7 +87,8 @@ function VideoChat(){
         }
 
         // if (im sending an answer), else (I got an answer)
-        if (!pc.setLocalDescription){
+        if (!pc.localDescription){
+          console.log("start")
           pc.onicecandidate = event => {
             if (!event.candidate){
               return
@@ -95,10 +96,11 @@ function VideoChat(){
             const data = {
               "origin": "videochat",
               "type": "stunCandidate",
-              "data": event.candidate.toJSON()}
+              "data": event.candidate.toJSON()
             }
             sendJsonMessage(data)
           }
+          
           const answerDescription = await pc.createAnswer()
           await pc.setLocalDescription(answerDescription)
           const answer = {
@@ -110,24 +112,28 @@ function VideoChat(){
             "type": "RTCsession",
             "data": answer
           }
+          console.log("sent my answer")
           sendJsonMessage(data)
         }
         break
       case "stunCandidate":
-        pc.addIceCandidate(new RTCIceCandidate(data.data))
+        if (pc.currentRemoteDescription){
+          pc.addIceCandidate(new RTCIceCandidate(data.data))
+        }
         break
     }
   }
+
   return(
     <div className={styles.videochatPage}>
       <h1 className={styles.title}>
         Videochat
       </h1>
-      <video ref={localCam} playsInline autoPlay></video>
-      <video ref={remoteCam}></video>
+      <video ref={localCam} playsInline autoPlay width={500}></video>
+      <video ref={remoteCam} playsInline autoPlay width={500}></video>
+      <div>de</div>
       <button onClick={startWebcam}>start webCam</button>
       <button onClick={makeCall}>Make call</button>
-      <button onClick={answerCall}>answer call</button>
       {/* <input ref={joinInput}/> */}
       {/* <button onClick={joinCall}></button> */}
     </div>
