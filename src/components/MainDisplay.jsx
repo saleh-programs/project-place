@@ -14,6 +14,15 @@ function MainDisplay({children, username, userInfoInitial}){
     "operations": [],
     "latestOp": -1
   })
+  const deviceInfo = useRef({
+    "device": null,
+    "routerRtpCapabilities": null,
+    "producer":{
+      "transportParams": null,
+      "connectCallback": null,
+      "produceCallback": null
+    }
+  })
 
   const externalChatRef = useRef((param1)=>{})
   const externalWhiteboardRef = useRef((param1)=>{})
