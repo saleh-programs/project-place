@@ -38,7 +38,6 @@ async function validateRoomReq(roomID) {
 
 async function storeMessageReq(messageInfo) {
   try{
-    console.log(messageInfo)
     const response = await fetch(baseurl + "storeMessage",{
       "method": "POST",
       "headers": {"Content-Type": "application/json"},
@@ -257,7 +256,6 @@ async function getRoomUsersReq(roomID) {
     if (!data.success){
       throw new Error(data.message ||"req failed")
     }
-    console.log(data)
     return data.data
   }catch(err){
     console.error(err)

@@ -1,5 +1,6 @@
 const http = require("http")
 const { WebSocketServer } = require("ws")
+const mediasoup = require("mediasoup")
 const url = require("url")
 const uuidv4 = require("uuid").v4
 
@@ -8,7 +9,7 @@ const path = require('path');
 const Queue = require("./Queue.js")
 
 const { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasReq, updateInstructionsReq, getCanvasReq, getInstructionsReq } = require("../requests.js")
-const { RTCPeerConnection } = require("wrtc")
+const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = require("wrtc")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -123,18 +124,50 @@ async function broadcastVideochat(data, uuid){
   switch(data.type){
     case "clientOffer":
       pc = new RTCPeerConnection(servers)
+
+      pc.ontrack = event => {
+        if (users[uuid]["haveClientTracks"]){
+          console.log("exited ontrack")
+          for (let i = 0; i < peers.length; i++){
+            if (peers[i] === uuid){
+              continue
+            }
+            users[peers[i]]["RTClink"].getReceivers().forEach(r => {
+              if (r.track){
+                pc.addTrack(r.track)
+                console.log("fed a track")
+              }
+            })
+          }
+          return
+        }
+        console.log("received tracks")
+        users[uuid]["haveClientTracks"] = true
+
+        event.streams[0].getTracks().forEach(track => {
+          console.log(track)
+          for (let i = 0; i < peers.length; i++){
+            if (peers[i] === uuid){
+              continue
+            }
+            users[peers[i]]["RTClink"].addTrack(track)
+            console.log("gave a track")
+          }
+        })
+      }
       await pc.setRemoteDescription(new RTCSessionDescription(data.data))
       
       pc.onicecandidate = event=>{
         if (!event.candidate){
           return
         }
-        connections[uuid].send({
+        connections[uuid].send(JSON.stringify({
           "origin": "videochat",
           "type": "serverCandidate",
-          "data": event.candidate.toJSON()
-        })
+          "data": event.candidate
+        }))
       }
+
 
       const serverAnswerDescription = await pc.createAnswer()
       await pc.setLocalDescription(serverAnswerDescription)
@@ -144,41 +177,22 @@ async function broadcastVideochat(data, uuid){
         sdp: serverAnswerDescription.sdp,
         type: serverAnswerDescription.type
       }
-      connections[uuid].send({
+      connections[uuid].send(JSON.stringify({
         "origin": "videochat",
         "type": "serverAnswer",
         "data": serverAnswer
-      })
+      }))
       
-      pc.ontrack = event => {
-        if (users[uuid].haveClientTracks){
-          return
-        }
-        users[uuid].haveClientTracks = true
-        event.streams[0].getTracks().forEach(track => {
-          for (let i = 0; i < peers.length; i++){
-            if (peers[i] === uuid){
-              continue
-            }
-            users[peers[i]]["RTClink"].addTrack(track)
-          }
-        })
-      }
-      for (let i = 0; i < peers.length; i++){
-        users[peers[i]]["RTClink"].getReceivers().forEach(r => {
-          if (r.track){
-            pc.addTrack(r.track)
-          }
-        })
-      }
 
       users[uuid]["RTClink"] = pc
       peers.push(uuid)
+      console.log("added users to memory")
 
       break
     case "clientCandidate":
       pc = users[uuid]["RTClink"]
-      if (pc.currentRemoteDescription){
+      if (pc && pc.currentRemoteDescription){
+        console.log("added a candidate")
         users[uuid]["RTClink"].addIceCandidate(new RTCIceCandidate(data.data))
       }
       break
