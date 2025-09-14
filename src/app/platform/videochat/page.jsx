@@ -23,41 +23,58 @@ function VideoChat(){
   async function startWebcam(){
     const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
     localCam.current.srcObject = stream
-    const videoProducerParams = {
-      track: stream.getVideoTracks()[0],
-      encodings: [
-        {
-          rid: 'r0',
-          maxBitrate: 100000,
-          scalabilityMode: 'S1T3',
-        },
-        {
-          rid: 'r1',
-          maxBitrate: 300000,
-          scalabilityMode: 'S1T3',
-        },
-        {
-          rid: 'r2',
-          maxBitrate: 900000,
-          scalabilityMode: 'S1T3',
-        },
-      ],
-      codecOptions: {
-        videoGoogleStartBitrate: 1000
-      }
-    } 
-    const audioProducerParams = {
-      track: stream.getAudioTracks()[0]
-    } 
+    deviceInfo.current["producerParams"].push(
+      {
+        track: stream.getVideoTracks()[0],
+        encodings: [
+          {
+            rid: 'r0',
+            maxBitrate: 100000,
+            scalabilityMode: 'S1T3',
+          },
+          {
+            rid: 'r1',
+            maxBitrate: 300000,
+            scalabilityMode: 'S1T3',
+          },
+          {
+            rid: 'r2',
+            maxBitrate: 900000,
+            scalabilityMode: 'S1T3',
+          },
+        ],
+        codecOptions: {
+          videoGoogleStartBitrate: 1000
+        }
+      },
+      {
+        track: stream.getAudioTracks()[0]
+      } 
+    )
 
-    //set up send transport
+    //device setup
     const device = await setupDevice()
-    const sendTransport = device.createSendTransport(deviceInfo.current["sendTransport"]["transportParams"])
+
+    sendJsonMessage({
+      "origin": "videochat",
+      "type": "transportParams"
+    })
+  }
+
+  async function setupDevice() {
+    deviceInfo.current["device"] = new mediasoupClient.Device()
+    await deviceInfo.current["device"].load({routerRtpCapabilities: deviceInfo.current["routerRtpCapabilities"]})
+    return deviceInfo.current["device"]
+  }
+
+  async function createTransports({sendParams, recvParams}) {
+    //set up send transport
+    const sendTransport = device.createSendTransport(sendParams)
     deviceInfo.current["sendTransport"]["ref"] = sendTransport
     sendTransport.on("connect", ({dtlsParameters}, callback)=>{
       sendJsonMessage({
         "username": username,
-        "type": "producerConnect",
+        "type": "sendConnect",
         "data": {dtlsParameters, rtpCapabilities: device.rtpCapabilities}
       })
       deviceInfo.current["sendTransport"]["connectCallback"] = callback
@@ -65,37 +82,33 @@ function VideoChat(){
     sendTransport.on("produce", ({kind, rtpParameters, appData}, callback)=>{
       sendJsonMessage({
         "username": username,
-        "type": "producerProduce",
+        "type": "sendProduce",
         "data": {
           kind,
           rtpParameters,
           appData
         }
       })
+      deviceInfo.current["sendTransport"]["produceCallback"] = callback
     })
 
     //set up recv transport
-    const recvTransport = device.createRecvTransport(deviceInfo.current["recvTransport"]["transportParams"])
+    const recvTransport = device.createRecvTransport(recvParams)
     deviceInfo.current["recvTransport"]["ref"] = recvTransport
 
     recvTransport.on("connect", ({dtlsParameters}, callback) => {
       sendJsonMessage({
         "username": username,
-        "type": "consumerConnect",
+        "type": "recvConnect",
         "data": dtlsParameters
       })
       deviceInfo.current["recvTransport"]["connectCallback"] = callback
     })
 
     //create producers
-    const videoProducer = await sendTransport.produce(videoProducerParams)
-    const audioProducer = await sendTransport.produce(audioProducerParams)
-  }
-
-  async function setupDevice() {
-    deviceInfo.current["device"] = new mediasoupClient.Device()
-    await deviceInfo.current["device"].load({routerRtpCapabilities: deviceInfo.current["routerRtpCapabilities"]})
-    return deviceInfo.current["device"]
+    for (let i = 0; i < deviceInfo.current["producerParams"].length; i++){
+      await sendTransport.produce(deviceInfo.current["producerParams"][i])
+    }
   }
 
   async function addConsumer({id, producerId, kind, rtpParameters}){
@@ -116,14 +129,17 @@ function VideoChat(){
   async function externalVideochat(data){
     const info = deviceInfo.current
     switch (data.type){
-      case "producerConnect":
+      case "sendConnect":
         info["sendTransport"]["connectCallback"]()
         break
-      case "producerProduce":
+      case "sendProduce":
         info["sendTransport"]["produceCallback"]({id: data.data})
         break
-      case "consumerConnect":
+      case "recvConnect":
         info["recvTransport"]["connectCallback"]()
+        break
+      case "transportParams":
+        createTransports(data.data)
         break
       case "addConsumer":
         addConsumer(data.data)

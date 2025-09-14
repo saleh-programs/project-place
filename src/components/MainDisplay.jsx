@@ -17,15 +17,14 @@ function MainDisplay({children, username, userInfoInitial}){
   const deviceInfo = useRef({
     "device": null,
     "routerRtpCapabilities": null,
+    "producerParams": [],
     "sendTransport":{
       "ref": null,
-      "transportParams": null,
       "connectCallback": null,
       "produceCallback": null
     },
     "recvTransport": {
       "ref": null,
-      "transportParams": null,
       "connectCallback": null
     }
   })
@@ -37,6 +36,7 @@ function MainDisplay({children, username, userInfoInitial}){
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
 
+  //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
       "username": username,
@@ -60,6 +60,11 @@ function MainDisplay({children, username, userInfoInitial}){
           externalWhiteboardRef.current(data)
           break
         case "videochat":
+          if (data.type === "setup"){
+            const {routerRtpCapabilities} = data.data
+            deviceInfo.current["routerRtpCapabilities"] = routerRtpCapabilities
+            break
+          }
           externalVideochatRef.current(data)
           break
       }
@@ -68,7 +73,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage, savedCanvasInfoRef,
+    sendJsonMessage, savedCanvasInfoRef, deviceInfo,
     externalWhiteboardRef,externalChatRef, externalVideochatRef,
     roomID, setRoomID,
     messages, setMessages

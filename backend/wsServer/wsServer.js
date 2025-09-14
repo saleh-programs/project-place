@@ -17,12 +17,29 @@ const wsServer = new WebSocketServer({server: httpServer})
 const connections = {}
 const users = {}
 const rooms = {}
-const servers = {
-  iceServers: [{
-    urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]
-  }],
-  iceCandidatePoolSize: 10,
-}
+
+let worker;
+mediasoup.createWorker()
+.then(res => {
+  worker = res
+})
+const mediaCodecs = [
+  {
+    kind: 'audio',
+    mimeType: 'audio/opus',
+    clockRate: 48000,
+    channels: 2,
+  },
+  {
+    kind: 'video',
+    mimeType: 'video/VP8',
+    clockRate: 90000,
+    parameters: {
+      'x-google-start-bitrate': 1000,
+    },
+  },
+]
+
 
 // any message layout:
 /*
@@ -45,10 +62,12 @@ wsServer.on("connection", (connection, request)=>{
   sendServerInfo(connection, roomID)
   
   users[uuid] = {
-    username: username,
-    roomID: roomID,
-    RTClink: null,
-    haveClientTracks: false
+    "username": username,
+    "roomID": roomID,
+    "sendTransport": null,
+    "recvTransport": null,
+    "producers": [],
+    "rtpCapabilities": null
   }
 
   
@@ -118,85 +137,55 @@ async function broadcastVideochat(data, uuid){
   // })
 
   const roomID = users[uuid]["roomID"]
-  const peers = rooms[roomID]["groupCallConnections"]
+  // const peers = rooms[roomID]["groupCallConnections"]
   // handling group calls
   let pc;
   switch(data.type){
-    case "clientOffer":
-      pc = new RTCPeerConnection(servers)
-
-      pc.ontrack = event => {
-        if (users[uuid]["haveClientTracks"]){
-          console.log("exited ontrack")
-          for (let i = 0; i < peers.length; i++){
-            if (peers[i] === uuid){
-              continue
-            }
-            users[peers[i]]["RTClink"].getReceivers().forEach(r => {
-              if (r.track){
-                pc.addTrack(r.track)
-                console.log("fed a track")
-              }
-            })
-          }
-          return
-        }
-        console.log("received tracks")
-        users[uuid]["haveClientTracks"] = true
-
-        event.streams[0].getTracks().forEach(track => {
-          console.log(track)
-          for (let i = 0; i < peers.length; i++){
-            if (peers[i] === uuid){
-              continue
-            }
-            users[peers[i]]["RTClink"].addTrack(track)
-            console.log("gave a track")
-          }
-        })
-      }
-      await pc.setRemoteDescription(new RTCSessionDescription(data.data))
-      
-      pc.onicecandidate = event=>{
-        if (!event.candidate){
-          return
-        }
-        connections[uuid].send(JSON.stringify({
-          "origin": "videochat",
-          "type": "serverCandidate",
-          "data": event.candidate
-        }))
-      }
-
-
-      const serverAnswerDescription = await pc.createAnswer()
-      await pc.setLocalDescription(serverAnswerDescription)
-
-
-      const serverAnswer = {
-        sdp: serverAnswerDescription.sdp,
-        type: serverAnswerDescription.type
-      }
+    case "sendConnect":
+      //new producer
+      const {dtlsParameters, rtpCapabilities} = data.data
+      users[uuid]["sendTransport"].connect(dtlsParameters)
+      users[uuid]["rtpCapabilities"] = rtpCapabilities
+      break
+    case "sendProduce":
+      const {kind, rtpParameters} = data.data
+      const producer = await users[uuid]["sendTransport"].produce({kind, rtpParameters})
+      users[uuid]["producers"].push(producer)
       connections[uuid].send(JSON.stringify({
         "origin": "videochat",
-        "type": "serverAnswer",
-        "data": serverAnswer
+        "type": "sendProduce",
+        "id": producer.id
       }))
-      
-
-      users[uuid]["RTClink"] = pc
-      peers.push(uuid)
-      console.log("added users to memory")
-
       break
-    case "clientCandidate":
-      pc = users[uuid]["RTClink"]
-      if (pc && pc.currentRemoteDescription){
-        console.log("added a candidate")
-        users[uuid]["RTClink"].addIceCandidate(new RTCIceCandidate(data.data))
-      }
+    case "recvConnect":
+      users[uuid]["recvTransport"].connect(data.data)
       break
-  } 
+    case "transportParams":
+      const sendTransport = await makeTransport(roomID)
+      const recvTransport = await makeTransport(roomID)
+      users[uuid]["sendTransport"] = sendTransport
+      users[uuid]["recvTransport"] = recvTransport
+
+      connections[uuid].send(JSON.stringify({
+        "origin": "videochat",
+        "type": "transportParams",
+        "data": {
+          "sendParams": {
+            "id": sendTransport.id,
+            "iceParameters": sendTransport.iceParameters,
+            "iceCandidates": sendTransport.iceCandidates,
+            "dtlsParameters": sendTransport.dtlsParameters
+          },
+          "recvParams": {
+            "id": recvTransport.id,
+            "iceParameters": recvTransport.iceParameters,
+            "iceCandidates": recvTransport.iceCandidates,
+            "dtlsParameters": recvTransport.dtlsParameters
+          }
+        }
+      }))
+      break
+    } 
 }
 
 function broadcastUser(data, uuid){
@@ -237,7 +226,8 @@ async function sendServerInfo(connection, roomID) {
       "canvas": canvas,
       "operations": instructions,
       "latestOp": instructions.length - 1,
-      "groupCallConnections": []
+      "router": await worker.createRouter({mediaCodecs}),
+      "callParticipants": []
     }
   }
 
@@ -257,8 +247,33 @@ async function sendServerInfo(connection, roomID) {
     "type": "chatHistory",
     "data": chatHistory
   }))
+  connection.send(JSON.stringify({
+    "origin": "videochat",
+    "type": "setup",
+    "data": {
+      "routerRtpCapabilities": rooms[roomID]["router"].rtpCapabilities,
+    }
+  }))
+
   connection.send(canvasInfo)
   initializing && redrawCanvas(roomID)
+}
+
+async function makeTransport(roomID) {
+  const options = {
+    listenIps: [
+      {
+        ip: '0.0.0.0', 
+        announcedIp: '127.0.0.1',
+      }
+    ],
+    enableUdp: true,
+    enableTcp: true,
+    preferUdp: true,
+  }
+
+  const transport = await rooms[roomID]["router"].createWebRtcTransport(options)
+  return transport
 }
 
 // Canvas/Drawing
@@ -299,15 +314,12 @@ function handleCanvasAction(data, roomID){
       }
   }
 }
-
 function redrawCanvas(roomID){
   rooms[roomID]["canvas"].getContext("2d").putImageData(rooms[roomID]["snapshot"],0,0)
   for (let i = 0; i <= rooms[roomID]["latestOp"]; i++){
     updateServerCanvas(rooms[roomID]["operations"][i], roomID)
   }
 }
-
-
 function updateServerCanvas(data, roomID){
   const mainCanvas = rooms[roomID]["canvas"]
     
