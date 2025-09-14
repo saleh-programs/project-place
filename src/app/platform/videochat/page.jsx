@@ -9,6 +9,7 @@ function VideoChat(){
 
   const localCam = useRef(null)
 
+  const [streams, setStreams] = useState({})
   
 
   useEffect(()=>{
@@ -51,14 +52,15 @@ function VideoChat(){
 
     //set up send transport
     const device = await setupDevice()
-    const sendTransport = device.createSendTransport(deviceInfo.current["producer"]["params"])
+    const sendTransport = device.createSendTransport(deviceInfo.current["sendTransport"]["transportParams"])
+    deviceInfo.current["sendTransport"]["ref"] = sendTransport
     sendTransport.on("connect", ({dtlsParameters}, callback)=>{
       sendJsonMessage({
         "username": username,
         "type": "producerConnect",
-        "data": dtlsParameters
+        "data": {dtlsParameters, rtpCapabilities: device.rtpCapabilities}
       })
-      deviceInfo.current["producer"]["connectCallback"] = callback
+      deviceInfo.current["sendTransport"]["connectCallback"] = callback
     })
     sendTransport.on("produce", ({kind, rtpParameters, appData}, callback)=>{
       sendJsonMessage({
@@ -72,6 +74,19 @@ function VideoChat(){
       })
     })
 
+    //set up recv transport
+    const recvTransport = device.createRecvTransport(deviceInfo.current["recvTransport"]["transportParams"])
+    deviceInfo.current["recvTransport"]["ref"] = recvTransport
+
+    recvTransport.on("connect", ({dtlsParameters}, callback) => {
+      sendJsonMessage({
+        "username": username,
+        "type": "consumerConnect",
+        "data": dtlsParameters
+      })
+      deviceInfo.current["recvTransport"]["connectCallback"] = callback
+    })
+
     //create producers
     const videoProducer = await sendTransport.produce(videoProducerParams)
     const audioProducer = await sendTransport.produce(audioProducerParams)
@@ -83,15 +98,35 @@ function VideoChat(){
     return deviceInfo.current["device"]
   }
 
+  async function addConsumer({id, producerId, kind, rtpParameters}){
+    const consumer = await deviceInfo.current["recvTransport"]["ref"].consume({
+      id,
+      producerId,
+      kind,
+      rtpParameters
+    })
+
+    if (producerId in streams){
+      streams[producerId].addTrack(consumer.track)
+    }else{
+      streams[producerId] = new MediaStream([consumer.track])
+    }
+  }
 
   async function externalVideochat(data){
-    const producer = deviceInfo.current["producer"]
+    const info = deviceInfo.current
     switch (data.type){
       case "producerConnect":
-        producer["connectCallback"]()
+        info["sendTransport"]["connectCallback"]()
         break
       case "producerProduce":
-        producer["produceCallback"]({id: data.data})
+        info["sendTransport"]["produceCallback"]({id: data.data})
+        break
+      case "consumerConnect":
+        info["recvTransport"]["connectCallback"]()
+        break
+      case "addConsumer":
+        addConsumer(data.data)
         break
     }
   }
@@ -102,6 +137,10 @@ function VideoChat(){
         Videochat
       </h1>
       <video ref={localCam} playsInline autoPlay width={200}></video>
+      {Object.entries(streams).map(([peerID, stream])=>{
+        const assignStream = (elem) => {if (elem){elem.srcObject = stream}}
+        return <video key={peerID} ref={assignStream} autoPlay playsInline></video>
+      })}
       <button onClick={startWebcam}>start webCam</button>
     </div>
   )

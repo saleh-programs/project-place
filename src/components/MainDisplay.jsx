@@ -17,10 +17,16 @@ function MainDisplay({children, username, userInfoInitial}){
   const deviceInfo = useRef({
     "device": null,
     "routerRtpCapabilities": null,
-    "producer":{
+    "sendTransport":{
+      "ref": null,
       "transportParams": null,
       "connectCallback": null,
       "produceCallback": null
+    },
+    "recvTransport": {
+      "ref": null,
+      "transportParams": null,
+      "connectCallback": null
     }
   })
 
