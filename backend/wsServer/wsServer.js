@@ -142,12 +142,13 @@ async function broadcastVideochat(data, uuid){
   let pc;
   switch(data.type){
     case "sendConnect":
-      //new producer
       const {dtlsParameters, rtpCapabilities} = data.data
       users[uuid]["sendTransport"].connect(dtlsParameters)
       users[uuid]["rtpCapabilities"] = rtpCapabilities
+      rooms[roomID]["callParticipants"].push(uuid)
       break
     case "sendProduce":
+      //new producer
       const {kind, rtpParameters} = data.data
       const producer = await users[uuid]["sendTransport"].produce({kind, rtpParameters})
       users[uuid]["producers"].push(producer)
@@ -184,6 +185,75 @@ async function broadcastVideochat(data, uuid){
           }
         }
       }))
+      break
+    case "producerReady":
+      for (let userID of rooms[roomID]["callParticipants"]){
+        if (userID == uuid) {
+          continue
+        }
+        if (!rooms[roomID]["router"].canConsume({
+          producerId: data.data,
+          rtpCapabilities: users[userID]["rtpCapabilities"]
+        })){
+          continue
+        }
+
+        const consumer = await rooms[roomID]["router"].consume({
+          producerId: data.data,
+          rtpCapabilities: users[userID]["rtpCapabilities"],
+          paused: true
+        })
+
+        rooms[roomID]["consumers"][consumer.id] = consumer
+
+        connections[userID].send(JSON.stringify({
+          "origin": "videochat",
+          "type": "addConsumer",
+          "data": {
+            id: consumer.id,
+            producerId: data.data,
+            kind: consumer.kind,
+            rtpParameters: consumer.rtpParameters
+          }
+        }))
+      }
+      break
+    case "unpauseConsumer":
+      rooms[roomID]["consumers"][data.data].resume()
+      break
+    case "receivePeers":
+      for (let userID of rooms[roomID]["callParticipants"]){
+        for (let i = 0; i < users[userID]["producers"].length; i++){
+          if (userID == uuid) {
+            continue
+          }
+          if (!rooms[roomID]["router"].canConsume({
+            producerId: users[userID]["producers"][i].id,
+            rtpCapabilities: users[uuid]["rtpCapabilities"]
+          })){
+            continue
+          }
+
+          const consumer = await rooms[roomID]["router"].consume({
+            producerId: users[userID]["producers"][i].id,
+            rtpCapabilities: users[uuid]["rtpCapabilities"],
+            paused: true
+          })
+
+          rooms[roomID]["consumers"][consumer.id] = consumer
+
+          connections[uuid].send(JSON.stringify({
+            "origin": "videochat",
+            "type": "addConsumer",
+            "data": {
+              id: consumer.id,
+              producerId: users[userID]["producers"][i].id,
+              kind: consumer.kind,
+              rtpParameters: consumer.rtpParameters
+            }
+          }))
+        }
+      }
       break
     } 
 }
@@ -227,7 +297,8 @@ async function sendServerInfo(connection, roomID) {
       "operations": instructions,
       "latestOp": instructions.length - 1,
       "router": await worker.createRouter({mediaCodecs}),
-      "callParticipants": []
+      "callParticipants": [],
+      "consumers": {}
     }
   }
 

@@ -124,6 +124,13 @@ function VideoChat(){
     }else{
       streams[producerId] = new MediaStream([consumer.track])
     }
+
+    sendJsonMessage({
+      "username": username,
+      "origin": "videochat",
+      "type": "unpauseConsumer",
+      "data": id
+    })
   }
 
   async function externalVideochat(data){
@@ -134,9 +141,22 @@ function VideoChat(){
         break
       case "sendProduce":
         info["sendTransport"]["produceCallback"]({id: data.data})
+
+        sendJsonMessage({
+          "origin": "videochat",
+          "username": username,
+          "type": "producerReady",
+          "data": data.data
+        })
         break
       case "recvConnect":
         info["recvTransport"]["connectCallback"]()
+
+        sendJsonMessage({
+          "origin": "videochat",
+          "username": username,
+          "type": "receivePeers"
+        })
         break
       case "transportParams":
         createTransports(data.data)
