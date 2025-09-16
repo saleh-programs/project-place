@@ -9,7 +9,6 @@ const path = require('path');
 const Queue = require("./Queue.js")
 
 const { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasReq, updateInstructionsReq, getCanvasReq, getInstructionsReq } = require("../requests.js")
-const { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } = require("wrtc")
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -137,15 +136,18 @@ async function broadcastVideochat(data, uuid){
   // })
 
   const roomID = users[uuid]["roomID"]
-  // const peers = rooms[roomID]["groupCallConnections"]
   // handling group calls
-  let pc;
   switch(data.type){
     case "sendConnect":
       const {dtlsParameters, rtpCapabilities} = data.data
-      users[uuid]["sendTransport"].connect(dtlsParameters)
+      await users[uuid]["sendTransport"].connect({dtlsParameters})
       users[uuid]["rtpCapabilities"] = rtpCapabilities
       rooms[roomID]["callParticipants"].push(uuid)
+      connections[uuid].send(JSON.stringify({
+        "origin": "videochat",
+        "type": "sendConnect",
+      }))
+      console.log("ST connected")
       break
     case "sendProduce":
       //new producer
@@ -155,11 +157,17 @@ async function broadcastVideochat(data, uuid){
       connections[uuid].send(JSON.stringify({
         "origin": "videochat",
         "type": "sendProduce",
-        "id": producer.id
+        "data": producer.id
       }))
+      console.log("Produced:", producer.id)
       break
     case "recvConnect":
-      users[uuid]["recvTransport"].connect(data.data)
+      users[uuid]["recvTransport"].connect({dtlsParameters: data.data})
+      connections[uuid].send(JSON.stringify({
+        "origin": "videochat",
+        "type": "recvConnect",
+      }))
+      console.log("RT connected")
       break
     case "transportParams":
       const sendTransport = await makeTransport(roomID)
@@ -185,26 +193,33 @@ async function broadcastVideochat(data, uuid){
           }
         }
       }))
+      console.log("Transport Params sent over")
       break
     case "producerReady":
+      console.log("ready producer", rooms[roomID]["callParticipants"], data)
       for (let userID of rooms[roomID]["callParticipants"]){
         if (userID == uuid) {
           continue
         }
-        if (!rooms[roomID]["router"].canConsume({
+        const options = {
           producerId: data.data,
           rtpCapabilities: users[userID]["rtpCapabilities"]
-        })){
+        }
+        console.log("before canConsume", options)
+
+        if (!rooms[roomID]["router"].canConsume(options)){
           continue
         }
+        console.log("after canConsume")
 
-        const consumer = await rooms[roomID]["router"].consume({
+        const consumer = await users[userID]["recvTransport"].consume({
           producerId: data.data,
           rtpCapabilities: users[userID]["rtpCapabilities"],
           paused: true
         })
 
         rooms[roomID]["consumers"][consumer.id] = consumer
+        console.log(uuid)
 
         connections[userID].send(JSON.stringify({
           "origin": "videochat",
@@ -213,20 +228,24 @@ async function broadcastVideochat(data, uuid){
             id: consumer.id,
             producerId: data.data,
             kind: consumer.kind,
-            rtpParameters: consumer.rtpParameters
+            rtpParameters: consumer.rtpParameters,
+            uuid: uuid
           }
         }))
+        console.log(`Sent producer ${data.data} to ${users[userID]["username"]} or ID: ${userID}`)
       }
       break
     case "unpauseConsumer":
       rooms[roomID]["consumers"][data.data].resume()
+      console.log(`consumer ${data.data} unpaused`)
       break
     case "receivePeers":
+      console.log("gimme peers", rooms[roomID]["callParticipants"])
       for (let userID of rooms[roomID]["callParticipants"]){
+        if (userID == uuid) {
+          continue
+        }
         for (let i = 0; i < users[userID]["producers"].length; i++){
-          if (userID == uuid) {
-            continue
-          }
           if (!rooms[roomID]["router"].canConsume({
             producerId: users[userID]["producers"][i].id,
             rtpCapabilities: users[uuid]["rtpCapabilities"]
@@ -234,14 +253,14 @@ async function broadcastVideochat(data, uuid){
             continue
           }
 
-          const consumer = await rooms[roomID]["router"].consume({
+          const consumer = await users[uuid]["recvTransport"].consume({
             producerId: users[userID]["producers"][i].id,
             rtpCapabilities: users[uuid]["rtpCapabilities"],
             paused: true
           })
 
           rooms[roomID]["consumers"][consumer.id] = consumer
-
+          console.log(userID)
           connections[uuid].send(JSON.stringify({
             "origin": "videochat",
             "type": "addConsumer",
@@ -249,9 +268,11 @@ async function broadcastVideochat(data, uuid){
               id: consumer.id,
               producerId: users[userID]["producers"][i].id,
               kind: consumer.kind,
-              rtpParameters: consumer.rtpParameters
+              rtpParameters: consumer.rtpParameters,
+              uuid: userID
             }
           }))
+          console.log(`Peer ${users[uuid]["username"]} or ID: ${uuid} received producer: ${users[userID]["producers"][i].id}`)
         }
       }
       break

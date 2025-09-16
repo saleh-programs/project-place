@@ -5,7 +5,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import styles from "styles/platform/VideoChat.module.css"
 
 function VideoChat(){
-  const {externalVideochatRef, deviceInfo, sendJsonMessage} = useContext(ThemeContext)
+  const {externalVideochatRef, deviceInfo, sendJsonMessage, username} = useContext(ThemeContext)
 
   const localCam = useRef(null)
 
@@ -19,6 +19,9 @@ function VideoChat(){
       externalVideochatRef.current = (param1) => {}
     }
   },[])
+  useEffect(()=>{
+    console.log("Streams changed:", streams)
+  },[streams])
 
   async function startWebcam(){
     const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
@@ -56,6 +59,7 @@ function VideoChat(){
     const device = await setupDevice()
 
     sendJsonMessage({
+      "username": username,
       "origin": "videochat",
       "type": "transportParams"
     })
@@ -68,12 +72,14 @@ function VideoChat(){
   }
 
   async function createTransports({sendParams, recvParams}) {
+    const device = deviceInfo.current["device"]
     //set up send transport
     const sendTransport = device.createSendTransport(sendParams)
     deviceInfo.current["sendTransport"]["ref"] = sendTransport
     sendTransport.on("connect", ({dtlsParameters}, callback)=>{
       sendJsonMessage({
         "username": username,
+        "origin": "videochat",
         "type": "sendConnect",
         "data": {dtlsParameters, rtpCapabilities: device.rtpCapabilities}
       })
@@ -82,6 +88,7 @@ function VideoChat(){
     sendTransport.on("produce", ({kind, rtpParameters, appData}, callback)=>{
       sendJsonMessage({
         "username": username,
+        "origin": "videochat",
         "type": "sendProduce",
         "data": {
           kind,
@@ -99,19 +106,26 @@ function VideoChat(){
     recvTransport.on("connect", ({dtlsParameters}, callback) => {
       sendJsonMessage({
         "username": username,
+        "origin": "videochat",
         "type": "recvConnect",
         "data": dtlsParameters
       })
       deviceInfo.current["recvTransport"]["connectCallback"] = callback
     })
+    sendJsonMessage({
+      "username": username,
+      "origin": "videochat",
+      "type": "receivePeers"
+    })
 
     //create producers
     for (let i = 0; i < deviceInfo.current["producerParams"].length; i++){
-      await sendTransport.produce(deviceInfo.current["producerParams"][i])
+      console.log("produced", deviceInfo.current["producerParams"][i])
+      sendTransport.produce(deviceInfo.current["producerParams"][i])
     }
   }
 
-  async function addConsumer({id, producerId, kind, rtpParameters}){
+  async function addConsumer({id, producerId, kind, rtpParameters, uuid}){
     const consumer = await deviceInfo.current["recvTransport"]["ref"].consume({
       id,
       producerId,
@@ -119,11 +133,15 @@ function VideoChat(){
       rtpParameters
     })
 
-    if (producerId in streams){
-      streams[producerId].addTrack(consumer.track)
-    }else{
-      streams[producerId] = new MediaStream([consumer.track])
-    }
+    setStreams(prev => {
+      const newStreams = {...prev}
+      if (uuid in newStreams){
+        newStreams[uuid].addTrack(consumer.track)
+      }else{
+        newStreams[uuid] = new MediaStream([consumer.track])
+      }
+      return newStreams
+    })
 
     sendJsonMessage({
       "username": username,
@@ -138,6 +156,7 @@ function VideoChat(){
     switch (data.type){
       case "sendConnect":
         info["sendTransport"]["connectCallback"]()
+        console.log("ST callback called")
         break
       case "sendProduce":
         info["sendTransport"]["produceCallback"]({id: data.data})
@@ -148,21 +167,21 @@ function VideoChat(){
           "type": "producerReady",
           "data": data.data
         })
+        console.log("produce callback called", data)
         break
       case "recvConnect":
         info["recvTransport"]["connectCallback"]()
+        console.log("RT callback called")
 
-        sendJsonMessage({
-          "origin": "videochat",
-          "username": username,
-          "type": "receivePeers"
-        })
         break
       case "transportParams":
         createTransports(data.data)
+        console.log("Received transport params:", data.data)
         break
       case "addConsumer":
+        console.log(data.data)
         addConsumer(data.data)
+        console.log("adding a consumer")
         break
     }
   }
@@ -174,8 +193,11 @@ function VideoChat(){
       </h1>
       <video ref={localCam} playsInline autoPlay width={200}></video>
       {Object.entries(streams).map(([peerID, stream])=>{
-        const assignStream = (elem) => {if (elem){elem.srcObject = stream}}
-        return <video key={peerID} ref={assignStream} autoPlay playsInline></video>
+        const assignStream = (elem) => {if (elem){
+          console.log(stream.getTracks(), stream.getVideoTracks(), stream.getAudioTracks())
+          elem.srcObject = stream
+        }}
+        return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
       })}
       <button onClick={startWebcam}>start webCam</button>
     </div>
