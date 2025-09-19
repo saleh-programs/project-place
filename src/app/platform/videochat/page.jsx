@@ -19,10 +19,7 @@ function VideoChat(){
       externalVideochatRef.current = (param1) => {}
     }
   },[])
-  useEffect(()=>{
-    console.log("Streams changed:", streams)
-  },[streams])
-
+  
   async function startWebcam(){
     const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
     localCam.current.srcObject = stream
@@ -61,7 +58,8 @@ function VideoChat(){
     sendJsonMessage({
       "username": username,
       "origin": "videochat",
-      "type": "transportParams"
+      "type": "transportParams",
+      "data": {rtpCapabilities: device.rtpCapabilities}
     })
   }
 
@@ -81,7 +79,7 @@ function VideoChat(){
         "username": username,
         "origin": "videochat",
         "type": "sendConnect",
-        "data": {dtlsParameters, rtpCapabilities: device.rtpCapabilities}
+        "data": {dtlsParameters}
       })
       deviceInfo.current["sendTransport"]["connectCallback"] = callback
     })
@@ -90,7 +88,7 @@ function VideoChat(){
         "username": username,
         "origin": "videochat",
         "type": "sendProduce",
-        "data": {
+        "data": { 
           kind,
           rtpParameters,
           appData
@@ -112,11 +110,7 @@ function VideoChat(){
       })
       deviceInfo.current["recvTransport"]["connectCallback"] = callback
     })
-    sendJsonMessage({
-      "username": username,
-      "origin": "videochat",
-      "type": "receivePeers"
-    })
+
 
     //create producers
     for (let i = 0; i < deviceInfo.current["producerParams"].length; i++){
@@ -156,7 +150,13 @@ function VideoChat(){
     switch (data.type){
       case "sendConnect":
         info["sendTransport"]["connectCallback"]()
-        console.log("ST callback called")
+
+        //server has rtpCapabilities now and transports are set up.
+        sendJsonMessage({
+          "username": username,
+          "origin": "videochat",
+          "type": "receivePeers"
+        })
         break
       case "sendProduce":
         info["sendTransport"]["produceCallback"]({id: data.data})
@@ -191,7 +191,7 @@ function VideoChat(){
       <h1 className={styles.title}>
         Videochat
       </h1>
-      <video ref={localCam} playsInline autoPlay width={200}></video>
+      <video ref={localCam} playsInline autoPlay muted width={200}></video>
       {Object.entries(streams).map(([peerID, stream])=>{
         const assignStream = (elem) => {if (elem){
           console.log(stream.getTracks(), stream.getVideoTracks(), stream.getAudioTracks())

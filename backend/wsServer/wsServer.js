@@ -139,9 +139,8 @@ async function broadcastVideochat(data, uuid){
   // handling group calls
   switch(data.type){
     case "sendConnect":
-      const {dtlsParameters, rtpCapabilities} = data.data
+      const {dtlsParameters} = data.data
       await users[uuid]["sendTransport"].connect({dtlsParameters})
-      users[uuid]["rtpCapabilities"] = rtpCapabilities
       rooms[roomID]["callParticipants"].push(uuid)
       connections[uuid].send(JSON.stringify({
         "origin": "videochat",
@@ -170,6 +169,8 @@ async function broadcastVideochat(data, uuid){
       console.log("RT connected")
       break
     case "transportParams":
+      users[uuid]["rtpCapabilities"] = data.data["rtpCapabilities"]
+    
       const sendTransport = await makeTransport(roomID)
       const recvTransport = await makeTransport(roomID)
       users[uuid]["sendTransport"] = sendTransport
@@ -245,13 +246,18 @@ async function broadcastVideochat(data, uuid){
         if (userID == uuid) {
           continue
         }
+        console.log("before canConsume receiverPeers")
         for (let i = 0; i < users[userID]["producers"].length; i++){
-          if (!rooms[roomID]["router"].canConsume({
+          const options2 = {
             producerId: users[userID]["producers"][i].id,
             rtpCapabilities: users[uuid]["rtpCapabilities"]
-          })){
+          }
+          console.log("options2:", options2)
+          if (!rooms[roomID]["router"].canConsume(options2)){
             continue
           }
+        console.log("after canConsume receiverPeers")
+
 
           const consumer = await users[uuid]["recvTransport"].consume({
             producerId: users[userID]["producers"][i].id,
@@ -260,7 +266,6 @@ async function broadcastVideochat(data, uuid){
           })
 
           rooms[roomID]["consumers"][consumer.id] = consumer
-          console.log(userID)
           connections[uuid].send(JSON.stringify({
             "origin": "videochat",
             "type": "addConsumer",
