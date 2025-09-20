@@ -1,4 +1,5 @@
 "use client"
+import * as mediasoupClient from "mediasoup-client"
 import { use, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
@@ -16,7 +17,6 @@ function MainDisplay({children, username, userInfoInitial}){
   })
   const deviceInfo = useRef({
     "device": null,
-    "routerRtpCapabilities": null,
     "producerParams": [],
     "sendTransport":{
       "ref": null,
@@ -62,7 +62,8 @@ function MainDisplay({children, username, userInfoInitial}){
         case "videochat":
           if (data.type === "setup"){
             const {routerRtpCapabilities} = data.data
-            deviceInfo.current["routerRtpCapabilities"] = routerRtpCapabilities
+            deviceInfo.current["device"] = new mediasoupClient.Device()
+            deviceInfo.current["device"].load({routerRtpCapabilities})
             break
           }
           externalVideochatRef.current(data)

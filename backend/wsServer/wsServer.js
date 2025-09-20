@@ -141,7 +141,6 @@ async function broadcastVideochat(data, uuid){
     case "sendConnect":
       const {dtlsParameters} = data.data
       await users[uuid]["sendTransport"].connect({dtlsParameters})
-      rooms[roomID]["callParticipants"].push(uuid)
       connections[uuid].send(JSON.stringify({
         "origin": "videochat",
         "type": "sendConnect",
@@ -169,8 +168,8 @@ async function broadcastVideochat(data, uuid){
       console.log("RT connected")
       break
     case "transportParams":
+      rooms[roomID]["callParticipants"].push(uuid)
       users[uuid]["rtpCapabilities"] = data.data["rtpCapabilities"]
-    
       const sendTransport = await makeTransport(roomID)
       const recvTransport = await makeTransport(roomID)
       users[uuid]["sendTransport"] = sendTransport
@@ -196,7 +195,7 @@ async function broadcastVideochat(data, uuid){
       }))
       console.log("Transport Params sent over")
       break
-    case "producerReady":
+    case "givePeers":
       console.log("ready producer", rooms[roomID]["callParticipants"], data)
       for (let userID of rooms[roomID]["callParticipants"]){
         if (userID == uuid) {
@@ -279,6 +278,26 @@ async function broadcastVideochat(data, uuid){
           }))
           console.log(`Peer ${users[uuid]["username"]} or ID: ${uuid} received producer: ${users[userID]["producers"][i].id}`)
         }
+      }
+      break
+    case "disconnect": 
+      rooms[roomID]["connections"].forEach(conn=>{ 
+        if (conn !== connections[uuid]){
+          conn.send(JSON.stringify({
+            ...data,
+             "data": {uuid}
+          }))
+        }
+      })
+      rooms[roomID]["callParticipants"].filter(userid => userid !== uuid)
+      users[uuid]["sendTransport"].close()
+      users[uuid]["recvTransport"].close()
+      users[uuid] = {
+        ...users[uuid],
+        "sendTransport": null,
+        "recvTransport": null,
+        "producers": [],
+        "rtpCapabilities": null
       }
       break
     } 
