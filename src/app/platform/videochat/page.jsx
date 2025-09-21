@@ -4,14 +4,26 @@ import ThemeContext from "src/assets/ThemeContext"
 import styles from "styles/platform/VideoChat.module.css"
 
 function VideoChat(){
-  const {externalVideochatRef, deviceInfo, sendJsonMessage, username} = useContext(ThemeContext)
+  const {externalVideochatRef, deviceInfo, sendJsonMessage, username, userStates} = useContext(ThemeContext)
 
   const localCam = useRef(null)
 
   const [streams, setStreams] = useState({})
   const consumersRef = useRef({})
-
   const tempJoinedFlag = useRef(false)
+
+  const servers = {
+    iceServers: [{
+      urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]
+    }],
+    iceCandidatePoolSize: 10,
+  }
+  const p2pInfo = useRef({ 
+    pc: new RTCPeerConnection(servers),
+    localStream: null,
+    remoteStream: null
+  })
+
 
 
   useEffect(()=>{
@@ -99,7 +111,6 @@ function VideoChat(){
     )
   }
 
-
   async function createTransports({sendParams, recvParams}) {
     const device = deviceInfo.current["device"]
     //set up send transport
@@ -182,6 +193,102 @@ function VideoChat(){
     })
   }
 
+  //P2P logic now..
+  async function p2pSetup(){
+    const pc = p2pInfo.current["pc"]
+    const localStream =  await navigator.mediaDevices.getUserMedia({video:true,audio:true})
+    const remoteStream = new MediaStream()
+    p2pInfo.current["localStream"] = localStream
+    p2pInfo.current["remoteStream"] = remoteStream
+
+    localStream.getTracks().forEach(track=>{
+      pc.addTrack(track, localStream)
+    })
+    pc.ontrack = event => {
+     event.streams[0].getTracks().forEach(track=>{
+      remoteStream.addTrack(track)
+     })
+    }
+    localCam.current.srcObject = localStream
+    remoteCam.current.srcObject = remoteStream
+  }
+  async function callPeer(name) {
+    const pc = p2pInfo.current["pc"]
+    pc.onicecandidate = event => {
+      if (!event.candidate){
+        return
+      }
+      const data = {
+        "origin": "videochat",
+        "type": "stunCandidate",
+        "data": {
+          "candidate": event.candidate.toJSON(),
+          "peer": name
+        }
+      }
+      sendJsonMessage(data)
+    }
+
+    const offerDescription = await pc.createOffer()
+    await pc.setLocalDescription(offerDescription)
+
+    const offer = {
+      sdp: offerDescription.sdp,
+      type: offerDescription.type
+    }
+    sendJsonMessage({
+      "username": username,
+      "origin": "videochat",
+      "type": "callRequest",
+      "data": {"peer": name, offer}
+    })
+  }
+
+  async function acceptCall(peerName) {
+    const {offer} = callOffers[peerName]
+    pc.setRemoteDescription(new RTCSessionDescription(offer))
+
+    pc.onicecandidate = event => {
+      if (!event.candidate){
+        return
+      }
+      const data = {
+        "origin": "videochat",
+        "type": "stunCandidate",
+        "data": {
+          "candidate": event.candidate.toJSON(),
+          "peer": peerName
+        }
+      }
+      sendJsonMessage(data)
+    }
+    
+    const answerDescription = await pc.createAnswer()
+    await pc.setLocalDescription(answerDescription)
+    const answer = {
+      type: answerDescription.type,
+      sdp: answerDescription.sdp 
+    }
+    sendJsonMessage({
+      "username": username,
+      "origin": "videochat",
+      "type": "callResponse",
+      "data": {
+        "peer": peerName,
+        "status": "accepted",
+        answer
+      }
+    })
+    console.log("sent my answer")
+  }
+  async function rejectCall(peerName) {
+    sendJsonMessage({
+      "username": username,
+      "origin": "videochat",
+      "type": "callResponse",
+      "data": {"status": "rejected", "peer": peerName}
+    })
+  }
   async function externalVideochat(data){
     const info = deviceInfo.current
     switch (data.type){
@@ -223,6 +330,15 @@ function VideoChat(){
           return newStreams
         })
         break
+      case "callRequest":
+        //pop up accept or deny screen
+        break
+      case "callResponse":
+        if (data.data["status"] === "accepted"){
+          pc.setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
+        }else{
+          //i dont wanna talk to you bryan
+        }
     }
   }
 
@@ -239,6 +355,14 @@ function VideoChat(){
         return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
       })}
       <button onClick={joinGroupCall}>Join Group Call</button>
+
+      <video ref={p2pLocal} playsInline autoPlay muted width={200}></video>
+      <video ref={p2pRemote} playsInline autoPlay muted width={200}></video>
+
+      <button onClick={p2pSetup}>Set up p2p call</button>
+      {Object.values(userStates).map(name=>{
+        return <button onClick={()=>callPeer(name)}>{name}</button>
+      })}
     </div>
   )
 }
