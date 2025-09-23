@@ -138,6 +138,35 @@ async function broadcastVideochat(data, uuid){
   const roomID = users[uuid]["roomID"]
   // handling group calls
   switch(data.type){
+    case "stunCandidate":
+      const userList = Object.keys(users)
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "callRequest":
+      const userList2 = Object.keys(users)
+      console.log(userList2,data)
+      for (let i = 0; i < userList2.length; i++){
+        if (users[userList2[i]]["username"] === data.data["peer"]){
+          console.log("found")
+          connections[userList2[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "callResponse":
+      const userList3 = Object.keys(users)
+      for (let i = 0; i < userList3.length; i++){
+        if (users[userList3[i]]["username"] === data.data["peer"]){
+          connections[userList3[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
     case "sendConnect":
       const {dtlsParameters} = data.data
       await users[uuid]["sendTransport"].connect({dtlsParameters})

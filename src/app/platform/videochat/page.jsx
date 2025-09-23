@@ -19,16 +19,18 @@ function VideoChat(){
     iceCandidatePoolSize: 10,
   }
   const p2pInfo = useRef({ 
-    pc: new RTCPeerConnection(servers),
+    pc: null,
     localStream: null,
     remoteStream: null
   })
-
+  const [callOffers, setCallOffers] = useState({})
+  const p2pLocal = useRef(null)
+  const p2pRemote = useRef(null)
 
 
   useEffect(()=>{
     externalVideochatRef.current = externalVideochat
-
+    p2pInfo.current["pc"] = new RTCPeerConnection(servers)
     return ()=>{
       externalVideochatRef.current = (param1) => {}
       disconnect()
@@ -209,18 +211,20 @@ function VideoChat(){
       remoteStream.addTrack(track)
      })
     }
-    localCam.current.srcObject = localStream
-    remoteCam.current.srcObject = remoteStream
+    p2pLocal.current.srcObject = localStream
+    p2pRemote.current.srcObject = remoteStream
   }
+
   async function callPeer(name) {
     const pc = p2pInfo.current["pc"]
     pc.onicecandidate = event => {
       if (!event.candidate){
-        return
+        return 
       }
       const data = {
         "origin": "videochat",
         "type": "stunCandidate",
+        "username": username,
         "data": {
           "candidate": event.candidate.toJSON(),
           "peer": name
@@ -245,7 +249,8 @@ function VideoChat(){
   }
 
   async function acceptCall(peerName) {
-    const {offer} = callOffers[peerName]
+    const {pc} = p2pInfo.current
+    const offer = callOffers[peerName]
     pc.setRemoteDescription(new RTCSessionDescription(offer))
 
     pc.onicecandidate = event => {
@@ -279,7 +284,11 @@ function VideoChat(){
         answer
       }
     })
-    console.log("sent my answer")
+    setCallOffers(prev => {
+      const newCallOffers = {...prev}
+      delete newCallOffers[peerName]
+      return newCallOffers
+    })
   }
   async function rejectCall(peerName) {
     sendJsonMessage({
@@ -288,7 +297,13 @@ function VideoChat(){
       "type": "callResponse",
       "data": {"status": "rejected", "peer": peerName}
     })
+    setCallOffers(prev => {
+      const newCallOffers = {...prev}
+      delete newCallOffers[peerName]
+      return newCallOffers
+    })
   }
+
   async function externalVideochat(data){
     const info = deviceInfo.current
     switch (data.type){
@@ -331,13 +346,23 @@ function VideoChat(){
         })
         break
       case "callRequest":
-        //pop up accept or deny screen
+        console.log("got offer")
+        setCallOffers(prev => {
+          return {...prev, [data["username"]]: data.data["offer"]}
+        })
         break
       case "callResponse":
         if (data.data["status"] === "accepted"){
-          pc.setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
+          p2pInfo.current["pc"].setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
         }else{
           //i dont wanna talk to you bryan
+          p2pInfo.current["pc"].onicecandidate = null
+          console.log("rejected at least")
+        }
+        break
+      case "stunCandidate":
+        if (p2pInfo.current["pc"].currentRemoteDescription){
+          p2pInfo.current["pc"].addIceCandidate(new RTCIceCandidate(data.data["candidate"]))
         }
     }
   }
@@ -358,10 +383,17 @@ function VideoChat(){
 
       <video ref={p2pLocal} playsInline autoPlay muted width={200}></video>
       <video ref={p2pRemote} playsInline autoPlay muted width={200}></video>
-
       <button onClick={p2pSetup}>Set up p2p call</button>
-      {Object.values(userStates).map(name=>{
-        return <button onClick={()=>callPeer(name)}>{name}</button>
+      {Object.keys(userStates).map((name,i)=>{
+        return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
+      })}
+      {Object.keys(callOffers).map((name,i) => {
+        console.log("inside")
+        return (<div key={i}>
+          New call offer from <strong>{name}</strong>!
+          <button onClick={()=>acceptCall(name)}>Accept</button>
+          <button onClick={()=>rejectCall(name)}>Reject</button>
+        </div>)
       })}
     </div>
   )

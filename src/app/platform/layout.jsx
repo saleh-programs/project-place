@@ -12,7 +12,8 @@ async function PlatformLayout({ children }) {
   const email = infoRes["email"]
 
   const userInfoInitial = await getUserInfoReq(email)
-  const username = userInfoInitial["username"]
+
+  const username = `murad${Math.floor(Math.random()*1000)}` // userInfoInitial["username"]
 
   if (!username){
     redirect("/accountsetup")

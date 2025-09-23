@@ -125,6 +125,7 @@ function MainDisplay({children, username, userInfoInitial}){
         break
       case "getUsers":
         const users = {}
+        console.log(data)
         data["data"].forEach(user => {
            users[user["username"]] = {
             "imageURL": user["imageURL"],

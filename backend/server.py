@@ -199,17 +199,13 @@ def getRoomUsers():
   roomUsers = []
   try:
     with AccessDatabase() as cursor:
-      print("broke here")
       cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (data["roomID"],))
-      print("broke there")
       users = json.loads(cursor.fetchone()[0])
-      print("you there ???", users)
       for user in users:
-        print(user)
-        cursor.execute("SELECT profilePicURL FROM users WHERE username = %s", (user,))
-        print(2)
+        # cursor.execute("SELECT profilePicURL FROM users WHERE username = %s", (user,))
+        cursor.execute("SELECT profilePicURL FROM users WHERE id = 1")
+
         profilePicture = cursor.fetchone()[0]
-        print(3)
         roomUsers.append({
           "username": user,
           "imageURL": profilePicture
