@@ -31,7 +31,8 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const externalChatRef = useRef((param1)=>{})
   const externalWhiteboardRef = useRef((param1)=>{})
-  const externalVideochatRef = useRef((param1)=>{})
+  const externalGroupcallRef = useRef((param1)=>{})
+  const externalPeercallRef = useRef((param1)=>{})
 
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
@@ -59,14 +60,17 @@ function MainDisplay({children, username, userInfoInitial}){
         case "whiteboard":
           externalWhiteboardRef.current(data)
           break
-        case "videochat":
+        case "groupcall":
           if (data.type === "setup"){
             const {routerRtpCapabilities} = data.data
             deviceInfo.current["device"] = new mediasoupClient.Device()
             deviceInfo.current["device"].load({routerRtpCapabilities})
             break
           }
-          externalVideochatRef.current(data)
+          externalGroupcallRef.current(data)
+          break
+        case "peercall":
+          externalPeercallRef.current(data)
           break
       }
     }
@@ -75,7 +79,7 @@ function MainDisplay({children, username, userInfoInitial}){
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
     sendJsonMessage, savedCanvasInfoRef, deviceInfo,
-    externalWhiteboardRef,externalChatRef, externalVideochatRef,
+    externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
     messages, setMessages
   }

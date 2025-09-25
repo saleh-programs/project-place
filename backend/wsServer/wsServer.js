@@ -97,8 +97,11 @@ function handleMessage(data, uuid){
     case "whiteboard":
       broadcastWhiteboard(parsedData, uuid)
       break
-    case"videochat":
-      broadcastVideochat(parsedData, uuid)
+    case "groupcall":
+      broadcastGroupcall(parsedData, uuid)
+      break
+    case "peercall":
+      broadcastPeercall(parsedData, uuid)
       break
     case "user":
       broadcastUser(parsedData, uuid)
@@ -126,52 +129,15 @@ function broadcastWhiteboard(data, uuid){
   handleCanvasAction(data, roomID)
 }
 
-async function broadcastVideochat(data, uuid){
-  // Let's say this is where we'll later handle peer to peer
-  // const roomID = users[uuid].roomID  
-  // rooms[roomID]["connections"].forEach(conn => {
-  //   if (conn !== connections[uuid]){
-  //     conn.send(JSON.stringify(data))
-  //    }
-  // })
-
+async function broadcastGroupcall(data, uuid){
   const roomID = users[uuid]["roomID"]
   // handling group calls
   switch(data.type){
-    case "stunCandidate":
-      const userList = Object.keys(users)
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "callRequest":
-      const userList2 = Object.keys(users)
-      console.log(userList2,data)
-      for (let i = 0; i < userList2.length; i++){
-        if (users[userList2[i]]["username"] === data.data["peer"]){
-          console.log("found")
-          connections[userList2[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "callResponse":
-      const userList3 = Object.keys(users)
-      for (let i = 0; i < userList3.length; i++){
-        if (users[userList3[i]]["username"] === data.data["peer"]){
-          connections[userList3[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
     case "sendConnect":
       const {dtlsParameters} = data.data
       await users[uuid]["sendTransport"].connect({dtlsParameters})
       connections[uuid].send(JSON.stringify({
-        "origin": "videochat",
+        "origin": "groupcall",
         "type": "sendConnect",
       }))
       console.log("ST connected")
@@ -182,7 +148,7 @@ async function broadcastVideochat(data, uuid){
       const producer = await users[uuid]["sendTransport"].produce({kind, rtpParameters})
       users[uuid]["producers"].push(producer)
       connections[uuid].send(JSON.stringify({
-        "origin": "videochat",
+        "origin": "groupcall",
         "type": "sendProduce",
         "data": producer.id
       }))
@@ -191,7 +157,7 @@ async function broadcastVideochat(data, uuid){
     case "recvConnect":
       users[uuid]["recvTransport"].connect({dtlsParameters: data.data})
       connections[uuid].send(JSON.stringify({
-        "origin": "videochat",
+        "origin": "groupcall",
         "type": "recvConnect",
       }))
       console.log("RT connected")
@@ -205,7 +171,7 @@ async function broadcastVideochat(data, uuid){
       users[uuid]["recvTransport"] = recvTransport
 
       connections[uuid].send(JSON.stringify({
-        "origin": "videochat",
+        "origin": "groupcall",
         "type": "transportParams",
         "data": {
           "sendParams": {
@@ -251,7 +217,7 @@ async function broadcastVideochat(data, uuid){
         console.log(uuid)
 
         connections[userID].send(JSON.stringify({
-          "origin": "videochat",
+          "origin": "groupcall",
           "type": "addConsumer",
           "data": {
             id: consumer.id,
@@ -295,7 +261,7 @@ async function broadcastVideochat(data, uuid){
 
           rooms[roomID]["consumers"][consumer.id] = consumer
           connections[uuid].send(JSON.stringify({
-            "origin": "videochat",
+            "origin": "groupcall",
             "type": "addConsumer",
             "data": {
               id: consumer.id,
@@ -327,6 +293,40 @@ async function broadcastVideochat(data, uuid){
         "recvTransport": null,
         "producers": [],
         "rtpCapabilities": null
+      }
+      break
+    } 
+}
+async function broadcastPeercall(data, uuid){
+  // handling group calls
+  switch(data.type){
+    case "stunCandidate":
+      const userList = Object.keys(users)
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "callRequest":
+      const userList2 = Object.keys(users)
+      console.log(userList2,data)
+      for (let i = 0; i < userList2.length; i++){
+        if (users[userList2[i]]["username"] === data.data["peer"]){
+          console.log("found")
+          connections[userList2[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "callResponse":
+      const userList3 = Object.keys(users)
+      for (let i = 0; i < userList3.length; i++){
+        if (users[userList3[i]]["username"] === data.data["peer"]){
+          connections[userList3[i]].send(JSON.stringify(data))
+          break
+        }
       }
       break
     } 
@@ -393,7 +393,7 @@ async function sendServerInfo(connection, roomID) {
     "data": chatHistory
   }))
   connection.send(JSON.stringify({
-    "origin": "videochat",
+    "origin": "groupcall",
     "type": "setup",
     "data": {
       "routerRtpCapabilities": rooms[roomID]["router"].rtpCapabilities,
