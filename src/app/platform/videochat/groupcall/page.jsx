@@ -1,14 +1,15 @@
 "use client"
-import { useContext } from "react"
+import { useContext,useRef, useState, useEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 function GroupCall(){
-    const { deviceInfo, externalGroupcallRef, sendJsonMessage } = useContext(ThemeContext)
+    const { deviceInfo, externalGroupcallRef, sendJsonMessage, username } = useContext(ThemeContext)
 
     const consumersRef = useRef({})
     const tempJoinedFlag = useRef(false)
     const localCam = useRef(null)
     
+    const [streams, setStreams] = useState({})
     useEffect(()=>{
         externalGroupcallRef.current = externalGroupcall
         return ()=>{
@@ -49,6 +50,7 @@ function GroupCall(){
     }
     async function joinGroupCall() {
         if (!deviceInfo.current["device"]){
+            console.log(deviceInfo.current)
         return
         }
         tempJoinedFlag.current = true
@@ -223,12 +225,14 @@ function GroupCall(){
     return(
         <div>
             <video ref={localCam} playsInline autoPlay muted width={200}></video>
+            hey
             {Object.entries(streams).map(([peerID, stream])=>{
                 const assignStream = (elem) => {if (elem){
                 elem.srcObject = stream
                 }}
-                return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
+                return <video style={{border:"5px solid"}} key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
             })}
+            
             <button onClick={joinGroupCall}>Join Group Call</button>
         </div>
     )

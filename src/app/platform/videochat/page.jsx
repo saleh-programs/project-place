@@ -29,26 +29,6 @@ function VideoChat(){
       }
       
       <button onClick={()=>router.push("/platform/videochat/groupcall")}>Join Group Call</button>
-      {/* <video ref={localCam} playsInline autoPlay muted width={200}></video>
-      {Object.entries(streams).map(([peerID, stream])=>{
-        const assignStream = (elem) => {if (elem){
-          elem.srcObject = stream
-        }}
-        return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
-      })}
-      <button onClick={joinGroupCall}>Join Group Call</button>
-
-      <video ref={p2pLocal} playsInline autoPlay muted width={200}></video>
-      <video ref={p2pRemote} playsInline autoPlay muted width={200}></video>
-      <button onClick={p2pSetup}>Set up p2p call</button>
-      {Object.keys(callOffers).map((name,i) => {
-        console.log("inside")
-        return (<div key={i}>
-          New call offer from <strong>{name}</strong>!
-          <button onClick={()=>acceptCall(name)}>Accept</button>
-          <button onClick={()=>rejectCall(name)}>Reject</button>
-        </div>)
-      })} */}
     </div>
   )
 }

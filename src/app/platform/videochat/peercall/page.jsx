@@ -1,11 +1,11 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useContext } from "react"
+import { useContext, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 function PeerCall(){
-    const { externalPeercallRef } = useContext(ThemeContext)
+    const { externalPeercallRef, userStates, username,sendJsonMessage  } = useContext(ThemeContext)
     const searchParams = useSearchParams()
 
     const servers = {
@@ -53,34 +53,7 @@ function PeerCall(){
     async function startWebcam(){
         const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
         localCam.current.srcObject = stream
-        deviceInfo.current["producerParams"].push(
-        {
-            track: stream.getVideoTracks()[0],
-            encodings: [
-            {
-                rid: 'r0',
-                maxBitrate: 100000,
-                scalabilityMode: 'S1T3',
-            },
-            {
-                rid: 'r1',
-                maxBitrate: 300000,
-                scalabilityMode: 'S1T3',
-            },
-            {
-                rid: 'r2',
-                maxBitrate: 900000,
-                scalabilityMode: 'S1T3',
-            },
-            ],
-            codecOptions: {
-            videoGoogleStartBitrate: 1000
-            }
-        },
-        {
-            track: stream.getAudioTracks()[0]
-        } 
-        )
+
     }
 
     async function callPeer(name) {
@@ -172,46 +145,7 @@ function PeerCall(){
         })
     }
     async function externalPeercall(data){
-        const info = deviceInfo.current
         switch (data.type){
-        case "sendConnect":
-            info["sendTransport"]["connectCallback"]()
-            break
-        case "sendProduce":
-            info["sendTransport"]["produceCallback"]({id: data.data})
-
-            // Now we can GIVE this media.
-            sendJsonMessage({
-            "origin": "peercall",
-            "username": username,
-            "type": "givePeers",
-            "data": data.data
-            })
-            break
-        case "recvConnect":
-            info["recvTransport"]["connectCallback"]()
-
-            console.log("RT callback called")
-            break
-        case "transportParams":
-            createTransports(data.data)
-            console.log("Received transport params:", data.data)
-            break
-        case "addConsumer":
-            console.log(data.data)
-            addConsumer(data.data)
-            console.log("adding a consumer")
-            break
-        case "disconnect":
-            setStreams(prev => {
-            const newStreams = {...prev}
-            consumersRef.current[data.data["uuid"]].forEach(consumer=>{
-                consumer.close()
-            })
-            delete newStreams[data.data["uuid"]]
-            return newStreams
-            })
-            break
         case "callRequest":
             console.log("got offer")
             setCallOffers(prev => {
@@ -235,7 +169,22 @@ function PeerCall(){
     }
     return(
         <div>
-            hello to peer {searchParams.get("peer")}!
+            hello to peer {searchParams.get("peer")}!\
+            <video ref={p2pLocal} playsInline autoPlay muted width={200}></video>
+            <video ref={p2pRemote} playsInline autoPlay muted width={200}></video>
+            <button onClick={p2pSetup}>Set up p2p call</button>
+            {Object.keys(userStates).map((name,i)=>{
+                return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
+            })}
+
+            {Object.keys(callOffers).map((name,i) => {
+                console.log("inside")
+                return (<div key={i}>
+                New call offer from <strong>{name}</strong>!
+                <button onClick={()=>acceptCall(name)}>Accept</button>
+                <button onClick={()=>rejectCall(name)}>Reject</button>
+                </div>)
+            })}
         </div>
     )
 }
