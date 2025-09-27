@@ -131,6 +131,7 @@ function broadcastWhiteboard(data, uuid){
 
 async function broadcastGroupcall(data, uuid){
   const roomID = users[uuid]["roomID"]
+
   // handling group calls
   switch(data.type){
     case "sendConnect":
@@ -165,6 +166,7 @@ async function broadcastGroupcall(data, uuid){
     case "transportParams":
       rooms[roomID]["callParticipants"].push(uuid)
       users[uuid]["rtpCapabilities"] = data.data["rtpCapabilities"]
+      
       const sendTransport = await makeTransport(roomID)
       const recvTransport = await makeTransport(roomID)
       users[uuid]["sendTransport"] = sendTransport

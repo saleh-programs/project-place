@@ -136,8 +136,8 @@ function Chat(){
     setTimeout(()=>{
         if (pendingMessages.current.has(messageID)){
           rawMessagesRef.current = {
-              ...prev,
-            [messageID]: {...prev[messageID], "status": "failed"}
+              ...rawMessagesRef.current,
+            [messageID]: {...rawMessagesRef.current[messageID], "status": "failed"}
           }
           setRawMessages(rawMessagesRef.current)
         }      
