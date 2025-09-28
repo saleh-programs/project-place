@@ -3,18 +3,37 @@ import { useContext,useRef, useState, useEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 function GroupCall(){
-    const { deviceInfo, externalGroupcallRef, sendJsonMessage, username } = useContext(ThemeContext)
+    const { device, externalGroupcallRef, sendJsonMessage, username } = useContext(ThemeContext)
 
-    const consumersRef = useRef({})
     const [isJoined, setIsJoined] = useState(false)
-    const isJoinedRef = useRef(false)
+    const connectionStateRef = useRef("disconnected")
     const localCam = useRef(null)
+
+    const callInfo = useRef({
+        "sendTransport":{
+            "ref": null,
+            "connectCallback": null,
+            "produceCallback": null
+        },
+        "recvTransport": {
+            "ref": null,
+            "connectCallback": null
+        },
+        "consumers": {},
+        "producers": [],
+    })
     
     const [streams, setStreams] = useState({})
+    const [videoAdded, setVideoAdded] = useState(false)
+    const [audioAdded, setAudioAdded] = useState(false)
+
+    const [showVideo, setShowVideo] = useState(true)
+    const [showAudio, setShowAudio] = useState(true)
 
     useEffect(()=>{
         externalGroupcallRef.current = externalGroupcall
         window.addEventListener("beforeunload", disconnect)
+        startWebcam()
 
         return ()=>{
             externalGroupcallRef.current = (param1) => {}
@@ -26,31 +45,34 @@ function GroupCall(){
     function disconnect(){
         console.log("in disconn")
 
-        if (!isJoinedRef.current){
+        if (connectionStateRef.current !== "connected"){
             console.log("disconn")
             return
         }
-        setIsJoined(false)
-        isJoinedRef.current = false
 
+        setIsJoined(false)
+        connectionStateRef.current = "disconnecting"
         setStreams({})
-        consumersRef.current = {}
 
         sendJsonMessage({
             "username": username,
             "origin": "groupcall",
             "type": "disconnect",
         })
-        //close our tracks and transports
-        for (let param of deviceInfo.current["producerParams"]){
-            param["track"].stop()
+        
+        const activeUsers = Object.values(callInfo.current["consumers"])
+        for (let i = 0; i < activeUsers.length; i++){
+            for (let consumer of activeUsers[i]){
+                consumer.close()
+            }
         }
-        deviceInfo.current["sendTransport"]["ref"]?.close()
-        deviceInfo.current["recvTransport"]["ref"]?.close()
-
-        deviceInfo.current = {
-            ...deviceInfo.current,
-            "producerParams": [],
+        for (let i = 0; i < callInfo.current["producers"].length; i++){
+            callInfo.current["producers"][i].close()
+        }
+        callInfo.current["sendTransport"]["ref"]?.close()
+        callInfo.current["recvTransport"]["ref"]?.close()
+        callInfo.current = {
+            ...callInfo.current,
             "sendTransport":{
                 "ref": null,
                 "connectCallback": null,
@@ -59,61 +81,52 @@ function GroupCall(){
             "recvTransport": {
                 "ref": null,
                 "connectCallback": null
-            }
+            },
+            "producers": [],
+            "consumers": {}
         }
+        navigator.mediaDevices.getUserMedia({video: videoAdded, audio: audioAdded})
+        .then(stream => {
+            localCam.current.srcObject = stream
+            connectionStateRef.current = "disconnected"
+        })
     }
     async function joinGroupCall() {
-        if (!deviceInfo.current["device"] || isJoinedRef.current){
+        console.log(device.current)
+        if (!device.current || connectionStateRef.current !== "disconnected"){
             return
         }
         setIsJoined(true)
-        isJoinedRef.current = true
-        await startWebcam()
+        connectionStateRef.current = "connecting"
         sendJsonMessage({
             "username": username,
             "origin": "groupcall",
-            "type": "transportParams",
-            "data": {rtpCapabilities: deviceInfo.current["device"].rtpCapabilities}
+            "type": "userJoined",
+            "data": {rtpCapabilities: device.current.rtpCapabilities}
+        })
+        
+        sendJsonMessage({
+            "username": username,
+            "origin": "groupcall",
+            "type": "transportParams"
         })
     }
     async function startWebcam(){
-        const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
+        let stream = new MediaStream()
+        try{
+            stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
+            setAudioAdded(true)
+            setVideoAdded(true)
+        }catch(err){
+            console.log("permission denied")
+        }
         localCam.current.srcObject = stream
-        deviceInfo.current["producerParams"] = [
-            {
-                track: stream.getVideoTracks()[0],
-                encodings: [
-                {
-                    rid: 'r0',
-                    maxBitrate: 100000,
-                    scalabilityMode: 'S1T3',
-                },
-                {
-                    rid: 'r1',
-                    maxBitrate: 300000,
-                    scalabilityMode: 'S1T3',
-                },
-                {
-                    rid: 'r2',
-                    maxBitrate: 900000,
-                    scalabilityMode: 'S1T3',
-                },
-                ],
-                codecOptions: {
-                videoGoogleStartBitrate: 1000
-                }
-            },
-            {
-                track: stream.getAudioTracks()[0]
-            } 
-        ]
     }
 
     async function createTransports({sendParams, recvParams}) {
-        const device = deviceInfo.current["device"]
         //set up send transport
-        const sendTransport = device.createSendTransport(sendParams)
-        deviceInfo.current["sendTransport"]["ref"] = sendTransport
+        const sendTransport = device.current.createSendTransport(sendParams)
+        callInfo.current["sendTransport"]["ref"] = sendTransport
         sendTransport.on("connect", ({dtlsParameters}, callback)=>{
             sendJsonMessage({
                 "username": username,
@@ -121,7 +134,7 @@ function GroupCall(){
                 "type": "sendConnect",
                 "data": {dtlsParameters}
             })
-            deviceInfo.current["sendTransport"]["connectCallback"] = callback
+            callInfo.current["sendTransport"]["connectCallback"] = callback
         })
         sendTransport.on("produce", ({kind, rtpParameters, appData}, callback)=>{
             sendJsonMessage({
@@ -134,12 +147,12 @@ function GroupCall(){
                     appData
                 }
             })
-            deviceInfo.current["sendTransport"]["produceCallback"] = callback
+            callInfo.current["sendTransport"]["produceCallback"] = callback
         })
 
         //set up recv transport
-        const recvTransport = device.createRecvTransport(recvParams)
-        deviceInfo.current["recvTransport"]["ref"] = recvTransport
+        const recvTransport = device.current.createRecvTransport(recvParams)
+        callInfo.current["recvTransport"]["ref"] = recvTransport
 
         recvTransport.on("connect", ({dtlsParameters}, callback) => {
             sendJsonMessage({
@@ -148,7 +161,7 @@ function GroupCall(){
                 "type": "recvConnect",
                 "data": dtlsParameters
             })
-            deviceInfo.current["recvTransport"]["connectCallback"] = callback
+            callInfo.current["recvTransport"]["connectCallback"] = callback
         })
 
         sendJsonMessage({
@@ -157,40 +170,61 @@ function GroupCall(){
             "type": "receivePeers"
         })
         //create producers
-        console.log(deviceInfo.current["producerParams"])
-        for (let i = 0; i < deviceInfo.current["producerParams"].length; i++){
-            sendTransport.produce(deviceInfo.current["producerParams"][i])
-        }
+        localCam.current.srcObject.getTracks().forEach(track => {
+            addProducer(track)
+        })
+        connectionStateRef.current = "connected"
     }  
+    async function addProducer(track) {
+        let produceOptions = {track}
+        if (track.kind === "video"){
+            produceOptions = {
+                ...produceOptions,
+                encodings: [
+                    {
+                        rid: 'r0',
+                        maxBitrate: 100000,
+                        scalabilityMode: 'S1T3',
+                    },
+                    {
+                        rid: 'r1',
+                        maxBitrate: 300000,
+                        scalabilityMode: 'S1T3',
+                    },
+                    {
+                        rid: 'r2',
+                        maxBitrate: 900000,
+                        scalabilityMode: 'S1T3',
+                    },
+                ],
+                codecOptions: {
+                    videoGoogleStartBitrate: 1000
+                }
+            }
+        }
+        callInfo.current["producers"].push(await callInfo.current["sendTransport"]["ref"].produce(produceOptions))
+    }
 
     async function addConsumer({id, producerId, kind, rtpParameters, uuid}){
-        const consumer = await deviceInfo.current["recvTransport"]["ref"].consume({
-        id,
-        producerId,
-        kind,
-        rtpParameters
-        })
-        if (uuid in consumersRef.current){
-            consumersRef.current[uuid].push(consumer)
-        }else{
-            consumersRef.current[uuid] = [consumer]
+        if (!(uuid in callInfo.current["consumers"])){
+            return
         }
-        console.log("ADDED")
+        const consumer = await callInfo.current["recvTransport"]["ref"].consume({
+            id,
+            producerId,
+            kind,
+            rtpParameters
+        })
+        console.log("consumer adding")
+
+        callInfo.current["consumers"][uuid].push(consumer)
         setStreams(prev => {
             const newStreams = {...prev}
             const consumerExists = newStreams[uuid]?.getTracks().some(t => t === consumer.track)
             if (consumerExists) {
                 return prev
             }
-            console.log("executed")
-            if (uuid in newStreams){
-                newStreams[uuid].addTrack(consumer.track)
-                console.log("added")
-            }else{
-                newStreams[uuid] = new MediaStream([consumer.track])
-            }
-            console.log("cons: ", consumersRef.current)
-            console.log("streams: ", newStreams, newStreams[uuid].getTracks())
+            newStreams[uuid].addTrack(consumer.track)
             return newStreams
         })
 
@@ -203,60 +237,130 @@ function GroupCall(){
         })
     }
 
+    async function requestMedia(type){
+        let stream
+        try{
+            if (type === "video"){
+                stream = await navigator.mediaDevices.getUserMedia({video: true})
+                const videoTrack = stream.getVideoTracks()[0]
+                localCam.current.srcObject.addTrack(videoTrack)
+                addProducer(videoTrack)
+                setVideoAdded(true)
+            }
+            if (type === "audio"){
+                stream = await navigator.mediaDevices.getUserMedia({audio: true})
+                const audioTrack = stream.getAudioTracks()[0]
+                localCam.current.srcObject.addTrack(audioTrack)
+                addProducer(audioTrack)
+                setAudioAdded(true)
+            }
+        }catch(err){
+            if (err.name === "NotAllowedError"){
+                //later iam going to add prompt in jsx to tell user how to turn media on
+                return
+            }
+            console.error(err)
+        }
+    }
+
+    async function toggleMedia(type){
+        const stream = localCam.current.srcObject
+        if (type === "video"){
+            const videoTrack = stream.getVideoTracks()[0]
+            videoTrack.enabled = !videoTrack.enabled
+            setShowVideo(videoTrack.enabled)
+        }
+        if (type === "audio"){
+            const audioTrack = stream.getAudioTracks()[0]
+            audioTrack.enabled = !audioTrack.enabled
+            setShowAudio(audioTrack.enabled)
+        }
+    }
+
     async function externalGroupcall(data){
-        const info = deviceInfo.current
+        //disconnecting or disconnected
+        if (connectionStateRef.current.includes("disconnect")){
+            return
+        }
+        const info = callInfo.current
         switch (data.type){
-        case "sendConnect":
-            info["sendTransport"]["connectCallback"]()
-            break
-        case "sendProduce":
-            info["sendTransport"]["produceCallback"]({id: data.data})
+            case "getParticipants":
+                console.log("added participants", data.data)
+                const newStreams = {}
+                for (let i = 0; i < data.data.length; i++){
+                    info["consumers"][data.data[i]] = []
+                    newStreams[data.data[i]] =  new MediaStream()
+                }
+                setStreams(newStreams)
+                break
+            case "transportParams":
+                createTransports(data.data)
+                break
+            case "sendConnect":
+                info["sendTransport"]["connectCallback"]()
+                break
+            case "sendProduce":
+                info["sendTransport"]["produceCallback"]({id: data.data})
 
-            // Now we can GIVE this media.
-            sendJsonMessage({
-                "origin": "groupcall",
-                "username": username,
-                "type": "givePeers",
-                "data": data.data
-            })
-            break
-        case "recvConnect":
-            info["recvTransport"]["connectCallback"]()
+                // Now we can GIVE this media.
+                sendJsonMessage({
+                    "origin": "groupcall",
+                    "username": username,
+                    "type": "givePeers",
+                    "data": data.data
+                })
+                break
+            case "recvConnect":
+                info["recvTransport"]["connectCallback"]()
+                break
+            case "addConsumer":
 
-            console.log("RT callback called")
-            break
-        case "transportParams":
-            createTransports(data.data)
-            console.log("Received transport params:", data.data)
-            break
-        case "addConsumer":
-            console.log(data.data)
-            addConsumer(data.data)
-            console.log("adding a consumer")
-            break
-        case "disconnect":
-            console.log("removing peer")
-            consumersRef.current[data.data["uuid"]].forEach(consumer=>{
-                consumer.close()
-            })
-            delete consumersRef.current[data.data["uuid"]]
-            setStreams(prev => {
-                const newStreams = {...prev}
-                delete newStreams[data.data["uuid"]]
-                return newStreams
-            })
-            break
+                addConsumer(data.data)
+                break
+            case "userJoined":
+                console.log("user adding")
+                info["consumers"][data.data["uuid"]] = []
+                setStreams(prev => {
+                    const newStreams = {...prev, [data.data["uuid"]]: new MediaStream()}
+                    return newStreams
+                })
+                break
+            case "disconnect":
+                info["consumers"][data.data["uuid"]].forEach(consumer=>{
+                    consumer.close()
+                })
+                delete info["consumers"][data.data["uuid"]]
+                setStreams(prev => {
+                    const newStreams = {...prev}
+                    delete newStreams[data.data["uuid"]]
+                    return newStreams
+                })
+                break
         }
     }
     
     return(
         <div>
             <video ref={localCam} playsInline autoPlay muted width={200}></video>
+            {
+                videoAdded
+                ?
+                    <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
+                :
+                    <button onClick={()=>requestMedia("video")}>Add Video</button>
+            }
+            {
+                audioAdded
+                ?
+                    <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
+                :
+                    <button onClick={()=>requestMedia("audio")}>Add Audio</button>
+            }
+
             {Object.entries(streams).sort(([a],[b])=>a.localeCompare(b)).map(([peerID, stream])=>{
                 const assignStream = (elem) => {if (elem && elem.srcObject !== stream){
                     elem.srcObject = stream 
                 }}
-                console.log(peerID)
                 return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
             })}
             {
