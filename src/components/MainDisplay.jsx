@@ -15,19 +15,7 @@ function MainDisplay({children, username, userInfoInitial}){
     "operations": [],
     "latestOp": -1
   })
-  const deviceInfo = useRef({
-    "device": null,
-    "producerParams": [],
-    "sendTransport":{
-      "ref": null,
-      "connectCallback": null,
-      "produceCallback": null
-    },
-    "recvTransport": {
-      "ref": null,
-      "connectCallback": null
-    }
-  })
+  const device = useRef(null)
 
   const externalChatRef = useRef((param1)=>{})
   const externalWhiteboardRef = useRef((param1)=>{})
@@ -63,8 +51,8 @@ function MainDisplay({children, username, userInfoInitial}){
         case "groupcall":
           if (data.type === "setup"){
             const {routerRtpCapabilities} = data.data
-            deviceInfo.current["device"] = new mediasoupClient.Device()
-            deviceInfo.current["device"].load({routerRtpCapabilities})
+            device.current = new mediasoupClient.Device()
+            device.current.load({routerRtpCapabilities})
             break
           }
           externalGroupcallRef.current(data)
@@ -78,7 +66,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage, savedCanvasInfoRef, deviceInfo,
+    sendJsonMessage, savedCanvasInfoRef, device,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
     messages, setMessages
