@@ -134,6 +134,51 @@ async function broadcastGroupcall(data, uuid){
 
   // handling group calls
   switch(data.type){
+    case "userJoined":
+      rooms[roomID]["callParticipants"].push(uuid)
+      users[uuid]["rtpCapabilities"] = data.data["rtpCapabilities"]
+
+      rooms[roomID]["connections"].forEach(conn=>{ 
+        if (conn !== connections[uuid]){
+          conn.send(JSON.stringify({
+            ...data,
+            "data": {uuid}
+          }))
+        }
+      })
+      connections[uuid].send(JSON.stringify({
+        "origin": "groupcall",
+        "type": "getParticipants",
+        "data": rooms[roomID]["callParticipants"].filter(id => id !== uuid)
+      }))
+
+      break
+    case "transportParams":
+      const sendTransport = await makeTransport(roomID)
+      const recvTransport = await makeTransport(roomID)
+      users[uuid]["sendTransport"] = sendTransport
+      users[uuid]["recvTransport"] = recvTransport
+
+      connections[uuid].send(JSON.stringify({
+        "origin": "groupcall",
+        "type": "transportParams",
+        "data": {
+          "sendParams": {
+            "id": sendTransport.id,
+            "iceParameters": sendTransport.iceParameters,
+            "iceCandidates": sendTransport.iceCandidates,
+            "dtlsParameters": sendTransport.dtlsParameters
+          },
+          "recvParams": {
+            "id": recvTransport.id,
+            "iceParameters": recvTransport.iceParameters,
+            "iceCandidates": recvTransport.iceCandidates,
+            "dtlsParameters": recvTransport.dtlsParameters
+          }
+        }
+      }))
+      console.log("Transport Params sent over")
+      break
     case "sendConnect":
       const {dtlsParameters} = data.data
       await users[uuid]["sendTransport"].connect({dtlsParameters})
@@ -162,35 +207,6 @@ async function broadcastGroupcall(data, uuid){
         "type": "recvConnect",
       }))
       console.log("RT connected")
-      break
-    case "transportParams":
-      rooms[roomID]["callParticipants"].push(uuid)
-      users[uuid]["rtpCapabilities"] = data.data["rtpCapabilities"]
-      
-      const sendTransport = await makeTransport(roomID)
-      const recvTransport = await makeTransport(roomID)
-      users[uuid]["sendTransport"] = sendTransport
-      users[uuid]["recvTransport"] = recvTransport
-
-      connections[uuid].send(JSON.stringify({
-        "origin": "groupcall",
-        "type": "transportParams",
-        "data": {
-          "sendParams": {
-            "id": sendTransport.id,
-            "iceParameters": sendTransport.iceParameters,
-            "iceCandidates": sendTransport.iceCandidates,
-            "dtlsParameters": sendTransport.dtlsParameters
-          },
-          "recvParams": {
-            "id": recvTransport.id,
-            "iceParameters": recvTransport.iceParameters,
-            "iceCandidates": recvTransport.iceCandidates,
-            "dtlsParameters": recvTransport.dtlsParameters
-          }
-        }
-      }))
-      console.log("Transport Params sent over")
       break
     case "givePeers":
       console.log("ready producer", rooms[roomID]["callParticipants"], data)
@@ -237,7 +253,6 @@ async function broadcastGroupcall(data, uuid){
       console.log(`consumer ${data.data} unpaused`)
       break
     case "receivePeers":
-      console.log("gimme peers", rooms[roomID]["callParticipants"])
       for (let userID of rooms[roomID]["callParticipants"]){
         if (userID == uuid) {
           continue
