@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation"
 import { useContext, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
-
+ 
 function PeerCall(){
     const { externalPeercallRef, userStates, username,sendJsonMessage  } = useContext(ThemeContext)
     const searchParams = useSearchParams()
@@ -14,80 +14,89 @@ function PeerCall(){
         }],
         iceCandidatePoolSize: 10,
     }
-    const p2pInfo = useRef({ 
+    const connectionInfo = useRef({ 
         pc: null,
         localStream: null,
         remoteStream: null
     })
-    const [callOffers, setCallOffers] = useState({})
-    const p2pLocal = useRef(null)
-    const p2pRemote = useRef(null)
+    const localCam = useRef(null)
+    const remoteCam = useRef(null)
+
+    const [videoAdded, setVideoAdded] = useState(false)
+    const [audioAdded, setAudioAdded] = useState(false)
+
+    const [showVideo, setShowVideo] = useState(true)
+    const [showAudio, setShowAudio] = useState(true)
 
     useEffect(()=>{
         externalPeercallRef.current = externalPeercall
-        p2pInfo.current["pc"] = new RTCPeerConnection(servers)
+
+        startWebcam()
+        
         return ()=>{
             externalPeercallRef.current = (param1) => {}
         }
     },[])
 
-    //P2P logic now..
-    async function p2pSetup(){
-        const pc = p2pInfo.current["pc"]
-        const localStream =  await navigator.mediaDevices.getUserMedia({video:true,audio:true})
+    async function startWebcam(){
+        let stream = new MediaStream()
+        try{
+            stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
+            setAudioAdded(true)
+            setVideoAdded(true)
+            connectionInfo.current["localStream"] = localStream
+        }catch(err){
+            console.log("permission denied")
+        }
+        localCam.current.srcObject = stream
+    }
+    async function callPeer(name) {
         const remoteStream = new MediaStream()
-        p2pInfo.current["localStream"] = localStream
-        p2pInfo.current["remoteStream"] = remoteStream
+        connectionInfo.current["remoteStream"] = remoteStream
+        remoteCam.current.srcObject = remoteStream
 
-        localStream.getTracks().forEach(track=>{
-        pc.addTrack(track, localStream)
+        const pc = new RTCPeerConnection(servers)
+        connectionInfo.current["pc"] = pc
+
+        connectionInfo.current["localStream"].getTracks().forEach(track => {
+            pc.addTrack(track, connectionInfo.current["localStream"])
         })
         pc.ontrack = event => {
-        event.streams[0].getTracks().forEach(track=>{
-        remoteStream.addTrack(track)
-        })
+            event.streams[0].getTracks().forEach(track=>{
+                remoteStream.addTrack(track)
+            })
         }
-        p2pLocal.current.srcObject = localStream
-        p2pRemote.current.srcObject = remoteStream
-    }
-    async function startWebcam(){
-        const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
-        localCam.current.srcObject = stream
-
-    }
-
-    async function callPeer(name) {
-        const pc = p2pInfo.current["pc"]
         pc.onicecandidate = event => {
-        if (!event.candidate){
-            return 
-        }
-        const data = {
-            "origin": "peercall",
-            "type": "stunCandidate",
-            "username": username,
-            "data": {
-            "candidate": event.candidate.toJSON(),
-            "peer": name
+            if (!event.candidate){
+                return 
             }
-        }
-        sendJsonMessage(data)
+            sendJsonMessage({
+                "origin": "peercall",
+                "type": "stunCandidate",
+                "username": username,
+                "data": {
+                    "candidate": event.candidate.toJSON(),
+                    "peer": name
+                }
+            })
         }
 
         const offerDescription = await pc.createOffer()
         await pc.setLocalDescription(offerDescription)
 
         const offer = {
-        sdp: offerDescription.sdp,
-        type: offerDescription.type
+            sdp: offerDescription.sdp,
+            type: offerDescription.type
         }
         sendJsonMessage({
-        "username": username,
-        "origin": "peercall",
-        "type": "callRequest",
-        "data": {"peer": name, offer}
+            "username": username,
+            "origin": "peercall",
+            "type": "callRequest",
+            "data": {"peer": name, offer}
         })
     }
+
+
 
     async function acceptCall(peerName) {
         const {pc} = p2pInfo.current
@@ -144,47 +153,101 @@ function PeerCall(){
         return newCallOffers
         })
     }
+
+    async function requestMedia(type){
+        let stream
+        try{
+            if (type === "video"){
+                stream = await navigator.mediaDevices.getUserMedia({video: true})
+                const videoTrack = stream.getVideoTracks()[0]
+                localCam.current.srcObject.addTrack(videoTrack)
+                setVideoAdded(true)
+            }
+            if (type === "audio"){
+                stream = await navigator.mediaDevices.getUserMedia({audio: true})
+                const audioTrack = stream.getAudioTracks()[0]
+                localCam.current.srcObject.addTrack(audioTrack)
+                setAudioAdded(true)
+            }
+        }catch(err){
+            if (err.name === "NotAllowedError"){
+                //later iam going to add prompt in jsx to tell user how to turn media on
+                console.log("set permissions")
+                return
+            }
+            console.error(err)
+        }
+    }
+
+    async function toggleMedia(type){
+        const stream = localCam.current.srcObject
+        if (type === "video"){
+            const videoTrack = stream.getVideoTracks()[0]
+            videoTrack.enabled = !videoTrack.enabled
+            setShowVideo(videoTrack.enabled)
+        }
+        if (type === "audio"){
+            const audioTrack = stream.getAudioTracks()[0]
+            audioTrack.enabled = !audioTrack.enabled
+            setShowAudio(audioTrack.enabled)
+        }
+    }
+
     async function externalPeercall(data){
+        const pc = connectionInfo.current["pc"]
+
         switch (data.type){
-        case "callRequest":
-            console.log("got offer")
-            setCallOffers(prev => {
-            return {...prev, [data["username"]]: data.data["offer"]}
-            })
-            break
-        case "callResponse":
-            if (data.data["status"] === "accepted"){
-            p2pInfo.current["pc"].setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
-            }else{
-            //i dont wanna talk to you bryan
-            p2pInfo.current["pc"].onicecandidate = null
-            console.log("rejected at least")
-            }
-            break
-        case "stunCandidate":
-            if (p2pInfo.current["pc"].currentRemoteDescription){
-            p2pInfo.current["pc"].addIceCandidate(new RTCIceCandidate(data.data["candidate"]))
-            }
+            case "callRequest":
+                console.log("got offer")
+                setCallOffers(prev => {
+                return {...prev, [data["username"]]: data.data["offer"]}
+                })
+                break
+            case "callResponse":
+                if (data.data["status"] === "accepted"){
+                    pc.setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
+                }else{
+                    //i dont wanna talk to you bryan
+                    pc.close()
+                }
+                break
+            case "stunCandidate":
+                if (pc.currentRemoteDescription){
+                    pc.addIceCandidate(new RTCIceCandidate(data.data["candidate"]))
+                }
+                break
         }
     }
     return(
         <div>
             hello to peer {searchParams.get("peer")}!\
-            <video ref={p2pLocal} playsInline autoPlay muted width={200}></video>
-            <video ref={p2pRemote} playsInline autoPlay muted width={200}></video>
-            <button onClick={p2pSetup}>Set up p2p call</button>
+            <video ref={localCam} playsInline autoPlay muted width={200}></video>
+            {
+                videoAdded
+                ?
+                    <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
+                :
+                    <button onClick={()=>requestMedia("video")}>Add Video</button>
+            }
+            {
+                audioAdded
+                ?
+                    <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
+                :
+                    <button onClick={()=>requestMedia("audio")}>Add Audio</button>
+            }
+            <video ref={remoteCam} playsInline autoPlay width={200}></video>
             {Object.keys(userStates).map((name,i)=>{
                 return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
             })}
-
+{/* 
             {Object.keys(callOffers).map((name,i) => {
-                console.log("inside")
                 return (<div key={i}>
                 New call offer from <strong>{name}</strong>!
                 <button onClick={()=>acceptCall(name)}>Accept</button>
                 <button onClick={()=>rejectCall(name)}>Reject</button>
                 </div>)
-            })}
+            })} */}
         </div>
     )
 }

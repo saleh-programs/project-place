@@ -14,20 +14,9 @@ function VideoChat(){
   return(
     <div className={styles.videochatPage}>
       <h1 className={styles.title}>
-        Videochat
+        Videochat 
       </h1>
-      {
-        selectedPeerCall
-        ?
-        <>
-          {Object.keys(userStates).map((name,i)=>{
-            return <button key={i} onClick={()=>router.push(`/platform/videochat/peercall?peer=${encodeURIComponent(name)}`)}>{name}</button>
-          })} 
-        </>
-        :
-        <button onClick={()=>setSelectedPeerCall(prev=>!prev)}>Call a peer</button>
-      }
-      
+      <button onClick={()=>router.push(`/platform/videochat/peercall`)}>Call a Peer</button>
       <button onClick={()=>router.push("/platform/videochat/groupcall")}>Join Group Call</button>
     </div>
   )
