@@ -5,7 +5,7 @@ import { useContext, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
  
 function PeerCall(){
-    const { externalPeercallRef, userStates, username,sendJsonMessage  } = useContext(ThemeContext)
+    const { externalPeercallRef, userStates, username,sendJsonMessage, callOffers, setCallOffers  } = useContext(ThemeContext)
     const searchParams = useSearchParams()
 
     const servers = {
@@ -28,6 +28,8 @@ function PeerCall(){
     const [showVideo, setShowVideo] = useState(true)
     const [showAudio, setShowAudio] = useState(true)
 
+    const connectionStateRef = useRef("disconnected")
+
     useEffect(()=>{
         externalPeercallRef.current = externalPeercall
 
@@ -44,20 +46,21 @@ function PeerCall(){
             stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true})
             setAudioAdded(true)
             setVideoAdded(true)
-            connectionInfo.current["localStream"] = localStream
+            connectionInfo.current["localStream"] = stream
         }catch(err){
             console.log("permission denied")
         }
         localCam.current.srcObject = stream
     }
     async function callPeer(name) {
+        connectionStateRef.current = "waiting"
+
         const remoteStream = new MediaStream()
         connectionInfo.current["remoteStream"] = remoteStream
         remoteCam.current.srcObject = remoteStream
 
         const pc = new RTCPeerConnection(servers)
         connectionInfo.current["pc"] = pc
-
         connectionInfo.current["localStream"].getTracks().forEach(track => {
             pc.addTrack(track, connectionInfo.current["localStream"])
         })
@@ -67,7 +70,7 @@ function PeerCall(){
             })
         }
         pc.onicecandidate = event => {
-            if (!event.candidate){
+            if (!event.candidate || connectionStateRef.current !== "connected"){
                 return 
             }
             sendJsonMessage({
@@ -99,46 +102,62 @@ function PeerCall(){
 
 
     async function acceptCall(peerName) {
-        const {pc} = p2pInfo.current
-        const offer = callOffers[peerName]
-        pc.setRemoteDescription(new RTCSessionDescription(offer))
+        connectionStateRef.current = "answering"
 
+        const remoteStream = new MediaStream()
+        connectionInfo.current["remoteStream"] = remoteStream
+        remoteCam.current.srcObject = remoteStream
+
+        const pc = new RTCPeerConnection(servers)
+        connectionInfo.current["pc"] = pc
+    
+        connectionInfo.current["localStream"].getTracks().forEach(track => {
+            pc.addTrack(track, connectionInfo.current["localStream"])
+        })
+        pc.ontrack = event => {
+            event.streams[0].getTracks().forEach(track=>{
+                remoteStream.addTrack(track)
+            })
+        }
         pc.onicecandidate = event => {
-        if (!event.candidate){
-            return
-        }
-        const data = {
-            "origin": "peercall",
-            "type": "stunCandidate",
-            "data": {
-            "candidate": event.candidate.toJSON(),
-            "peer": peerName
+            if (!event.candidate || connectionStateRef.current !== "connected"){
+                return 
             }
+            sendJsonMessage({
+                "origin": "peercall",
+                "type": "stunCandidate",
+                "username": username,
+                "data": {
+                    "candidate": event.candidate.toJSON(),
+                    "peer": peerName
+                }
+            })
         }
-        sendJsonMessage(data)
-        }
-        
+
+        pc.setRemoteDescription(new RTCSessionDescription(callOffers[peerName]))
+
         const answerDescription = await pc.createAnswer()
         await pc.setLocalDescription(answerDescription)
-        const answer = {
-        type: answerDescription.type,
-        sdp: answerDescription.sdp 
-        }
+        
         sendJsonMessage({
-        "username": username,
-        "origin": "peercall",
-        "type": "callResponse",
-        "data": {
-            "peer": peerName,
-            "status": "accepted",
-            answer
-        }
+            "username": username,
+            "origin": "peercall",
+            "type": "callResponse",
+            "data": {
+                "peer": peerName,
+                "status": "accepted",
+                "answer": {
+                    type: answerDescription.type,
+                    sdp: answerDescription.sdp 
+                }
+            }
         })
         setCallOffers(prev => {
-        const newCallOffers = {...prev}
-        delete newCallOffers[peerName]
-        return newCallOffers
+            const newCallOffers = {...prev}
+            delete newCallOffers[peerName]
+            return newCallOffers
         })
+        connectionStateRef.current = "connected"
     }
     async function rejectCall(peerName) {
         sendJsonMessage({
@@ -200,12 +219,13 @@ function PeerCall(){
             case "callRequest":
                 console.log("got offer")
                 setCallOffers(prev => {
-                return {...prev, [data["username"]]: data.data["offer"]}
+                    return {...prev, [data["username"]]: data.data["offer"]}
                 })
                 break
             case "callResponse":
                 if (data.data["status"] === "accepted"){
                     pc.setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
+                    connectionStateRef.current = "connected"
                 }else{
                     //i dont wanna talk to you bryan
                     pc.close()
@@ -240,14 +260,14 @@ function PeerCall(){
             {Object.keys(userStates).map((name,i)=>{
                 return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
             })}
-{/* 
-            {Object.keys(callOffers).map((name,i) => {
-                return (<div key={i}>
+            
+            {Object.keys(callOffers).map((name) => {
+                return (<div key={name}>
                 New call offer from <strong>{name}</strong>!
                 <button onClick={()=>acceptCall(name)}>Accept</button>
                 <button onClick={()=>rejectCall(name)}>Reject</button>
                 </div>)
-            })} */}
+            })}
         </div>
     )
 }

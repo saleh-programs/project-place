@@ -25,6 +25,8 @@ function MainDisplay({children, username, userInfoInitial}){
   const [userInfo, setUserInfo] = useState(userInfoInitial)
   const [userStates, setUserStates] = useState({})
 
+  const [callOffers, setCallOffers] = useState({})
+
   //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
@@ -66,7 +68,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage, savedCanvasInfoRef, device,
+    sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
     messages, setMessages

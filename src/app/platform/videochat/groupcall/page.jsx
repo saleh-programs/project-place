@@ -3,7 +3,7 @@ import { useContext,useRef, useState, useEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 function GroupCall(){
-    const { device, externalGroupcallRef, sendJsonMessage, username } = useContext(ThemeContext)
+    const { device, externalGroupcallRef, sendJsonMessage, username, callOffers } = useContext(ThemeContext)
 
     const [isJoined, setIsJoined] = useState(false)
     const connectionStateRef = useRef("disconnected")
