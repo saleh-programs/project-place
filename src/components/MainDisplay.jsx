@@ -6,8 +6,11 @@ import useWebSocket from "react-use-websocket"
 
 import styles from "styles/components/MainDisplay.module.css"
 import Sidebar from "src/components/Sidebar"
+import { useRouter } from "next/navigation"
 
 function MainDisplay({children, username, userInfoInitial}){
+  const router = useRouter()
+  
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
   const savedCanvasInfoRef = useRef({
@@ -27,6 +30,9 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const [callOffers, setCallOffers] = useState({})
 
+  useEffect(()=>{
+    console.log(callOffers)
+  },[callOffers])
   //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
@@ -60,6 +66,13 @@ function MainDisplay({children, username, userInfoInitial}){
           externalGroupcallRef.current(data)
           break
         case "peercall":
+          if (data.type === "callRequest"){
+            setCallOffers(prev => {
+              return {...prev, [data["username"]]: data.data["offer"]}
+            })
+            break
+          }
+
           externalPeercallRef.current(data)
           break
       }
@@ -138,6 +151,16 @@ function MainDisplay({children, username, userInfoInitial}){
         <Sidebar/>
         <div className={`pageContainer ${!roomID ? styles.dimScreen: ""}`}>
           {children}
+          hey
+          {Object.keys(callOffers).map((name) => {
+            return (
+            <div key={name} className={styles.callNotification}>
+              New call offer from <strong>{name}</strong>!
+              <button onClick={()=>router.push(`/platform/videochat/peercall?peer=${encodeURI(name)}`)}>Accept</button>
+              <button onClick={()=>rejectCall(name)}>Reject</button>
+            </div>
+            )
+          })}
         </div>
       </div>
         

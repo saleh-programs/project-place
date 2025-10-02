@@ -33,7 +33,14 @@ function PeerCall(){
     useEffect(()=>{
         externalPeercallRef.current = externalPeercall
 
-        startWebcam()
+        const setup = async () => {
+            await startWebcam()
+            const peer = searchParams.get("peer")
+            if (peer){
+                acceptCall(peer)
+            }
+        }
+        setup()
         
         return ()=>{
             externalPeercallRef.current = (param1) => {}
@@ -133,12 +140,11 @@ function PeerCall(){
                 }
             })
         }
-
         pc.setRemoteDescription(new RTCSessionDescription(callOffers[peerName]))
 
         const answerDescription = await pc.createAnswer()
         await pc.setLocalDescription(answerDescription)
-        
+
         sendJsonMessage({
             "username": username,
             "origin": "peercall",
@@ -216,12 +222,6 @@ function PeerCall(){
         const pc = connectionInfo.current["pc"]
 
         switch (data.type){
-            case "callRequest":
-                console.log("got offer")
-                setCallOffers(prev => {
-                    return {...prev, [data["username"]]: data.data["offer"]}
-                })
-                break
             case "callResponse":
                 if (data.data["status"] === "accepted"){
                     pc.setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
@@ -261,13 +261,6 @@ function PeerCall(){
                 return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
             })}
             
-            {Object.keys(callOffers).map((name) => {
-                return (<div key={name}>
-                New call offer from <strong>{name}</strong>!
-                <button onClick={()=>acceptCall(name)}>Accept</button>
-                <button onClick={()=>rejectCall(name)}>Reject</button>
-                </div>)
-            })}
         </div>
     )
 }
