@@ -31,7 +31,6 @@ function MainDisplay({children, username, userInfoInitial}){
   const [callOffers, setCallOffers] = useState({})
 
   useEffect(()=>{
-    console.log(callOffers)
   },[callOffers])
   //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
@@ -70,7 +69,15 @@ function MainDisplay({children, username, userInfoInitial}){
             setCallOffers(prev => {
               return {...prev, [data["username"]]: data.data["offer"]}
             })
-            break
+          }else if (data.type === "disconnect"){
+            setCallOffers(prev => {
+              if (prev.hasOwnProperty(data["username"])){
+                const newCallOffers = {...prev}
+                delete newCallOffers[data["username"]]
+                return newCallOffers
+              }
+              return prev
+            })
           }
 
           externalPeercallRef.current(data)
@@ -145,6 +152,19 @@ function MainDisplay({children, username, userInfoInitial}){
         break
     }
   }
+  async function rejectCall(peerName) {
+      sendJsonMessage({
+      "username": username,
+      "origin": "peercall",
+      "type": "callResponse",
+      "data": {"status": "rejected", "peer": peerName}
+      })
+      setCallOffers(prev => {
+        const newCallOffers = {...prev}
+        delete newCallOffers[peerName]
+        return newCallOffers
+      })
+    }
   return(
     <ThemeContext.Provider value={shared}>
       <div className="siteWrapper">

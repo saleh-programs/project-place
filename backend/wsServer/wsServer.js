@@ -317,15 +317,6 @@ async function broadcastGroupcall(data, uuid){
 async function broadcastPeercall(data, uuid){
   // handling group calls
   switch(data.type){
-    case "stunCandidate":
-      const userList = Object.keys(users)
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
     case "callRequest":
       const userList2 = Object.keys(users)
       console.log(userList2,data)
@@ -342,6 +333,24 @@ async function broadcastPeercall(data, uuid){
       for (let i = 0; i < userList3.length; i++){
         if (users[userList3[i]]["username"] === data.data["peer"]){
           connections[userList3[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "stunCandidate":
+      const userList = Object.keys(users)
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "disconnect":
+      const userList4 = Object.keys(users)
+      for (let i = 0; i < userList4.length; i++){
+        if (users[userList4[i]]["username"] === data.data["peer"]){
+          connections[userList4[i]].send(JSON.stringify(data))
           break
         }
       }
