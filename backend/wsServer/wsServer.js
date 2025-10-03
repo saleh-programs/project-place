@@ -316,29 +316,42 @@ async function broadcastGroupcall(data, uuid){
 }
 async function broadcastPeercall(data, uuid){
   // handling group calls
+  const userList = Object.keys(users)
   switch(data.type){
     case "callRequest":
-      const userList2 = Object.keys(users)
-      console.log(userList2,data)
-      for (let i = 0; i < userList2.length; i++){
-        if (users[userList2[i]]["username"] === data.data["peer"]){
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
           console.log("found")
-          connections[userList2[i]].send(JSON.stringify(data))
+          connections[userList[i]].send(JSON.stringify(data))
           break
         }
       }
       break
     case "callResponse":
-      const userList3 = Object.keys(users)
-      for (let i = 0; i < userList3.length; i++){
-        if (users[userList3[i]]["username"] === data.data["peer"]){
-          connections[userList3[i]].send(JSON.stringify(data))
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "renegotiationRequest":
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
+          break
+        }
+      }
+      break
+    case "renegotiationResponse":
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
           break
         }
       }
       break
     case "stunCandidate":
-      const userList = Object.keys(users)
       for (let i = 0; i < userList.length; i++){
         if (users[userList[i]]["username"] === data.data["peer"]){
           connections[userList[i]].send(JSON.stringify(data))
@@ -347,10 +360,9 @@ async function broadcastPeercall(data, uuid){
       }
       break
     case "disconnect":
-      const userList4 = Object.keys(users)
-      for (let i = 0; i < userList4.length; i++){
-        if (users[userList4[i]]["username"] === data.data["peer"]){
-          connections[userList4[i]].send(JSON.stringify(data))
+      for (let i = 0; i < userList.length; i++){
+        if (users[userList[i]]["username"] === data.data["peer"]){
+          connections[userList[i]].send(JSON.stringify(data))
           break
         }
       }
@@ -446,6 +458,7 @@ async function makeTransport(roomID) {
   const transport = await rooms[roomID]["router"].createWebRtcTransport(options)
   return transport
 }
+
 
 // Canvas/Drawing
 function handleCanvasAction(data, roomID){

@@ -6,10 +6,11 @@ import useWebSocket from "react-use-websocket"
 
 import styles from "styles/components/MainDisplay.module.css"
 import Sidebar from "src/components/Sidebar"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 
 function MainDisplay({children, username, userInfoInitial}){
   const router = useRouter()
+  const pathname = usePathname()
   
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
@@ -29,9 +30,8 @@ function MainDisplay({children, username, userInfoInitial}){
   const [userStates, setUserStates] = useState({})
 
   const [callOffers, setCallOffers] = useState({})
+  const callOffersRef = useRef(callOffers)
 
-  useEffect(()=>{
-  },[callOffers])
   //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
@@ -66,18 +66,11 @@ function MainDisplay({children, username, userInfoInitial}){
           break
         case "peercall":
           if (data.type === "callRequest"){
-            setCallOffers(prev => {
-              return {...prev, [data["username"]]: data.data["offer"]}
-            })
-          }else if (data.type === "disconnect"){
-            setCallOffers(prev => {
-              if (prev.hasOwnProperty(data["username"])){
-                const newCallOffers = {...prev}
-                delete newCallOffers[data["username"]]
-                return newCallOffers
-              }
-              return prev
-            })
+            callOffersRef.current[data["username"]] = data.data["offer"]
+            setCallOffers({...callOffersRef.current})
+          }else if (data.type === "disconnect" && callOffersRef.current.hasOwnProperty(data["username"])){
+            delete callOffersRef.current[data["username"]]
+            setCallOffers({...callOffersRef.current})
           }
 
           externalPeercallRef.current(data)
@@ -88,7 +81,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers,
+    sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
     messages, setMessages
@@ -152,19 +145,17 @@ function MainDisplay({children, username, userInfoInitial}){
         break
     }
   }
-  async function rejectCall(peerName) {
+
+  function rejectCall(peerName) {
       sendJsonMessage({
       "username": username,
       "origin": "peercall",
       "type": "callResponse",
       "data": {"status": "rejected", "peer": peerName}
       })
-      setCallOffers(prev => {
-        const newCallOffers = {...prev}
-        delete newCallOffers[peerName]
-        return newCallOffers
-      })
-    }
+      delete callOffersRef.current[peerName]
+      setCallOffers({...callOffersRef.current})
+  }
   return(
     <ThemeContext.Provider value={shared}>
       <div className="siteWrapper">
