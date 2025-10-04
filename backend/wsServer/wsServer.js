@@ -338,6 +338,7 @@ async function broadcastPeercall(data, uuid){
     case "renegotiationRequest":
       for (let i = 0; i < userList.length; i++){
         if (users[userList[i]]["username"] === data.data["peer"]){
+          console.log("sent renegotiation")
           connections[userList[i]].send(JSON.stringify(data))
           break
         }

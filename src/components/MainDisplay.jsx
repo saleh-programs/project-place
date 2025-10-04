@@ -66,13 +66,22 @@ function MainDisplay({children, username, userInfoInitial}){
           break
         case "peercall":
           if (data.type === "callRequest"){
-            callOffersRef.current[data["username"]] = data.data["offer"]
+            callOffersRef.current[data["username"]] = {
+              "offer": data.data["offer"],
+              "candidates": []
+            }
             setCallOffers({...callOffersRef.current})
-          }else if (data.type === "disconnect" && callOffersRef.current.hasOwnProperty(data["username"])){
+          }
+          if (data.type === "disconnect" && callOffersRef.current.hasOwnProperty(data["username"])){
             delete callOffersRef.current[data["username"]]
             setCallOffers({...callOffersRef.current})
           }
 
+          if (data.type === "stunCandidate" && data.data["caller"] && callOffersRef.current.hasOwnProperty(data["username"])){
+            callOffersRef.current[data["username"]]["candidates"].push(data.data["candidate"])
+            setCallOffers({...callOffersRef.current})
+            break
+          }
           externalPeercallRef.current(data)
           break
       }
