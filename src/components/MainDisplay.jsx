@@ -31,6 +31,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const [callOffers, setCallOffers] = useState({})
   const callOffersRef = useRef(callOffers)
+  const stunCandidates = useRef({})
 
   //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
@@ -66,21 +67,24 @@ function MainDisplay({children, username, userInfoInitial}){
           break
         case "peercall":
           if (data.type === "callRequest"){
-            callOffersRef.current[data["username"]] = {
-              "offer": data.data["offer"],
-              "candidates": []
-            }
+            callOffersRef.current[data["username"]] = data.data["offer"]
             setCallOffers({...callOffersRef.current})
           }
           if (data.type === "disconnect" && callOffersRef.current.hasOwnProperty(data["username"])){
             delete callOffersRef.current[data["username"]]
             setCallOffers({...callOffersRef.current})
+
+            if (stunCandidates.current.hasOwnProperty(data["username"])){
+              delete stunCandidates.current[data["username"]]
+            }
           }
 
-          if (data.type === "stunCandidate" && data.data["caller"] && callOffersRef.current.hasOwnProperty(data["username"])){
-            callOffersRef.current[data["username"]]["candidates"].push(data.data["candidate"])
-            setCallOffers({...callOffersRef.current})
-            break
+          if (data.type === "stunCandidate"){
+              if (!stunCandidates.current.hasOwnProperty(data["username"])){
+                stunCandidates.current[data["username"]] = [data.data["candidate"]]
+              }else{
+                stunCandidates.current[data["username"]].push(data.data["candidate"])
+              }
           }
           externalPeercallRef.current(data)
           break
@@ -90,7 +94,7 @@ function MainDisplay({children, username, userInfoInitial}){
 
   const shared = {
     username,userInfo, setUserInfo, userStates, setUserStates,
-    sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef,
+    sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
     messages, setMessages
