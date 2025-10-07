@@ -15,11 +15,6 @@ const connections = {}
 const users = {}
 const rooms = {}
 
-let worker;
-mediasoup.createWorker()
-.then(res => {
-  worker = res
-})
 const mediaCodecs = [
   {
     kind: 'audio',
@@ -36,6 +31,13 @@ const mediaCodecs = [
     },
   },
 ]
+
+let worker;
+mediasoup.createWorker()
+.then(res => {
+  worker = res
+})
+
 
 
 // any message layout:
@@ -56,17 +58,18 @@ wsServer.on("connection", (connection, request)=>{
   const uuid = uuidv4()
 
   connections[uuid] = connection
-  sendServerInfo(connection, roomID)
-  
   users[uuid] = {
     "username": username,
     "roomID": roomID,
-    "sendTransport": null,
-    "recvTransport": null,
-    "producers": [],
-    "rtpCapabilities": null
+    "groupcall": {
+      "sendTransport": null,
+      "recvTransport": null,
+      "producers": [],
+      "rtpCapabilities": null
+    }
   }
 
+  sendServerInfo(uuid)
   
   connection.on("message",(data)=>handleMessage(data, uuid))
   connection.on("close",()=>handleClose(uuid))
@@ -90,7 +93,7 @@ function handleMessage(data, uuid){
 
   switch (parsedData.origin){
     case "chat":
-      broadcastMessage(parsedData, uuid)
+      broadcastChat(parsedData, uuid)
       break
     case "whiteboard":
       broadcastWhiteboard(parsedData, uuid)
@@ -108,23 +111,17 @@ function handleMessage(data, uuid){
 }
 
 //broadcast functions
-async function broadcastMessage(data, uuid){
+async function broadcastChat(data, uuid){
   // store message in database before broadcasting 
   const {origin, type, ...msgToStore} = data
   await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]})
 
-  rooms[users[uuid].roomID]["connections"].forEach(conn=>{
-    conn.send(JSON.stringify(data))
-  })
+  sendAll(uuid, toSender=true)
 }
+
 function broadcastWhiteboard(data, uuid){
-  const roomID = users[uuid].roomID  
-  rooms[roomID]["connections"].forEach(conn=>{ 
-    if (conn !== connections[uuid]){
-      conn.send(JSON.stringify(data))
-     }
-  })
-  handleCanvasAction(data, roomID)
+  sendAll(uuid, toSender=false)
+  handleCanvasAction(data, users[uuid].roomID )
 }
 
 async function broadcastGroupcall(data, uuid){
@@ -314,7 +311,6 @@ async function broadcastGroupcall(data, uuid){
 }
 async function broadcastPeercall(data, uuid){
   // handling group calls
-  const userList = Object.keys(users)
   switch(data.type){
     case "callRequest":
       for (let i = 0; i < userList.length; i++){
@@ -378,14 +374,17 @@ function broadcastUser(data, uuid){
 
 
 //utility functions
-async function sendServerInfo(connection, roomID) {
+async function sendServerInfo(uuid) {
+  const roomID = users[uuid]["roomID"]
+  const connection = connections[uuid]
+
   const roomHistories = [getRoomUsersReq(roomID), getMessagesReq(roomID)]
   let initializing = false
 
   if (roomID in rooms){
-    rooms[roomID]["connections"].push(connection)
-    roomHistories.push(rooms[roomID]["canvas"])
-    roomHistories.push(rooms[roomID]["operations"])
+    rooms[roomID]["users"].push(uuid)
+    roomHistories.push(rooms[roomID]["whiteboard"]["canvas"])
+    roomHistories.push(rooms[roomID]["whiteboard"]["operations"])
   }else{
     initializing = true
     const canvas = createCanvas(1000,1000)
@@ -402,14 +401,18 @@ async function sendServerInfo(connection, roomID) {
 
   if (initializing){
     rooms[roomID] = {
-      "connections": [connection],
-      "snapshot": canvas.getContext("2d").getImageData(0,0,canvas.width, canvas.height),
-      "canvas": canvas,
-      "operations": instructions,
-      "latestOp": instructions.length - 1,
-      "router": await worker.createRouter({mediaCodecs}),
-      "callParticipants": [],
-      "consumers": {}
+      "users": [uuid],
+      "whiteboard": {
+        "snapshot": canvas.getContext("2d").getImageData(0,0,canvas.width, canvas.height),
+        "canvas": canvas,
+        "operations": instructions,
+        "latestOp": instructions.length - 1
+        },
+      "groupcall": {
+        "router": await worker.createRouter({mediaCodecs}),
+        "callParticipants": [],
+        "consumers": {}
+      }
     }
   }
 
@@ -417,7 +420,7 @@ async function sendServerInfo(connection, roomID) {
   const canvasBuffer = canvas.toBuffer("image/png")
   const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
   canvasInfo.writeUInt32BE(opsBuffer.length, 0)
-  canvasInfo.writeInt8(rooms[roomID]["latestOp"], 4)
+  canvasInfo.writeInt8(rooms[roomID]["whiteboard"]["latestOp"], 4)
 
   connection.send(JSON.stringify({
     "origin": "user",
@@ -433,7 +436,7 @@ async function sendServerInfo(connection, roomID) {
     "origin": "groupcall",
     "type": "setup",
     "data": {
-      "routerRtpCapabilities": rooms[roomID]["router"].rtpCapabilities,
+      "routerRtpCapabilities": rooms[roomID]["groupcall"]["router"].rtpCapabilities,
     }
   }))
 
@@ -442,7 +445,7 @@ async function sendServerInfo(connection, roomID) {
 }
 
 async function makeTransport(roomID) {
-  const options = {
+  const transport = await rooms[roomID]["groupcall"]["router"].createWebRtcTransport({
     listenIps: [
       {
         ip: '0.0.0.0', 
@@ -452,12 +455,26 @@ async function makeTransport(roomID) {
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
-  }
-
-  const transport = await rooms[roomID]["router"].createWebRtcTransport(options)
+  })
   return transport
 }
 
+function sendAll(uuid, toSender=false){
+  rooms[users[uuid]["roomID"]]["users"].forEach(id =>{
+    (id !== uuid || toSender) && connections[id].send(JSON.stringify(data))
+  })
+}
+
+function sendPeer(uuid, peerUsername){
+  const userList = rooms[users[uuid]["roomID"]]["users"]
+  for (let i = 0; i < userList.length; i++){
+    if (peerUsername === users[userList[i]]["username"]){
+      conn.send(JSON.stringify(data))
+      return
+    }
+  }
+
+}
 
 // Canvas/Drawing
 function handleCanvasAction(data, roomID){
