@@ -2,7 +2,7 @@
 import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
-import Queue from "src/assets/Queue"
+import Queue from "utils/Queue.js"
 import styles from "styles/platform/Whiteboard.module.css"
 import { updateCanvasReq } from "backend/requests"
 

@@ -2,6 +2,7 @@
   "name": "wsserver",
   "version": "1.0.0",
   "main": "wsServer.js",
+  "type": "module",
   "scripts": {
     "start": "node wsServer.js"
   },
