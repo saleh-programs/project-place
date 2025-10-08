@@ -91,8 +91,7 @@ function fill([X,Y], canvas, options){
   cxt.putImageData(canvasImage,0,0)
 }
 function clear(canvas){
-  const context = canvas.getContext("2d")
-  context.clearRect(0,0,canvas.width, canvas.height)
+  canvas.getContext("2d").clearRect(0,0,canvas.width, canvas.height)
 }
 
 export {draw, fill, clear}

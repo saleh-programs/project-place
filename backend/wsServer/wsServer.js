@@ -65,6 +65,7 @@ wsServer.on("connection", (connection, request)=>{
       "sendTransport": null,
       "recvTransport": null,
       "producers": [],
+      "consumers": [],
       "rtpCapabilities": null
     }
   }
@@ -93,66 +94,63 @@ function handleMessage(data, uuid){
 
   switch (parsedData.origin){
     case "chat":
-      broadcastChat(parsedData, uuid)
+      processChat(parsedData, uuid)
       break
     case "whiteboard":
-      broadcastWhiteboard(parsedData, uuid)
+      processWhiteboard(parsedData, uuid)
       break
     case "groupcall":
-      broadcastGroupcall(parsedData, uuid)
+      processGroupcall(parsedData, uuid)
       break
     case "peercall":
-      broadcastPeercall(parsedData, uuid)
+      processPeercall(parsedData, uuid)
       break
     case "user":
-      broadcastUser(parsedData, uuid)
+      processUser(parsedData, uuid)
       break
   }
 }
 
-//broadcast functions
-async function broadcastChat(data, uuid){
+//Process messages respective of origins
+async function processChat(data, uuid){
   // store message in database before broadcasting 
   const {origin, type, ...msgToStore} = data
   await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]})
 
-  sendAll(uuid, toSender=true)
+  broadcastAll(uuid, data, toSender=true)
 }
-
-function broadcastWhiteboard(data, uuid){
-  sendAll(uuid, toSender=false)
-  handleCanvasAction(data, users[uuid].roomID )
+function processWhiteboard(data, uuid){
+  broadcastAll(uuid, data, toSender=false)
+  handleCanvasAction(data, users[uuid]["roomID"] )
 }
-
-async function broadcastGroupcall(data, uuid){
+async function processGroupcall(data, uuid){
   const roomID = users[uuid]["roomID"]
+  const roomCallInfo = rooms[roomID]["groupcall"]
+  const userCallInfo = users[uuid]["groupcall"]
 
-  // handling group calls
   switch(data.type){
     case "userJoined":
-      rooms[roomID]["callParticipants"].push(uuid)
-      users[uuid]["rtpCapabilities"] = data.data["rtpCapabilities"]
+      roomCallInfo["callParticipants"].push(uuid)
+      userCallInfo["rtpCapabilities"] = data.data["rtpCapabilities"]
 
-      rooms[roomID]["connections"].forEach(conn=>{ 
-        if (conn !== connections[uuid]){
-          conn.send(JSON.stringify({
-            ...data,
-            "data": {uuid}
-          }))
-        }
+      broadcastAll(uuid,{
+        ...data,
+        "data": {uuid}
       })
+
+      //user will have this on client side soon
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "getParticipants",
-        "data": rooms[roomID]["callParticipants"].filter(id => id !== uuid)
+        "data": roomCallInfo["callParticipants"].filter(id => id !== uuid)
       }))
 
       break
     case "transportParams":
       const sendTransport = await makeTransport(roomID)
       const recvTransport = await makeTransport(roomID)
-      users[uuid]["sendTransport"] = sendTransport
-      users[uuid]["recvTransport"] = recvTransport
+      userCallInfo["sendTransport"] = sendTransport
+      userCallInfo["recvTransport"] = recvTransport
 
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
@@ -172,62 +170,59 @@ async function broadcastGroupcall(data, uuid){
           }
         }
       }))
-      console.log("Transport Params sent over")
       break
     case "sendConnect":
       const {dtlsParameters} = data.data
-      await users[uuid]["sendTransport"].connect({dtlsParameters})
+      await userCallInfo["sendTransport"].connect({dtlsParameters})
+
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "sendConnect",
       }))
-      console.log("ST connected")
       break
     case "sendProduce":
-      //new producer
       const {kind, rtpParameters} = data.data
-      const producer = await users[uuid]["sendTransport"].produce({kind, rtpParameters})
-      users[uuid]["producers"].push(producer)
+      const producer = await userCallInfo["sendTransport"].produce({kind, rtpParameters})
+      userCallInfo["producers"].push(producer)
+      roomCallInfo["producers"][producer.id] = producer
+
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "sendProduce",
         "data": producer.id
       }))
-      console.log("Produced:", producer.id)
       break
     case "recvConnect":
-      users[uuid]["recvTransport"].connect({dtlsParameters: data.data})
+      userCallInfo["recvTransport"].connect({dtlsParameters: data.data})
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "recvConnect",
       }))
-      console.log("RT connected")
       break
     case "givePeers":
-      console.log("ready producer", rooms[roomID]["callParticipants"], data)
-      for (let userID of rooms[roomID]["callParticipants"]){
-        if (userID == uuid) {
+      for (let i = 0; i < roomCallInfo["callParticipants"].length; i++){
+        const userID = roomCallInfo["callParticipants"][i]
+        const peerCallInfo = users[userID]["groupcall"]
+        if (userID === uuid) {
           continue
         }
         const options = {
           producerId: data.data,
-          rtpCapabilities: users[userID]["rtpCapabilities"]
+          rtpCapabilities: peerCallInfo["rtpCapabilities"]
         }
-        console.log("before canConsume", options)
 
-        if (!rooms[roomID]["router"].canConsume(options)){
+        if (!roomCallInfo["router"].canConsume(options)){
           continue
         }
-        console.log("after canConsume")
 
-        const consumer = await users[userID]["recvTransport"].consume({
+        const consumer = await peerCallInfo["recvTransport"].consume({
           producerId: data.data,
-          rtpCapabilities: users[userID]["rtpCapabilities"],
+          rtpCapabilities: peerCallInfo["rtpCapabilities"],
           paused: true
         })
 
-        rooms[roomID]["consumers"][consumer.id] = consumer
-        console.log(uuid)
+        peerCallInfo["consumers"].push(consumer)
+        roomCallInfo["consumers"][consumer.id] = consumer
 
         connections[userID].send(JSON.stringify({
           "origin": "groupcall",
@@ -240,137 +235,77 @@ async function broadcastGroupcall(data, uuid){
             uuid: uuid
           }
         }))
-        console.log(`Sent producer ${data.data} to ${users[userID]["username"]} or ID: ${userID}`)
       }
       break
-    case "unpauseConsumer":
-      rooms[roomID]["consumers"][data.data].resume()
-      console.log(`consumer ${data.data} unpaused`)
-      break
     case "receivePeers":
-      for (let userID of rooms[roomID]["callParticipants"]){
+      for (let i = 0; i < roomCallInfo["callParticipants"].length; i++){
+        const userID = roomCallInfo["callParticipants"][i]
         if (userID == uuid) {
           continue
         }
-        console.log("before canConsume receiverPeers")
-        for (let i = 0; i < users[userID]["producers"].length; i++){
-          const options2 = {
-            producerId: users[userID]["producers"][i].id,
-            rtpCapabilities: users[uuid]["rtpCapabilities"]
+        for (let j = 0; j < userCallInfo["producers"].length; j++){
+          const producer = userCallInfo["producers"][j] 
+          const options = {
+            producerId: producer.id,
+            rtpCapabilities: userCallInfo["rtpCapabilities"]
           }
-          console.log("options2:", options2)
-          if (!rooms[roomID]["router"].canConsume(options2)){
+          if (!roomCallInfo["router"].canConsume(options)){
             continue
           }
-        console.log("after canConsume receiverPeers")
 
-
-          const consumer = await users[uuid]["recvTransport"].consume({
-            producerId: users[userID]["producers"][i].id,
-            rtpCapabilities: users[uuid]["rtpCapabilities"],
+          const consumer = await userCallInfo["recvTransport"].consume({
+            producerId: producer.id,
+            rtpCapabilities: userCallInfo["rtpCapabilities"],
             paused: true
           })
 
-          rooms[roomID]["consumers"][consumer.id] = consumer
+          userCallInfo["consumers"].push(consumer)
+          roomCallInfo["consumers"][consumer.id] = consumer
+          
           connections[uuid].send(JSON.stringify({
             "origin": "groupcall",
             "type": "addConsumer",
             "data": {
               id: consumer.id,
-              producerId: users[userID]["producers"][i].id,
+              producerId: producer.id,
               kind: consumer.kind,
               rtpParameters: consumer.rtpParameters,
               uuid: userID
             }
           }))
-          console.log(`Peer ${users[uuid]["username"]} or ID: ${uuid} received producer: ${users[userID]["producers"][i].id}`)
         }
       }
       break
+    case "unpauseConsumer":
+      roomCallInfo["consumers"][data.data].resume()
+      break
     case "disconnect": 
-      rooms[roomID]["connections"].forEach(conn=>{ 
-        if (conn !== connections[uuid]){
-          conn.send(JSON.stringify({
-            ...data,
-             "data": {uuid}
-          }))
-        }
+      broadcastAll(uuid,{
+        ...data,
+          "data": {uuid}
       })
-      rooms[roomID]["callParticipants"].filter(userid => userid !== uuid)
-      users[uuid]["sendTransport"].close()
-      users[uuid]["recvTransport"].close()
-      users[uuid] = {
-        ...users[uuid],
+      roomCallInfo["callParticipants"].filter(userid => userid !== uuid)
+      userCallInfo["producers"].forEach(p => delete roomCallInfo["producers"][p.id])
+      userCallInfo["consumers"].forEach(c => delete roomCallInfo["consumers"][c.id])
+
+      userCallInfo["sendTransport"].close()
+      userCallInfo["recvTransport"].close()
+      users[uuid]["groupcall"] = {
         "sendTransport": null,
         "recvTransport": null,
         "producers": [],
+        "consumers": [],
         "rtpCapabilities": null
       }
       break
-    } 
+  } 
 }
-async function broadcastPeercall(data, uuid){
-  // handling group calls
-  switch(data.type){
-    case "callRequest":
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          console.log("found")
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "callResponse":
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "renegotiationRequest":
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          console.log("sent renegotiation")
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "renegotiationResponse":
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "stunCandidate":
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    case "disconnect":
-      for (let i = 0; i < userList.length; i++){
-        if (users[userList[i]]["username"] === data.data["peer"]){
-          connections[userList[i]].send(JSON.stringify(data))
-          break
-        }
-      }
-      break
-    } 
+async function processPeercall(data, uuid){
+  broadcastOne(uuid, data, data.data["peer"])
 }
-
-function broadcastUser(data, uuid){
-  // sends everyone data
-  rooms[users[uuid].roomID]["connections"].forEach(conn=>{
-    conn.send(JSON.stringify(data))
-})}
-
+function processUser(data, uuid){
+  broadcastAll(uuid, data)
+}
 
 
 //utility functions
@@ -411,7 +346,8 @@ async function sendServerInfo(uuid) {
       "groupcall": {
         "router": await worker.createRouter({mediaCodecs}),
         "callParticipants": [],
-        "consumers": {}
+        "consumers": {},
+        "producers": {}
       }
     }
   }
@@ -459,13 +395,13 @@ async function makeTransport(roomID) {
   return transport
 }
 
-function sendAll(uuid, toSender=false){
+function broadcastAll(uuid, data, toSender=false){
   rooms[users[uuid]["roomID"]]["users"].forEach(id =>{
     (id !== uuid || toSender) && connections[id].send(JSON.stringify(data))
   })
 }
 
-function sendPeer(uuid, peerUsername){
+function broadcastOne(uuid, data, peerUsername){
   const userList = rooms[users[uuid]["roomID"]]["users"]
   for (let i = 0; i < userList.length; i++){
     if (peerUsername === users[userList[i]]["username"]){
@@ -482,46 +418,49 @@ function handleCanvasAction(data, roomID){
   if (exclude.includes(data.type)){
     return
   }
-  const room = rooms[roomID]
+  const wbInfo = rooms[roomID]["whiteboard"]
 
   switch (data.type){
     case "undo":
-      room["latestOp"] -= 1
-      room["canvas"].getContext("2d").putImageData(room["snapshot"], 0, 0)
+      wbInfo["latestOp"] -= 1
+      wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"], 0, 0)
       redrawCanvas(roomID)
       break
     case "redo":
-      room["latestOp"] += 1
-      updateServerCanvas(room["operations"][room["latestOp"]], roomID)
+      wbInfo["latestOp"] += 1
+      updateServerCanvas(wbInfo["operations"][wbInfo["latestOp"]], roomID)
       break
     default:
-      room["latestOp"] += 1
-      room["operations"] = room["operations"].slice(0, room["latestOp"])
-      room["operations"].push(data)
+      wbInfo["latestOp"] += 1
+      wbInfo["operations"] = wbInfo["operations"].slice(0, wbInfo["latestOp"])
+      wbInfo["operations"].push(data)
 
-      if (room["operations"].length > 10){
-        room["canvas"].getContext("2d").putImageData(room["snapshot"], 0, 0)
-        for (let i = 0; i <= room["latestOp"]; i++){
-          updateServerCanvas(room["operations"][i], roomID)
+      if (wbInfo["operations"].length > 10){
+        wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"], 0, 0)
+        for (let i = 0; i <= wbInfo["latestOp"]; i++){
+          updateServerCanvas(wbInfo["operations"][i], roomID)
           if (i == 4){
-            room["snapshot"] = room["canvas"].getContext("2d").getImageData(0,0,room["canvas"].width, room["canvas"].height)
+            wbInfo["snapshot"] = wbInfo["canvas"].getContext("2d").getImageData(0,0,wbInfo["canvas"].width, wbInfo["canvas"].height)
           }
         }
-        room["operations"] = room["operations"].slice(5)
-        room["latestOp"] = 5
+        wbInfo["operations"] = wbInfo["operations"].slice(5)
+        wbInfo["latestOp"] = 5
       }else{
           updateServerCanvas(data, roomID)
       }
   }
 }
+
 function redrawCanvas(roomID){
-  rooms[roomID]["canvas"].getContext("2d").putImageData(rooms[roomID]["snapshot"],0,0)
-  for (let i = 0; i <= rooms[roomID]["latestOp"]; i++){
-    updateServerCanvas(rooms[roomID]["operations"][i], roomID)
+  const wbInfo = rooms[roomID]["whiteboard"]
+
+  wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"],0,0)
+  for (let i = 0; i <= wbInfo["latestOp"]; i++){
+    updateServerCanvas(wbInfo["operations"][i], roomID)
   }
 }
 function updateServerCanvas(data, roomID){
-  const mainCanvas = rooms[roomID]["canvas"]
+  const mainCanvas = rooms[roomID]["whiteboard"]["canvas"]
     
   switch (data.type){
     case "doneDrawing":
