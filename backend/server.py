@@ -46,6 +46,20 @@ class AccessDatabase:
     self.conn.commit()
     self.cursor.close()
     self.conn.close()
+  
+# Creates a decorator with the given error message. 
+# Now can easily wrap endpoints in a try/catch and send message on failure
+def handleError(errorMessage):
+  def decorator(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+      try:
+        return func(*args, **kwargs)
+      except Exception as e:
+        print(e)
+        return jsonify({"success": False, "message": errorMessage}), 500
+    return wrapper
+  return decorator
 
 
 with AccessDatabase() as cursor:
