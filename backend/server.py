@@ -68,8 +68,8 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(70),
-      profilePicURL TEXT,
-      images TEXT,
+      currentAvatar TEXT,
+      imageIDs TEXT,
       email VARCHAR(350)
     )
     '''
@@ -79,7 +79,7 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS messages (
       id INT AUTO_INCREMENT PRIMARY KEY,
       roomID VARCHAR(10),
-      data TEXT,
+      content TEXT,
       username VARCHAR(70),
       timestamp BIGINT,
       messageID VARCHAR(50)
@@ -92,7 +92,7 @@ with AccessDatabase() as cursor:
       id INT AUTO_INCREMENT PRIMARY KEY,
       roomID VARCHAR(10),
       roomName VARCHAR(70),
-      users TEXT
+      users JSON
     )
     '''
   )
@@ -107,7 +107,6 @@ with AccessDatabase() as cursor:
     '''
   )
   cursor.execute(
-
     '''
     CREATE TABLE IF NOT EXISTS images (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -121,30 +120,37 @@ with AccessDatabase() as cursor:
   )
    
 
+
+# 
+# 
+# DONT FORGET: changed data to content. changed urls. changed room ids. will load pfps from memory instead.!!!!!!!!!!!!!!!!!!
+# 
+# 
+
 #----------- Room Resources (include messages, canvases)
 @app.route("/rooms", methods=["POST"])
 @handleError("failed to create room")
 def createRoom():
   data = request.get_json()
+  roomName = data["roomName"]
+  username = data["username"]
   with AccessDatabase() as cursor:
     exists = True
     while (exists):
       roomID = generateRoomCode()
       cursor.execute("SELECT * from rooms WHERE roomID=%s",(roomID,))
       exists = cursor.fetchone() is not None
-    cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, data["roomName"], json.dumps([data["username"]])))
+    cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, roomName, json.dumps([username])))
 
-  return jsonify({"success": True, "data": roomID}), 200
+  return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
 @handleError("failed to valdiate room")
 def checkRoomExists(roomID):
-  data = request.get_json()
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT * FROM rooms where roomID=%s",(data["roomID"],))
+    cursor.execute("SELECT * FROM rooms where roomID=%s",(roomID,))
     exists = cursor.fetchone() is not None
-
   return jsonify({"success":True,"data": exists}), 200
 
 
@@ -152,63 +158,54 @@ def checkRoomExists(roomID):
 @handleError("failed to create message")
 def createMessage(roomID):
   data = request.get_json()
+  username = data["username"]
+  content = data["content"]
+  timestamp = data["metadata"]["timestamp"]
+  messageID = data["metadata"]["messageID"]
   with AccessDatabase() as cursor:
-    cursor.execute("INSERT INTO messages (roomID, username, data, timestamp, messageID) VALUES (%s, %s, %s, %s, %s)", (data["roomID"], data["username"], data["data"], data["metadata"]["timestamp"], data["metadata"]["messageID"]))
+    cursor.execute("INSERT INTO messages (roomID, username, content, timestamp, messageID) VALUES (%s, %s, %s, %s, %s)", (roomID, username, content, timestamp, messageID))
     
   return jsonify({"success":True}),200
 
 @app.route("/rooms/<roomID>/messages", methods=["GET"])
 @handleError("Failed to get room messages")
 def getMessages(roomID):
-  data = request.get_json()
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username,  data, timestamp, messageID FROM messages WHERE roomID = %s", (data["roomID"],))
-    tupleMessages = cursor.fetchall()
+    cursor.execute("SELECT username, content, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
+    messages = cursor.fetchall()
     jsonMessages = [
       {
         "username": lst[0],
-        "data": lst[1],
+        "content": lst[1],
         "metadata": {
           "timestamp": lst[2],
           "messageID": lst[3] 
         }
-      } for lst in tupleMessages
+      } for lst in messages
     ]
   return jsonify({"success": True, "data": jsonMessages }), 200
 
 
-@app.route("/rooms/<roomID>/users", methods=["POST"])
+@app.route("/rooms/<roomID>/users", methods=["PUT"])
 @handleError("failed to add room user")
 def addRoomUser(roomID):
   data = request.get_json()
+  username = data["username"]
+
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (data["roomID"],))
-    users = json.loads(cursor.fetchone()[0])
-    if data["username"] in users:
-      return jsonify({"success": True}), 200
-    users.append(data["username"])
-    cursor.execute("UPDATE rooms SET users = %s WHERE roomID = %s",(json.dumps(users), data["roomID"]))
+    cursor.execute('''
+    UPDATE rooms SET users = JSON_ARRAY_APPEND(users, '$', %s)
+    WHERE roomID = %s AND JSON_CONTAINS(users, %s, '$') = 0''',(username, roomID, f'"{username}"'))
 
   return jsonify({"success": True}), 200
 
 @app.route("/rooms/<roomID>/users", methods=["GET"])
 @handleError("Failed to get room users")
 def getRoomUsers(roomID):
-  data = request.get_json()
-  roomUsers = []
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (data["roomID"],))
+    cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (roomID,))
     users = json.loads(cursor.fetchone()[0])
-    for user in users:
-      # cursor.execute("SELECT profilePicURL FROM users WHERE username = %s", (user,))
-      cursor.execute("SELECT profilePicURL FROM users WHERE id = 1")
-
-      profilePicture = cursor.fetchone()[0]
-      roomUsers.append({
-        "username": user,
-        "imageURL": profilePicture
-      })
-  return jsonify({"success":True,"data": roomUsers}), 200
+  return jsonify({"success":True,"data": users}), 200
 
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["PUT"])
