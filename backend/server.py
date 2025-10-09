@@ -106,9 +106,41 @@ with AccessDatabase() as cursor:
     '''
   )
    
-# Adds message from any room to messages table
-@app.route("/storeMessage", methods=["POST"])
-def storeMessage():
+
+#----------- Room Resources (include messages, canvases)
+@app.route("/rooms", methods=["POST"])
+def createRoom():
+  try:
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      exists = True
+      while (exists):
+        roomID = generateRoomCode()
+        cursor.execute("SELECT * from rooms WHERE roomID=%s",(roomID,))
+        exists = cursor.fetchone() is not None
+      cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, data["roomName"], json.dumps([data["username"]])))
+
+    return jsonify({"success": True, "data": roomID}), 200
+  except Exception as e:
+    print(e)
+    return jsonify({"success": False,"message": "failed to create room"}), 500
+
+@app.route("/rooms/<roomID>/exists", methods=["GET"])
+def checkRoomExists(roomID):
+  try:
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT * FROM rooms where roomID=%s",(data["roomID"],))
+      exists = cursor.fetchone() is not None
+
+    return jsonify({"success":True,"data": exists}), 200
+  except Exception as e:
+    print(e)
+    return jsonify({"success":False, "message": "failed to valdiate room"}), 500
+
+
+@app.route("/rooms/<roomID>/messages", methods=["POST"])
+def createMessage(roomID):
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
@@ -119,9 +151,8 @@ def storeMessage():
     print(e)
     return jsonify({"success":False,"message": "Failed to update messages."}), 500
 
-#Returns all chats from a room provided its roomID
-@app.route("/getMessages", methods=["POST"])
-def getMessages():
+@app.route("/rooms/<roomID>/messages", methods=["GET"])
+def getMessages(roomID):
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
@@ -143,26 +174,8 @@ def getMessages():
     return jsonify({"success": False, "message": "Failed to get room messages"}), 500
 
 
-# Creates room with name and unique 6 char code
-@app.route("/createRoom", methods=["POST"])
-def createRoom():
-  try:
-    data = request.get_json()
-    with AccessDatabase() as cursor:
-      exists = True
-      while (exists):
-        roomID = generateRoomCode()
-        cursor.execute("SELECT * from rooms WHERE roomID=%s",(roomID,))
-        exists = cursor.fetchone() is not None
-      cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, data["roomName"], json.dumps([data["username"]])))
-
-    return jsonify({"success": True, "data": roomID}), 200
-  except Exception as e:
-    print(e)
-    return jsonify({"success": False,"message": "failed to create room"}), 500
-
-@app.route("/addRoomUser", methods=["POST"])
-def addRoomUser():
+@app.route("/rooms/<roomID>/users", methods=["POST"])
+def addRoomUser(roomID):
   try:
     data = request.get_json()
     with AccessDatabase() as cursor:
@@ -178,23 +191,8 @@ def addRoomUser():
     print(e)
     return jsonify({"success": False,"message": "failed to add room user"}), 500
 
-
-# checks if roomID exists
-@app.route("/validateRoom", methods=["POST"])
-def validateRoom():
-  try:
-    data = request.get_json()
-    with AccessDatabase() as cursor:
-      cursor.execute("SELECT * FROM rooms where roomID=%s",(data["roomID"],))
-      exists = cursor.fetchone() is not None
-
-    return jsonify({"success":True,"data": exists}), 200
-  except Exception as e:
-    print(e)
-    return jsonify({"success":False, "message": "failed to valdiate room"}), 500
-
-@app.route("/getRoomUsers", methods=["POST"])
-def getRoomUsers():
+@app.route("/rooms/<roomID>/users", methods=["GET"])
+def getRoomUsers(roomID):
   data = request.get_json()
   roomUsers = []
   try:
@@ -214,9 +212,9 @@ def getRoomUsers():
   except Exception as e:
     return jsonify({"success":False,"message": "Failed to get room users"}), 500
 
-# Updates canvas image. Receives roomID as query param and sends canvasdata as bytes
-@app.route("/updateCanvas", methods=["POST"])
-def updateCanvas():
+
+@app.route("/rooms/<roomID>/canvas/snapshot", methods=["PUT"])
+def updateCanvasSnapshot(roomID):
   try:
     roomID = request.args.get("roomID")
     canvasBytes = request.get_data()
@@ -234,22 +232,8 @@ def updateCanvas():
     print(e)
     return {"success": False, "message": "failed to update canvas data"}, 500
 
-# Update instructions for a canvas
-@app.route("/updateInstructions", methods=["POST"])
-def updateInstructions():
-  try:
-    roomID = request.args.get("roomID")
-    data = request.get_json()
-    with AccessDatabase() as cursor:
-      cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(data), roomID))
-    return {"success": True}, 200
-  except Exception as e:
-    print(e)
-    return {"success": False, "message": "failed to update instructions"}, 500
-
-# gets canvas data for new connections joining
-@app.route("/getCanvas")
-def getCanvas():
+@app.route("/rooms/<roomID>/canvas/snapshot", methods=["GET"])
+def getCanvasSnapshot(roomID):
   try:
     roomID = request.args.get("roomID")
     with AccessDatabase() as cursor:
@@ -260,9 +244,21 @@ def getCanvas():
     print(e)
     return {"success": False, "message": "failed to get canvas data"}, 500
 
-# gets Instructions for a canvas
-@app.route("/getInstructions")
-def getInstructions():
+
+@app.route("/rooms/<roomID>/canvas/instructions", methods=["PUT"])
+def updateCanvasInstructions(roomID):
+  try:
+    roomID = request.args.get("roomID")
+    data = request.get_json()
+    with AccessDatabase() as cursor:
+      cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(data), roomID))
+    return {"success": True}, 200
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to update instructions"}, 500
+
+@app.route("/rooms/<roomID>/canvas/instructions", methods=["GET"])
+def getCanvasInstructions(roomID):
   try:
     roomID = request.args.get("roomID")
     with AccessDatabase() as cursor:
@@ -273,9 +269,10 @@ def getInstructions():
     print(e)
     return {"success": False, "message": "failed to get canvas data"}, 500
 
-# getUserInfo. Get site's unique user info, not Auth0's general user info
-@app.route("/getUserInfo", methods=["POST"])
-def getUserInfo():
+
+# ----------User Resources (include images)
+@app.route("/users/<username>", methods=["GET"])
+def getUser(username):
   data = request.get_json()
   try:
     with AccessDatabase() as cursor:
@@ -291,9 +288,8 @@ def getUserInfo():
     print(e)
     return jsonify({"success": False, "message": "checking if user has username failed"}), 500
 
-#modify any fields from a user's data
-@app.route("/modifyUserInfo", methods=["POST"])
-def modifyUserInfo():
+@app.route("/users/<username>", methods=["PUT"])
+def updateUser(username):
   try:
     userInfo = request.get_json()
 
@@ -309,34 +305,20 @@ def modifyUserInfo():
     print(e)
     return jsonify({"success": False, "message":"Failed to modify user info"}), 500
   
-# updates usermame. Usually after new account is made.
-@app.route("/updateUsername", methods=["POST"])
-def updateUsername():
-  data = request.get_json()
-  try:
-    print(data)
-    with AccessDatabase() as cursor:
-      cursor.execute("UPDATE users SET username = %s WHERE email = %s", (data["username"],data["email"]))
-    return jsonify({"success": True}), 200
-  except Exception as e:
-    print(e)
-    return jsonify({"success": False, "message": "updating username failed"}), 500
+# @app.route("/updateUsername", methods=["POST"])
+# def updateUsername():
+#   data = request.get_json()
+#   try:
+#     print(data)
+#     with AccessDatabase() as cursor:
+#       cursor.execute("UPDATE users SET username = %s WHERE email = %s", (data["username"],data["email"]))
+#     return jsonify({"success": True}), 200
+#   except Exception as e:
+#     print(e)
+#     return jsonify({"success": False, "message": "updating username failed"}), 500
 
-@app.route("/getImage/<imageID>")
-def getImage(imageID):
-  try:
-    with AccessDatabase() as cursor:
-      cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
-      imageInfo = cursor.fetchone()
-      if imageInfo is None:
-        return {"success": False, "message": "failed to locate image"}, 500
-    return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
-  except Exception as e:
-    print(e)
-    return {"success": False, "message": "failed to get image"}, 500
-
-@app.route("/uploadNewImage", methods=["POST"])
-def uploadNewImage():
+@app.route("/users/<username>/images", methods=["POST"])
+def uploadImage(username):
   try:
     rawImageData = request.get_data()
     imageType = request.content_type
@@ -348,6 +330,20 @@ def uploadNewImage():
   except Exception as e:
     print(e)
     return {"success": False, "message": "failed to upload image"}, 500
+
+@app.route("/users/<username>/images/<imageID>", methods=["GET"])
+def getImage(username, imageID):
+  try:
+    with AccessDatabase() as cursor:
+      cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
+      imageInfo = cursor.fetchone()
+      if imageInfo is None:
+        return {"success": False, "message": "failed to locate image"}, 500
+    return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
+  except Exception as e:
+    print(e)
+    return {"success": False, "message": "failed to get image"}, 500
+
 
 # adds user to db if they don't exist (NOT ENDPOINT)
 def addUser(email):

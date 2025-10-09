@@ -62,6 +62,7 @@ wsServer.on("connection", (connection, request)=>{
     "username": username,
     "roomID": roomID,
     "groupcall": {
+      "connected": false,
       "sendTransport": null,
       "recvTransport": null,
       "producers": [],
@@ -78,17 +79,23 @@ wsServer.on("connection", (connection, request)=>{
 
 // Handle new messages / close
 function handleClose(uuid){
-  const roomID = users[uuid].roomID
-  rooms[roomID]["connections"] = rooms[roomID]["connections"].filter(item => item !== connections[uuid])
-  if (rooms[roomID]["connections"] == 0){
-    rooms[roomID]["canvas"].getContext("2d").putImageData(rooms[roomID]["snapshot"],0,0)
-    const savedCanvasBuffer = rooms[roomID]["canvas"].toBuffer("image/png")
+  const roomID = users[uuid]["roomID"]
+
+  delete rooms[roomID]["users"][uuid]
+  delete connections[uuid]
+  delete users[uuid]
+
+  if (rooms[roomID]["users"] == 0){
+    rooms[roomID]["whiteboard"]["canvas"].getContext("2d").putImageData(rooms[roomID]["whiteboard"]["snapshot"],0,0)
+    const savedCanvasBuffer = rooms[roomID]["whiteboard"]["canvas"].toBuffer("image/png")
     updateCanvasReq(savedCanvasBuffer, roomID)
     updateInstructionsReq(rooms[roomID]["operations"], roomID)
+
+    rooms[roomID]["groupcall"]["router"].close()
     delete rooms[roomID]
   }
-  delete connections[uuid]
 }
+
 function handleMessage(data, uuid){
   const parsedData = JSON.parse(data.toString())
 
@@ -130,6 +137,7 @@ async function processGroupcall(data, uuid){
 
   switch(data.type){
     case "userJoined":
+      userCallInfo["connected"] = true
       roomCallInfo["callParticipants"].push(uuid)
       userCallInfo["rtpCapabilities"] = data.data["rtpCapabilities"]
 
@@ -291,6 +299,7 @@ async function processGroupcall(data, uuid){
       userCallInfo["sendTransport"].close()
       userCallInfo["recvTransport"].close()
       users[uuid]["groupcall"] = {
+        "connected": false,
         "sendTransport": null,
         "recvTransport": null,
         "producers": [],
