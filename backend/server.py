@@ -70,9 +70,8 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       username VARCHAR(70),
-      currentAvatar TEXT,
-      imageIDs TEXT,
-      email VARCHAR(350)
+      currentAvatar VARCHAR(50),
+      imageIDs JSON
     )
     '''
   )
@@ -131,6 +130,7 @@ changed urls.
 changed room ids. 
 will load pfps from memory instead.
 actual data is another layer in.
+Not tracking email anymore (until later)
 !!!!!!!!!!!!!!!!!!
  '''
 
@@ -256,57 +256,48 @@ def getCanvasInstructions(roomID):
 
 
 # ----------User Resources (include images)
+@app.route("/users", methods=["POST"])
+@handleError("Creating user failed")
+def createUser():
+  data = request.get_json()
+  username = data["username"]
+  with AccessDatabase() as cursor:
+    cursor.execute("INSERT INTO users (username, currentAvatar, imageIDs) VALUES (%s, %s, %s)", (username, "willow", "[]"))
+  return jsonify({"success": True}), 200
+
 @app.route("/users/<username>", methods=["GET"])
 @handleError("getting user failed")
 def getUser(username):
-  data = request.get_json()
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT * FROM users WHERE email = %s", (data["email"],))
+    cursor.execute("SELECT * FROM users WHERE username = %s", (username,)) #remember, this used to be email
 
     keys = cursor.column_names
-    print(keys)
     values = cursor.fetchone()
-    print(values)
+    
     userInfo = {keys[i]: values[i] for i in range(len(keys))}
-  return jsonify({"success": True, "data": userInfo}), 200
+  return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
 @app.route("/users/<username>", methods=["PUT"])
 @handleError("Failed to modify user info")
 def updateUser(username):
-  userInfo = request.get_json()
+  data = request.get_json()
+  changeFieldsStr = ", ".join(f"{col} = %s" for col in data.keys())
+  newValues = tuple(list(data.values()) + [username])
 
-  username = userInfo["username"]
-  del userInfo["username"]
-
-  changeFieldsStr = ", ".join(f"{field} = %s" for field in userInfo.keys())
-  newFieldValuesTup = tuple(list(userInfo.values()) + [username])
   with AccessDatabase() as cursor:
-    cursor.execute(f"UPDATE users SET {changeFieldsStr} WHERE username = %s", newFieldValuesTup)
-  return jsonify({"success":True}), 200
+    cursor.execute(f"UPDATE users SET {changeFieldsStr} WHERE username = %s", newValues)
 
-  
-# @app.route("/updateUsername", methods=["POST"])
-# def updateUsername():
-#   data = request.get_json()
-#   try:
-#     print(data)
-#     with AccessDatabase() as cursor:
-#       cursor.execute("UPDATE users SET username = %s WHERE email = %s", (data["username"],data["email"]))
-#     return jsonify({"success": True}), 200
-#   except Exception as e:
-#     print(e)
-#     return jsonify({"success": False, "message": "updating username failed"}), 500
+  return jsonify({"success":True}), 200
 
 @app.route("/users/<username>/images", methods=["POST"])
 @handleError("failed to upload image")
 def uploadImage(username):
   rawImageData = request.get_data()
   imageType = request.content_type
-  newImageID = str(uuid.uuid4())
-  username = request.args.get("owner")
+  imageID = str(uuid.uuid4())
   with AccessDatabase() as cursor:
     cursor.execute("INSERT INTO images (image, mimeType, imageID, owner) VALUES (%s, %s, %s,%s)", (rawImageData, imageType, newImageID, username))
-  return {"success": True, "data": newImageID}, 200
+  return {"success": True, "data": {"imageID": imageID}}, 200
 
 @app.route("/users/<username>/images/<imageID>", methods=["GET"])
 @handleError("failed to get image")
@@ -314,21 +305,7 @@ def getImage(username, imageID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
     imageInfo = cursor.fetchone()
-    if imageInfo is None:
-      return {"success": False, "message": "failed to locate image"}, 500
   return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
-
-
-# adds user to db if they don't exist (NOT ENDPOINT)
-def addUser(email):
-  try:
-    with AccessDatabase() as cursor:
-      cursor.execute("SELECT email FROM users WHERE email = %s", (email,))
-      exists = cursor.fetchone() is not None
-      if not exists:
-        cursor.execute("INSERT INTO users (email, username, profilePicURL) VALUES (%s, %s, %s)", (email, None, "http://localhost:5000/getImage/willow"))
-  except Exception as e:
-    print(e)
 
 
 
@@ -347,7 +324,6 @@ def login():
 def callback():
   token = oauth.auth0.authorize_access_token()
   session["user"] = token
-  addUser(token["userinfo"]["email"])
   return redirect("http://localhost:3000/platform")
 
 # Ends the user's session, and redirects them to home page.
