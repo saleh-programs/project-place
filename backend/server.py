@@ -3,6 +3,8 @@ import json, os
 from os import environ as env
 from urllib.parse import quote_plus, urlencode
 from random import randint, choice
+from PIL import Image
+import io
 
 from authlib.integrations.flask_client import OAuth
 from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for
@@ -122,10 +124,16 @@ with AccessDatabase() as cursor:
 
 
 # 
-# 
-# DONT FORGET: changed data to content. changed urls. changed room ids. will load pfps from memory instead.!!!!!!!!!!!!!!!!!!
-# 
-# 
+'''
+DONT FORGET !!!!!!!!!! ------------------------------------------------------------------------------: 
+changed data to content. 
+changed urls. 
+changed room ids. 
+will load pfps from memory instead.
+actual data is another layer in.
+!!!!!!!!!!!!!!!!!!
+ '''
+
 
 #----------- Room Resources (include messages, canvases)
 @app.route("/rooms", methods=["POST"])
@@ -138,10 +146,16 @@ def createRoom():
     exists = True
     while (exists):
       roomID = generateRoomCode()
-      cursor.execute("SELECT * from rooms WHERE roomID=%s",(roomID,))
+      cursor.execute("SELECT 1 from rooms WHERE roomID=%s",(roomID,))
       exists = cursor.fetchone() is not None
+
     cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, roomName, json.dumps([username])))
 
+    canvasImg = Image.new(mode = "RGBA", size=(1000,1000), color=(0,0,0,0))
+    buffer = io.BytesIO()
+    canvasImg.save(buffer, format="PNG")
+    canvasBytes = buffer.getvalue()
+    cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]", roomID))
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
 
@@ -151,7 +165,7 @@ def checkRoomExists(roomID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT * FROM rooms where roomID=%s",(roomID,))
     exists = cursor.fetchone() is not None
-  return jsonify({"success":True,"data": exists}), 200
+  return jsonify({"success":True,"data": {"exists": exists}}), 200
 
 
 @app.route("/rooms/<roomID>/messages", methods=["POST"])
@@ -183,7 +197,7 @@ def getMessages(roomID):
         }
       } for lst in messages
     ]
-  return jsonify({"success": True, "data": jsonMessages }), 200
+  return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
 
 
 @app.route("/rooms/<roomID>/users", methods=["PUT"])
@@ -205,52 +219,40 @@ def getRoomUsers(roomID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (roomID,))
     users = json.loads(cursor.fetchone()[0])
-  return jsonify({"success":True,"data": users}), 200
-
+  return jsonify({"success":True,"data": {"users": users}}), 200
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["PUT"])
 @handleError("failed to update canvas snapshot")
 def updateCanvasSnapshot(roomID):
-  roomID = request.args.get("roomID")
   canvasBytes = request.get_data()
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM canvases WHERE roomID = %s",(roomID,))
-    exists = cursor.fetchone() is not None
-
-    if exists:
-      cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
-    else:
-      cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]",roomID))
-
+    cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["GET"])
-@handleError("failed to get canvas data")
+@handleError("failed to get canvas snapshot")
 def getCanvasSnapshot(roomID):
-  roomID = request.args.get("roomID")
   with AccessDatabase() as cursor:
     cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s",(roomID,))
     canvasBytes = cursor.fetchone()[0]
   return Response(canvasBytes, mimetype='application/octet-stream', status=200)
 
-
 @app.route("/rooms/<roomID>/canvas/instructions", methods=["PUT"])
 @handleError("failed to update canvas instructions")
 def updateCanvasInstructions(roomID):
-  roomID = request.args.get("roomID")
   data = request.get_json()
+  instructions = data["instructions"]
   with AccessDatabase() as cursor:
-    cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(data), roomID))
+    cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(instructions), roomID))
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/instructions", methods=["GET"])
-@handleError("failed to get canvas snapshot")
+@handleError("failed to get canvas instructions")
 def getCanvasInstructions(roomID):
-  roomID = request.args.get("roomID")
   with AccessDatabase() as cursor:
     cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
-    instructions = cursor.fetchone()[0]
-  return {"success": True, "data": json.loads(instructions)}, 200
+    instructions = loads(cursor.fetchone()[0])
+  return {"success": True, "data": {"instructions": instructions}}, 200
 
 
 # ----------User Resources (include images)

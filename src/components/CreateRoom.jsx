@@ -14,7 +14,7 @@ function CreateRoom({setIsCreatingRoom, setRoomID, username}){
       canvas.height = 1000
       const blob = await new Promise((resolve)=>canvas.toBlob(resolve, "image/png"))
 
-      updateCanvasReq(blob,res)
+      updateCanvasReq(blob,res) //MURAD WHY ARE YOU SO LAZY JUST LET CREATEROOM HANDLE IT
       setNewRoomName("")
       setRoomID(res)
       setIsCreatingRoom(false)
