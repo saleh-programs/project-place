@@ -336,7 +336,7 @@ def logout():
     + "/v2/logout?"
     + urlencode(
         {
-          "returnTo": "http://localhost:3000",
+          "returnTo": "http://localhost:3000", 
           "client_id": env.get("AUTH0_CLIENT_ID"),
         },
         quote_via=quote_plus,

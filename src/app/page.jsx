@@ -5,8 +5,6 @@ import { useEffect, useState } from "react";
 import styles from "styles/Home.module.css"
 
 function Home(){
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
   const router = useRouter()
 
   return(

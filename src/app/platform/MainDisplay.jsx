@@ -1,6 +1,6 @@
 "use client"
 import * as mediasoupClient from "mediasoup-client"
-import { use, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -8,9 +8,8 @@ import styles from "styles/components/MainDisplay.module.css"
 import Sidebar from "src/components/Sidebar"
 import { useRouter, usePathname } from "next/navigation"
 
-function MainDisplay({children, username, userInfoInitial}){
+function MainDisplay({children, username, initialUserinfo}){
   const router = useRouter()
-  const pathname = usePathname()
   
   const [roomID, setRoomID] = useState("")
   const [messages, setMessages] = useState([])
@@ -26,7 +25,7 @@ function MainDisplay({children, username, userInfoInitial}){
   const externalGroupcallRef = useRef((param1)=>{})
   const externalPeercallRef = useRef((param1)=>{})
 
-  const [userInfo, setUserInfo] = useState(userInfoInitial)
+  const [userInfo, setUserInfo] = useState(initialUserinfo)
   const [userStates, setUserStates] = useState({})
 
   const [callOffers, setCallOffers] = useState({})
