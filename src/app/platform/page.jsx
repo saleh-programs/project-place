@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation"
 
-import styles from "styles/platform/PlatformHome.module.css"
-
 function PlatformHome(){
   redirect("/platform/chat")
 

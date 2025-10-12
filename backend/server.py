@@ -5,8 +5,11 @@ from urllib.parse import quote_plus, urlencode
 from random import randint, choice
 from PIL import Image
 import io
+from functools import wraps
 
 from authlib.integrations.flask_client import OAuth
+from authlib.jose import jwt, JsonWebKey
+import requests
 from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for
 from flask_cors import CORS
 import uuid
@@ -18,6 +21,7 @@ app = Flask(__name__)
 app.secret_key = env.get("APP_SECRET_KEY")
 CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
 
+JWKS = requests.get(f"https://{env.get('AUTH0_DOMAIN')}/.well-known/jwks.json").json()
 
 oauth = OAuth(app)
 oauth.register(
@@ -56,6 +60,8 @@ def handleError(errorMessage):
     @wraps(func)
     def wrapper(*args, **kwargs):
       try:
+        decodedToken = jwt.decode(session["user"]["access_token"], JsonWebKey.import_key_set(JWKS))
+        decodedToken.validate()
         return func(*args, **kwargs)
       except Exception as e:
         print(e)
@@ -68,7 +74,7 @@ with AccessDatabase() as cursor:
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      userID VARCHAR(100) PRIMARY KEY,
       username VARCHAR(70),
       currentAvatar VARCHAR(50),
       imageIDs JSON
@@ -160,7 +166,7 @@ def createRoom():
 
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
-@handleError("failed to valdiate room")
+@handleError("failed to validate room")
 def checkRoomExists(roomID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT * FROM rooms where roomID=%s",(roomID,))
@@ -256,36 +262,27 @@ def getCanvasInstructions(roomID):
 
 
 # ----------User Resources (include images)
-@app.route("/users", methods=["POST"])
-@handleError("Creating user failed")
-def createUser():
-  data = request.get_json()
-  username = data["username"]
+@app.route("/users", methods=["GET"])
+@handleError("getting user info failed")
+def getUserInfo():
   with AccessDatabase() as cursor:
-    cursor.execute("INSERT INTO users (username, currentAvatar, imageIDs) VALUES (%s, %s, %s)", (username, "willow", "[]"))
-  return jsonify({"success": True}), 200
+    cursor.execute("SELECT (username, currentAvatar, imageIDs) FROM users WHERE userID = %s", (session["userID"],))
 
-@app.route("/users/<username>", methods=["GET"])
-@handleError("getting user failed")
-def getUser(username):
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT * FROM users WHERE username = %s", (username,)) #remember, this used to be email
-
-    keys = cursor.column_names
+    columns = cursor.column_names
     values = cursor.fetchone()
-    
-    userInfo = {keys[i]: values[i] for i in range(len(keys))}
+    userInfo = {columns[i]: values[i] for i in range(len(keys))}
+
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
-@app.route("/users/<username>", methods=["PUT"])
+@app.route("/users", methods=["PUT"])
 @handleError("Failed to modify user info")
 def updateUser(username):
   data = request.get_json()
-  changeFieldsStr = ", ".join(f"{col} = %s" for col in data.keys())
-  newValues = tuple(list(data.values()) + [username])
+  modifiedFields = ", ".join(f"{col} = %s" for col in data.keys())
+  newValues = tuple(list(data.values()) + [session["userID"]])
 
   with AccessDatabase() as cursor:
-    cursor.execute(f"UPDATE users SET {changeFieldsStr} WHERE username = %s", newValues)
+    cursor.execute(f"UPDATE users SET {modifiedFields} WHERE userID = %s", newValues)
 
   return jsonify({"success":True}), 200
 
@@ -308,6 +305,16 @@ def getImage(username, imageID):
   return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
 
 
+# Backend only functions
+def createUser():
+  with AccessDatabase() as cursor:
+    userID = session["userID"]
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s", userID)
+    exists = cursor.fetchone() is not None
+
+    if (not exists):
+      cursor.execute("INSERT INTO users (userID, username, currentAvatar, imageIDs) VALUES (%s, %s, %s, %s)", (userID, None, "willow", "[]"))
+
 
 #-----------------AUTH0 STUFF------------------
 
@@ -318,12 +325,17 @@ def login():
   return oauth.auth0.authorize_redirect(
     redirect_uri = url_for("callback",_external=True)
   )
-
+ 
 # Redirects user to home page (or page after authentication)
 @app.route("/callback", methods=["GET", "POST"])
 def callback():
   token = oauth.auth0.authorize_access_token()
+  
   session["user"] = token
+  session["userID"] = jwt.decode(session["user"]["id_token"], options={"verify_signature": False})["sub"]
+
+  createUser()
+
   return redirect("http://localhost:3000/platform")
 
 # Ends the user's session, and redirects them to home page.
@@ -342,14 +354,6 @@ def logout():
         quote_via=quote_plus,
     )
   )
-
-# Used to get user information (email mainly)
-@app.route("/getSessionUserInfo")
-def getSessionUserInfo():
-  user = session.get("user")
-  if not user:
-    return jsonify({"success": False}), 400
-  return jsonify({"success": True, "data": user["userinfo"]}), 200
 
 # returns random 6 digit string. [A-Z]or [0-9]. Letters more likely
 def generateRoomCode():

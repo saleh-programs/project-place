@@ -66,49 +66,30 @@ async function getMessagesReq(roomID) {
 }
 
 
-async function getSessionUserInfoReq(sessionToken=null) {
-  let options;
-  if (sessionToken){
-    options = {
-      "method": "GET",
-      "headers": {"Cookie": `session=${sessionToken}`}
-    }
-  }else{
-    options = {
+async function getUserInfoReq() {
+  const response = await fetch(baseurl + "users",{
       "method": "GET",
       "credentials": "include"
-    }
-  }
-  const response = await fetch(baseurl + "getSessionUserInfo", options)
-  const data = await response.json()
-  if (!data.success){ 
-    throw new Error(data.message ||"req failed")
-  }
-  return data.data
-}
-
-async function getUserInfoReq(email) {
-  const response = await fetch(baseurl +"getUserInfo", {
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"email":email})
   })
   const data = await response.json()
   if (!data.success){ 
     throw new Error(data.message ||"req failed")
   }
-  return data.data
+  return data["data"]["userInfo"]
 }
-async function modifyUserInfoReq(changedFieldsObj) {
-  const response = await fetch(baseurl + "modifyUserInfo", {
+
+async function modifyUserInfoReq(modifiedFields) {
+  const response = await fetch(baseurl + "users", {
     "method": "POST",
+    "credentials": "include",
     "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify(changedFieldsObj)
+    "body": JSON.stringify(modifiedFields)
   })
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
+
   return data
 }
 
@@ -237,6 +218,6 @@ function getUniqueMessageID(){
 }
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateInstructionsReq, getInstructionsReq,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, getSessionUserInfoReq, getUserInfoReq, modifyUserInfoReq, 
+  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, getUserInfoReq, modifyUserInfoReq, 
   uploadNewImageReq,
   updateUsernameReq, getCanvasReq, updateCanvasReq}
