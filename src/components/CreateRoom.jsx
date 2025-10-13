@@ -7,17 +7,11 @@ function CreateRoom({setIsCreatingRoom, setRoomID, username}){
   const [newRoomName, setNewRoomName] = useState("")
 
   async function handleRoomCreation(){
-    const res = await createRoomReq(newRoomName, username)
+    const res = await createRoomReq(newRoomName)
     if (res){
-      const canvas = document.createElement("canvas")
-      canvas.width = 1000
-      canvas.height = 1000
-      const blob = await new Promise((resolve)=>canvas.toBlob(resolve, "image/png"))
-
-      updateCanvasReq(blob,res) //MURAD WHY ARE YOU SO LAZY JUST LET CREATEROOM HANDLE IT
       setNewRoomName("")
-      setRoomID(res)
       setIsCreatingRoom(false)
+      setRoomID(res)
     }
   }
 

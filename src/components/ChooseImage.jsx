@@ -1,12 +1,11 @@
 import styles from "styles/components/ChooseImage.module.css"
-import { modifyUserInfoReq, uploadNewImageReq } from "backend/requests"
-import { use } from "react"
+import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
 
 function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo, sendJsonMessage}){
   const publicImages = []// ["willow","dude","man"]
   
   async function setNewUserImage(imageURL){
-    const response = await modifyUserInfoReq({"profilePicURL": imageURL, "username": username})
+    const response = await updateUserInfoReq({"profilePicURL": imageURL, "username": username})
     if (response){
       setUserInfo(prev => {
         return {
@@ -41,7 +40,7 @@ function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo, sendJs
     }
     newImagesList.push(uploadImageRes)
     const newImagesListStr = JSON.stringify(newImagesList)
-    const modifyInfoRes = await modifyUserInfoReq({"images": newImagesListStr, "username": username})
+    const modifyInfoRes = await updateUserInfoReq({"images": newImagesListStr, "username": username})
     if (!modifyInfoRes){
       return
     }

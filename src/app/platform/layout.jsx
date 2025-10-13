@@ -1,10 +1,14 @@
 import MainDisplay from "./MainDisplay"
-import { getUserInfoReq, getSessionUserInfoReq } from "../../../backend/requests"
+import { getUserInfoReq } from "../../../backend/requests"
 
 import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
 
 async function PlatformLayout({ children }) {
-  const initialUserInfo = await getUserInfoReq() 
+  const allCookies = await cookies()
+  const session = allCookies.get("session")?.value
+
+  const initialUserInfo = await getUserInfoReq(session) 
   const username = initialUserInfo["username"]
 
   if (!username){

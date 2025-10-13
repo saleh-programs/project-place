@@ -8,7 +8,7 @@ import io
 from functools import wraps
 
 from authlib.integrations.flask_client import OAuth
-from authlib.jose import jwt, JsonWebKey
+from authlib.jose import JsonWebToken, JsonWebKey
 import requests
 from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for
 from flask_cors import CORS
@@ -21,16 +21,16 @@ app = Flask(__name__)
 app.secret_key = env.get("APP_SECRET_KEY")
 CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
 
-JWKS = requests.get(f"https://{env.get('AUTH0_DOMAIN')}/.well-known/jwks.json").json()
-
+jwt = JsonWebToken(["RS256"])
+JWKS = JsonWebKey.import_key_set(
+    requests.get(f"https://{env.get('AUTH0_DOMAIN')}/.well-known/jwks.json").json()
+)
 oauth = OAuth(app)
 oauth.register(
   "auth0",
   client_id = env.get("AUTH0_CLIENT_ID"),
   client_secret = env.get("AUTH0_CLIENT_SECRET"),
-  client_kwargs = {
-    "scope": "openid profile email",
-  },
+  client_kwargs = {"scope": "openid profile email"},
   server_metadata_url = f'https://{env.get("AUTH0_DOMAIN")}/.well-known/openid-configuration'
 )
 
@@ -60,7 +60,7 @@ def handleError(errorMessage):
     @wraps(func)
     def wrapper(*args, **kwargs):
       try:
-        decodedToken = jwt.decode(session["user"]["access_token"], JsonWebKey.import_key_set(JWKS))
+        decodedToken = jwt.decode(session["user"]["access_token"], key=JWKS)
         decodedToken.validate()
         return func(*args, **kwargs)
       except Exception as e:
@@ -107,7 +107,7 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS canvases (
       roomID VARCHAR(10) PRIMARY KEY,
       canvas BLOB,
-      instructions JSON,
+      instructions JSON
     )
     '''
   )
@@ -144,11 +144,11 @@ Not tracking email anymore (until later)
 @handleError("getting user info failed")
 def getUserInfo():
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT (username, currentAvatar, imageIDs, rooms) FROM users WHERE userID = %s", (session["userID"],))
+    cursor.execute("SELECT username, currentAvatar, imageIDs, rooms FROM users WHERE userID = %s", (session["userID"],))
 
     columns = cursor.column_names
     values = cursor.fetchone()
-    userInfo = {columns[i]: values[i] for i in range(len(keys))}
+    userInfo = {columns[i]: values[i] for i in range(len(columns))}
 
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
@@ -342,7 +342,7 @@ def getCanvasInstructions(roomID):
 # Backend only functions
 def createUser():
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s", session["userID"])
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s", (session["userID"],))
     exists = cursor.fetchone() is not None
 
     if (not exists):
@@ -356,7 +356,8 @@ def createUser():
 def login():
   # HARDCODE THE URL FOR REDIRECT_URI IF YOU WANT TO TEST MOBILE MURAD
   return oauth.auth0.authorize_redirect(
-    redirect_uri = url_for("callback",_external=True)
+    redirect_uri = url_for("callback",_external=True),
+    audience=env.get("AUTH0_API_AUDIENCE")
   )
  
 # Redirects user to home page (or page after authentication)
@@ -365,8 +366,7 @@ def callback():
   token = oauth.auth0.authorize_access_token()
   
   session["user"] = token
-  session["userID"] = jwt.decode(session["user"]["id_token"], options={"verify_signature": False})["sub"]
-
+  session["userID"] = jwt.decode(token["id_token"], key=JWKS)["sub"]
   createUser()
 
   return redirect("http://localhost:3000/platform")

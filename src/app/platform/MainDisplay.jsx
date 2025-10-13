@@ -11,7 +11,11 @@ import { useRouter, usePathname } from "next/navigation"
 function MainDisplay({children, username, initialUserinfo}){
   const router = useRouter()
   
+  const [userInfo, setUserInfo] = useState(initialUserinfo)
+
   const [roomID, setRoomID] = useState("")
+  const [userStates, setUserStates] = useState({})
+
   const [messages, setMessages] = useState([])
   const savedCanvasInfoRef = useRef({
     "snapshot": null,
@@ -19,18 +23,15 @@ function MainDisplay({children, username, initialUserinfo}){
     "latestOp": -1
   })
   const device = useRef(null)
-
+  const [callOffers, setCallOffers] = useState({})
+  const callOffersRef = useRef(callOffers)
+  const stunCandidates = useRef({})
+  
   const externalChatRef = useRef((param1)=>{})
   const externalWhiteboardRef = useRef((param1)=>{})
   const externalGroupcallRef = useRef((param1)=>{})
   const externalPeercallRef = useRef((param1)=>{})
 
-  const [userInfo, setUserInfo] = useState(initialUserinfo)
-  const [userStates, setUserStates] = useState({})
-
-  const [callOffers, setCallOffers] = useState({})
-  const callOffersRef = useRef(callOffers)
-  const stunCandidates = useRef({})
 
   //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{

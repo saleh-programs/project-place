@@ -13,10 +13,12 @@ function handleError(fn){
 }
 
 
-async function getUserInfoReq() {
+async function getUserInfoReq(session) {
   const response = await fetch(baseurl + "users",{
       "method": "GET",
-      "credentials": "include"
+      "headers": {
+        "cookie": `session=${session}`
+      }
   })
   const data = await response.json()
   if (!data.success){ 
@@ -25,8 +27,9 @@ async function getUserInfoReq() {
   return data["data"]["userInfo"]
 }
 async function updateUserInfoReq(modifiedFields) {
+  console.log(modifiedFields)
   const response = await fetch(baseurl + "users", {
-    "method": "POST",
+    "method": "PUT",
     "credentials": "include",
     "headers": {"Content-Type": "application/json"},
     "body": JSON.stringify({"fields": modifiedFields})

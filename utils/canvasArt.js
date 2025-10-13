@@ -1,4 +1,4 @@
-import Queue from "./Queue"
+import Queue from "./Queue.js"
 
 function draw(commands, canvas, erase, options){
     const context = canvas.getContext("2d")

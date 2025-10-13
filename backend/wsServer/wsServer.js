@@ -5,8 +5,8 @@ import url from "url"
 import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
-import { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasReq, updateInstructionsReq, getCanvasReq, getInstructionsReq } from "../requests.js"
-import { draw, fill, clear } from "utils/canvasArt.js"
+import { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq } from "../requests.js"
+import { draw, fill, clear } from "../../utils/canvasArt.js"
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -88,8 +88,8 @@ function handleClose(uuid){
   if (rooms[roomID]["users"] == 0){
     rooms[roomID]["whiteboard"]["canvas"].getContext("2d").putImageData(rooms[roomID]["whiteboard"]["snapshot"],0,0)
     const savedCanvasBuffer = rooms[roomID]["whiteboard"]["canvas"].toBuffer("image/png")
-    updateCanvasReq(savedCanvasBuffer, roomID)
-    updateInstructionsReq(rooms[roomID]["operations"], roomID)
+    updateCanvasSnapshotReq(savedCanvasBuffer, roomID)
+    updateCanvasInstructionsReq(rooms[roomID]["operations"], roomID)
 
     rooms[roomID]["groupcall"]["router"].close()
     delete rooms[roomID]
@@ -333,13 +333,13 @@ async function sendServerInfo(uuid) {
     initializing = true
     const canvas = createCanvas(1000,1000)
     roomHistories.push(
-      getCanvasReq(roomID)
+      getCanvasSnapshotReq(roomID)
       .then(buffer => loadImage(buffer))
       .then(img => {
         canvas.getContext("2d").drawImage(img,0,0);
         return canvas
       }))
-    roomHistories.push(getInstructionsReq(roomID))
+    roomHistories.push(getCanvasInstructionsReq(roomID))
   }
   const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react";
-import { updateUsernameReq, getSessionUserInfoReq, modifyUserInfoReq } from "backend/requests";
+import {updateUserInfoReq } from "backend/requests";
 import { useRouter } from "next/navigation";
 
 
@@ -10,7 +10,7 @@ function AccountSetup(){
   const inputRef = useRef(null)
 
   async function handleSubmit(){
-    const response = await modifyUserInfoReq({"username": inputRef.current.value})
+    const response = await updateUserInfoReq({"username": inputRef.current.value})
     if (response){
       router.push("/platform")
     }
