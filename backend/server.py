@@ -77,27 +77,26 @@ with AccessDatabase() as cursor:
       userID VARCHAR(100) PRIMARY KEY,
       username VARCHAR(70),
       currentAvatar VARCHAR(50),
-      imageIDs JSON
+      imageIDs JSON,
+      rooms JSON
     )
     '''
   )
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS messages (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      messageID VARCHAR(50) PRIMARY KEY,
       roomID VARCHAR(10),
       content TEXT,
       username VARCHAR(70),
-      timestamp BIGINT,
-      messageID VARCHAR(50)
+      timestamp BIGINT
     )
     '''
   )
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS rooms (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      roomID VARCHAR(10),
+      roomID VARCHAR(10) PRIMARY KEY,
       roomName VARCHAR(70),
       users JSON
     )
@@ -106,10 +105,9 @@ with AccessDatabase() as cursor:
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS canvases (
-      id INT AUTO_INCREMENT PRIMARY KEY,
+      roomID VARCHAR(10) PRIMARY KEY,
       canvas BLOB,
       instructions JSON,
-      roomID VARCHAR(10)
     )
     '''
   )
@@ -141,13 +139,59 @@ Not tracking email anymore (until later)
  '''
 
 
+# ----------User Resources (include images)
+@app.route("/users", methods=["GET"])
+@handleError("getting user info failed")
+def getUserInfo():
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT (username, currentAvatar, imageIDs, rooms) FROM users WHERE userID = %s", (session["userID"],))
+
+    columns = cursor.column_names
+    values = cursor.fetchone()
+    userInfo = {columns[i]: values[i] for i in range(len(keys))}
+
+  return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
+
+@app.route("/users", methods=["PUT"])
+@handleError("Failed to update user info")
+def updateUserInfo():
+  data = request.get_json()
+  fields = data["fields"]
+  modifiedFields = ", ".join(f"{col} = %s" for col in fields.keys())
+  newValues = tuple(list(fields.values()) + [session["userID"]])
+
+  with AccessDatabase() as cursor:
+    cursor.execute(f"UPDATE users SET {modifiedFields} WHERE userID = %s", newValues)
+
+  return jsonify({"success":True}), 200
+
+@app.route("/users/images", methods=["POST"])
+@handleError("failed to upload image")
+def uploadNewImage():
+  rawImageData = request.get_data()
+  imageType = request.content_type
+  imageID = str(uuid.uuid4())
+  with AccessDatabase() as cursor:
+    cursor.execute("INSERT INTO images (image, mimeType, imageID, owner) VALUES (%s, %s, %s,%s)", (rawImageData, imageType, newImageID, session["userID"]))
+  return {"success": True, "data": {"imageID": imageID}}, 200
+
+@app.route("/users/<username>/images/<imageID>", methods=["GET"])
+@handleError("failed to get image")
+def getImage(username, imageID):
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
+    imageInfo = cursor.fetchone()
+  return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
+
+
+
 #----------- Room Resources (include messages, canvases)
 @app.route("/rooms", methods=["POST"])
 @handleError("failed to create room")
 def createRoom():
   data = request.get_json()
   roomName = data["roomName"]
-  username = data["username"]
+  
   with AccessDatabase() as cursor:
     exists = True
     while (exists):
@@ -155,8 +199,9 @@ def createRoom():
       cursor.execute("SELECT 1 from rooms WHERE roomID=%s",(roomID,))
       exists = cursor.fetchone() is not None
 
-    cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, roomName, json.dumps([username])))
-
+    cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, roomName, json.dumps([session["userID"]])))
+    cursor.execute("UPDATE users SET rooms = JSON_ARRAY_APPEND(rooms,'$',%s) WHERE userID = %s", (roomID, session["userID"]))
+    # store empty canvas 
     canvasImg = Image.new(mode = "RGBA", size=(1000,1000), color=(0,0,0,0))
     buffer = io.BytesIO()
     canvasImg.save(buffer, format="PNG")
@@ -169,53 +214,20 @@ def createRoom():
 @handleError("failed to validate room")
 def checkRoomExists(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT * FROM rooms where roomID=%s",(roomID,))
+    cursor.execute("SELECT 1 FROM rooms where roomID=%s",(roomID,))
     exists = cursor.fetchone() is not None
   return jsonify({"success":True,"data": {"exists": exists}}), 200
-
-
-@app.route("/rooms/<roomID>/messages", methods=["POST"])
-@handleError("failed to create message")
-def createMessage(roomID):
-  data = request.get_json()
-  username = data["username"]
-  content = data["content"]
-  timestamp = data["metadata"]["timestamp"]
-  messageID = data["metadata"]["messageID"]
-  with AccessDatabase() as cursor:
-    cursor.execute("INSERT INTO messages (roomID, username, content, timestamp, messageID) VALUES (%s, %s, %s, %s, %s)", (roomID, username, content, timestamp, messageID))
-    
-  return jsonify({"success":True}),200
-
-@app.route("/rooms/<roomID>/messages", methods=["GET"])
-@handleError("Failed to get room messages")
-def getMessages(roomID):
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, content, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
-    messages = cursor.fetchall()
-    jsonMessages = [
-      {
-        "username": lst[0],
-        "content": lst[1],
-        "metadata": {
-          "timestamp": lst[2],
-          "messageID": lst[3] 
-        }
-      } for lst in messages
-    ]
-  return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
-
 
 @app.route("/rooms/<roomID>/users", methods=["PUT"])
 @handleError("failed to add room user")
 def addRoomUser(roomID):
-  data = request.get_json()
-  username = data["username"]
-
   with AccessDatabase() as cursor:
     cursor.execute('''
     UPDATE rooms SET users = JSON_ARRAY_APPEND(users, '$', %s)
-    WHERE roomID = %s AND JSON_CONTAINS(users, %s, '$') = 0''',(username, roomID, f'"{username}"'))
+    WHERE roomID = %s AND NOT JSON_CONTAINS(users, %s, '$')''',(session["userID"], roomID, json.dumps(session["userID"])))
+    cursor.execute('''
+    UPDATE users SET rooms = JSON_ARRAY_APPEND(rooms,'$',%s)
+    WHERE userID = %s AND NOT JSON_CONTAINS(rooms, %s, '$')''', (roomID, session["userID"], json.dumps(roomID)))
 
   return jsonify({"success": True}), 200
 
@@ -223,15 +235,67 @@ def addRoomUser(roomID):
 @handleError("Failed to get room users")
 def getRoomUsers(roomID):
   with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    isRoomMember = cursor.fetchone() is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to get room users")
+    
     cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (roomID,))
     users = json.loads(cursor.fetchone()[0])
   return jsonify({"success":True,"data": {"users": users}}), 200
+
+
+@app.route("/rooms/<roomID>/messages", methods=["POST"])
+@handleError("failed to create message")
+def storeMessage(roomID):
+  data = request.get_json()
+  message = data["message"]
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT username FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    fetchedUsername = cursor.fetchone()
+    isRoomMember = fetchedUsername is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to add messages")
+    
+    cursor.execute("INSERT INTO messages (messageID, roomID, username, content, timestamp) VALUES (%s, %s, %s, %s, %s)", 
+    (message["messageID"], roomID, fetchedUsername[0], message["content"], message["timestamp"]))
+    
+  return jsonify({"success":True}),200
+
+@app.route("/rooms/<roomID>/messages", methods=["GET"])
+@handleError("Failed to get room messages")
+def getMessages(roomID):
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    isRoomMember = cursor.fetchone() is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to see the room messages")
+    
+    cursor.execute("SELECT username, content, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
+    messages = cursor.fetchall()
+    jsonMessages = [
+      {
+        "username": tpl[0],
+        "content": tpl[1],
+        "metadata": {
+          "timestamp": tpl[2],
+          "messageID": tpl[3] 
+        }
+      } for tpl in messages
+    ]
+  return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
+
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["PUT"])
 @handleError("failed to update canvas snapshot")
 def updateCanvasSnapshot(roomID):
   canvasBytes = request.get_data()
   with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    isRoomMember = cursor.fetchone() is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to update the canvas snapshot")
+    
     cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
   return {"success": True}, 200
 
@@ -239,6 +303,11 @@ def updateCanvasSnapshot(roomID):
 @handleError("failed to get canvas snapshot")
 def getCanvasSnapshot(roomID):
   with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    isRoomMember = cursor.fetchone() is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to get the canvas snapshot")
+
     cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s",(roomID,))
     canvasBytes = cursor.fetchone()[0]
   return Response(canvasBytes, mimetype='application/octet-stream', status=200)
@@ -249,6 +318,11 @@ def updateCanvasInstructions(roomID):
   data = request.get_json()
   instructions = data["instructions"]
   with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    isRoomMember = cursor.fetchone() is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to update the canvas instructions")
+
     cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(instructions), roomID))
   return {"success": True}, 200
 
@@ -256,64 +330,23 @@ def updateCanvasInstructions(roomID):
 @handleError("failed to get canvas instructions")
 def getCanvasInstructions(roomID):
   with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
+    isRoomMember = cursor.fetchone() is not None
+    if (not isRoomMember):
+      raise Exception("this nosy nonmember wants to get the canvas instructions")
+
     cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
     instructions = loads(cursor.fetchone()[0])
   return {"success": True, "data": {"instructions": instructions}}, 200
 
-
-# ----------User Resources (include images)
-@app.route("/users", methods=["GET"])
-@handleError("getting user info failed")
-def getUserInfo():
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT (username, currentAvatar, imageIDs) FROM users WHERE userID = %s", (session["userID"],))
-
-    columns = cursor.column_names
-    values = cursor.fetchone()
-    userInfo = {columns[i]: values[i] for i in range(len(keys))}
-
-  return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
-
-@app.route("/users", methods=["PUT"])
-@handleError("Failed to modify user info")
-def updateUser(username):
-  data = request.get_json()
-  modifiedFields = ", ".join(f"{col} = %s" for col in data.keys())
-  newValues = tuple(list(data.values()) + [session["userID"]])
-
-  with AccessDatabase() as cursor:
-    cursor.execute(f"UPDATE users SET {modifiedFields} WHERE userID = %s", newValues)
-
-  return jsonify({"success":True}), 200
-
-@app.route("/users/<username>/images", methods=["POST"])
-@handleError("failed to upload image")
-def uploadImage(username):
-  rawImageData = request.get_data()
-  imageType = request.content_type
-  imageID = str(uuid.uuid4())
-  with AccessDatabase() as cursor:
-    cursor.execute("INSERT INTO images (image, mimeType, imageID, owner) VALUES (%s, %s, %s,%s)", (rawImageData, imageType, newImageID, username))
-  return {"success": True, "data": {"imageID": imageID}}, 200
-
-@app.route("/users/<username>/images/<imageID>", methods=["GET"])
-@handleError("failed to get image")
-def getImage(username, imageID):
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
-    imageInfo = cursor.fetchone()
-  return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
-
-
 # Backend only functions
 def createUser():
   with AccessDatabase() as cursor:
-    userID = session["userID"]
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s", userID)
+    cursor.execute("SELECT 1 FROM users WHERE userID = %s", session["userID"])
     exists = cursor.fetchone() is not None
 
     if (not exists):
-      cursor.execute("INSERT INTO users (userID, username, currentAvatar, imageIDs) VALUES (%s, %s, %s, %s)", (userID, None, "willow", "[]"))
+      cursor.execute("INSERT INTO users (userID, username, currentAvatar, imageIDs) VALUES (%s, %s, %s, %s)", (session["userID"], None, "willow", "[]"))
 
 
 #-----------------AUTH0 STUFF------------------

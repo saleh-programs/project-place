@@ -13,59 +13,6 @@ function handleError(fn){
 }
 
 
-async function createRoomReq(roomName, username) {
-  const response = await fetch(baseurl + "createRoom",{
-    "method": "POST",
-    "headers" : {"Content-Type": "application/json"},
-    "body": JSON.stringify({"roomName": roomName, "username": username})
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new Error(data.message || "req failed")
-  }
-  return data.data
-}
-
-async function validateRoomReq(roomID) {
-  const response = await fetch(baseurl + "validateRoom",{
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"roomID":roomID})
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new error(data.message || "req failed")
-  }
-  return data.data
-}
-
-async function storeMessageReq(messageInfo) {
-  const response = await fetch(baseurl + "storeMessage",{
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify(messageInfo)
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new Error(data.message ||"req failed")
-  }
-  return data
-}
-
-async function getMessagesReq(roomID) {
-  const response = await fetch(baseurl + "getMessages",{
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"roomID":roomID})
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new Error(data.message ||"req failed")
-  }
-  return data.data
-}
-
-
 async function getUserInfoReq() {
   const response = await fetch(baseurl + "users",{
       "method": "GET",
@@ -77,13 +24,12 @@ async function getUserInfoReq() {
   }
   return data["data"]["userInfo"]
 }
-
-async function modifyUserInfoReq(modifiedFields) {
+async function updateUserInfoReq(modifiedFields) {
   const response = await fetch(baseurl + "users", {
     "method": "POST",
     "credentials": "include",
     "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify(modifiedFields)
+    "body": JSON.stringify({"fields": modifiedFields})
   })
   const data = await response.json()
   if (!data.success){
@@ -92,11 +38,11 @@ async function modifyUserInfoReq(modifiedFields) {
 
   return data
 }
-
-async function uploadNewImageReq(imageFile, username) {
+async function uploadNewImageReq(imageFile) {
   const rawImageData = new Uint8Array(await imageFile.arrayBuffer())
-  const response = await fetch(baseurl + "uploadNewImage" + `?owner=${username}` , {
+  const response = await fetch(baseurl + "users/images", {
     "method": "POST",
+    "credentials": "include",
     "headers": {"Content-Type": "application/octet-stream"},
     "body": rawImageData
   })
@@ -104,24 +50,90 @@ async function uploadNewImageReq(imageFile, username) {
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
-  return data.data
+  return data["data"]["imageID"]
 }
-async function updateUsernameReq(email, username){
-  const response = await fetch(baseurl + "updateUsername",{
+
+
+
+async function createRoomReq(roomName) {
+  const response = await fetch(baseurl + "rooms",{
     "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"email": email,"username": username})
+    "credentials": "include",
+    "headers" : {"Content-Type": "application/json"},
+    "body": JSON.stringify({"roomName": roomName})
   })
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
+  return data.data["roomID"]
+}
+async function checkRoomExistsReq(roomID) {
+  const response = await fetch(baseurl + `rooms/${roomID}/exists`,{
+    "method": "POST",
+    "credentials": "include",
+    "headers": {"Content-Type": "application/json"},
+    "body": JSON.stringify({"roomID":roomID})
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new error(data.message || "req failed")
+  }
+  return data.data["exists"]
+}
+async function addRoomUserReq(roomID) {
+  const response = await fetch(baseurl + `rooms/${roomID}/users`,{
+    "method": "PUT",
+    "credentials": "include",
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
   return data
 }
+async function getRoomUsersReq(roomID) {
+  const response = await fetch(baseurl + `rooms/${roomID}/users`,{
+    "method": "GET",
+    "credentials": "include"
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data.data["users"]
+}
 
-async function updateCanvasReq(canvasBuffer,roomID){
-  const response = await fetch(baseurl + "updateCanvas" + `?roomID=${roomID}`, {
+async function storeMessageReq(message) {
+  const response = await fetch(baseurl + `rooms/${roomID}/messages`,{
     "method": "POST",
+    "credentials": "include",
+    "headers": {"Content-Type": "application/json"},
+    "body": JSON.stringify({"message": message})
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data
+}
+async function getMessagesReq(roomID) {
+  const response = await fetch(baseurl + `rooms/${roomID}/messages`,{
+    "method": "GET",
+    "credentials": "include",
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data["data"]["messages"]
+}
+
+
+async function updateCanvasSnapshotReq(canvasBuffer,roomID){
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, {
+    "method": "PUT",
+    "credentials": "include",
     "headers": {"Content-Type": "application/octet-stream"},
     "body": canvasBuffer
   })
@@ -131,81 +143,57 @@ async function updateCanvasReq(canvasBuffer,roomID){
   }
   return data
 }
-
-async function updateInstructionsReq(instructions, roomID) {
-  const response = await fetch(baseurl + "updateInstructions" + `?roomID=${roomID}`, {
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify(instructions)
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new Error(data.message || "req failed")
-  }
-  return data
-}
-async function getCanvasReq(roomID){
-  const response = await fetch(baseurl + "getCanvas" + `?roomID=${roomID}`, {
+async function getCanvasSnapshotReq(roomID){
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, {
     "method": "GET",
+    "credentials": "include"
   })
   if (response.status !== 200){
-    throw new Error(data.message || "req failed")
+    throw new Error("req failed")
   }
   const webBuffer = await response.arrayBuffer() 
   return Buffer.from(webBuffer)
 }
-async function getInstructionsReq(roomID){
-  const response = await fetch(baseurl + "getInstructions" + `?roomID=${roomID}`, {
-    "method": "GET",
+
+async function updateCanvasInstructionsReq(instructions, roomID) {
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, {
+    "method": "PUT",
+    "credentials": "include",
+    "headers": {"Content-Type": "application/json"},
+    "body": JSON.stringify({"instructions": instructions})
   })
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
-  return data.data
-}
-
-async function getRoomUsersReq(roomID) {
-  const response = await fetch(baseurl + "getRoomUsers",{
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"roomID": roomID})
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new Error(data.message ||"req failed")
-  }
-  return data.data
-}
-
-async function addRoomUserReq(username, roomID) {
-  const response = await fetch(baseurl + "addRoomUser",{
-    "method": "POST",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"username": username,"roomID": roomID})
-  })
-  const data = await response.json()
-  if (!data.success){
-    throw new Error(data.message ||"req failed")
-  }
   return data
 }
+async function getCanvasInstructionsReq(roomID){
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, {
+    "method": "GET",
+    "credentials": "include"
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
+  }
+  return data["data"]["instructions"]
+}
 
-createRoomReq = handleError(createRoomReq)
-validateRoomReq = handleError(validateRoomReq)
-storeMessageReq = handleError(storeMessageReq)
-getMessagesReq = handleError(getMessagesReq)
-getSessionUserInfoReq = handleError(getSessionUserInfoReq)
 getUserInfoReq = handleError(getUserInfoReq)
-modifyUserInfoReq = handleError(modifyUserInfoReq)
+updateUserInfoReq = handleError(updateUserInfoReq)
 uploadNewImageReq = handleError(uploadNewImageReq)
-updateUsernameReq = handleError(updateUsernameReq)
-updateCanvasReq = handleError(updateCanvasReq)
-updateInstructionsReq = handleError(updateInstructionsReq)
-getCanvasReq = handleError(getCanvasReq)
-getInstructionsReq = handleError(getInstructionsReq)
+createRoomReq = handleError(createRoomReq)
+checkRoomExistsReq = handleError(checkRoomExistsReq)
 getRoomUsersReq = handleError(getRoomUsersReq)
 addRoomUserReq = handleError(addRoomUserReq)
+storeMessageReq = handleError(storeMessageReq)
+getMessagesReq = handleError(getMessagesReq)
+updateCanvasSnapshotReq = handleError(updateCanvasSnapshotReq)
+getCanvasSnapshotReq = handleError(getCanvasSnapshotReq)
+updateCanvasInstructionsReq = handleError(updateCanvasInstructionsReq)
+getCanvasInstructionsReq = handleError(getCanvasInstructionsReq)
+
 
 
 function getUniqueMessageID(){
@@ -217,7 +205,6 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 
-export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateInstructionsReq, getInstructionsReq,
-  createRoomReq, validateRoomReq, storeMessageReq, getMessagesReq, getUserInfoReq, modifyUserInfoReq, 
-  uploadNewImageReq,
-  updateUsernameReq, getCanvasReq, updateCanvasReq}
+export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
+  createRoomReq, checkRoomExistsReq, storeMessageReq, getMessagesReq, getUserInfoReq, updateUserInfoReq, 
+  uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}
