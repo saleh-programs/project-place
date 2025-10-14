@@ -34,8 +34,13 @@ const mediaCodecs = [
 
 let worker;
 mediasoup.createWorker()
-.then(res => {
-  worker = res
+.then(w => {
+  worker = w;
+})
+let token;
+getToken()
+.then(t =>{
+  token = t;
 })
 
 
@@ -71,10 +76,10 @@ wsServer.on("connection", (connection, request)=>{
     }
   }
 
-  sendServerInfo(uuid)
+  sendServerInfo(uuid);
   
-  connection.on("message",(data)=>handleMessage(data, uuid))
-  connection.on("close",()=>handleClose(uuid))
+  connection.on("message",(data)=>handleMessage(data, uuid));
+  connection.on("close",()=>handleClose(uuid));
 })
 
 // Handle new messages / close
@@ -85,11 +90,11 @@ function handleClose(uuid){
   delete connections[uuid]
   delete users[uuid]
 
-  if (rooms[roomID]["users"] == 0){
+  if (rooms[roomID]["users"].length === 0){
     rooms[roomID]["whiteboard"]["canvas"].getContext("2d").putImageData(rooms[roomID]["whiteboard"]["snapshot"],0,0)
     const savedCanvasBuffer = rooms[roomID]["whiteboard"]["canvas"].toBuffer("image/png")
-    updateCanvasSnapshotReq(savedCanvasBuffer, roomID)
-    updateCanvasInstructionsReq(rooms[roomID]["operations"], roomID)
+    updateCanvasSnapshotReq(savedCanvasBuffer, roomID, token)
+    updateCanvasInstructionsReq(rooms[roomID]["operations"], roomID, token)
 
     rooms[roomID]["groupcall"]["router"].close()
     delete rooms[roomID]
@@ -120,9 +125,8 @@ function handleMessage(data, uuid){
 
 //Process messages respective of origins
 async function processChat(data, uuid){
-  // store message in database before broadcasting 
   const {origin, type, ...msgToStore} = data
-  await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]})
+  await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]}, token)
 
   broadcastAll(uuid, data, toSender=true)
 }
@@ -322,7 +326,7 @@ async function sendServerInfo(uuid) {
   const roomID = users[uuid]["roomID"]
   const connection = connections[uuid]
 
-  const roomHistories = [getRoomUsersReq(roomID), getMessagesReq(roomID)]
+  const roomHistories = [getRoomUsersReq(roomID, token), getMessagesReq(roomID, token)]
   let initializing = false
 
   if (roomID in rooms){
@@ -333,24 +337,24 @@ async function sendServerInfo(uuid) {
     initializing = true
     const canvas = createCanvas(1000,1000)
     roomHistories.push(
-      getCanvasSnapshotReq(roomID)
+      getCanvasSnapshotReq(roomID, token)
       .then(buffer => loadImage(buffer))
       .then(img => {
         canvas.getContext("2d").drawImage(img,0,0);
         return canvas
       }))
-    roomHistories.push(getCanvasInstructionsReq(roomID))
+    roomHistories.push(getCanvasInstructionsReq(roomID, token))
   }
-  const [roomUsers, chatHistory, canvas, instructions] = await Promise.all(roomHistories)
+  const [roomUsers, chatHistory, canvasSnapshot, canvasInstructions] = await Promise.all(roomHistories)
 
   if (initializing){
     rooms[roomID] = {
       "users": [uuid],
       "whiteboard": {
-        "snapshot": canvas.getContext("2d").getImageData(0,0,canvas.width, canvas.height),
-        "canvas": canvas,
-        "operations": instructions,
-        "latestOp": instructions.length - 1
+        "snapshot": canvasSnapshot.getContext("2d").getImageData(0,0,canvasSnapshot.width, canvasSnapshot.height),
+        "canvas": canvasSnapshot,
+        "operations": canvasInstructions,
+        "latestOp": canvasInstructions.length - 1
         },
       "groupcall": {
         "router": await worker.createRouter({mediaCodecs}),
@@ -360,12 +364,6 @@ async function sendServerInfo(uuid) {
       }
     }
   }
-
-  const opsBuffer = Buffer.from(JSON.stringify(instructions))
-  const canvasBuffer = canvas.toBuffer("image/png")
-  const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
-  canvasInfo.writeUInt32BE(opsBuffer.length, 0)
-  canvasInfo.writeInt8(rooms[roomID]["whiteboard"]["latestOp"], 4)
 
   connection.send(JSON.stringify({
     "origin": "user",
@@ -385,7 +383,13 @@ async function sendServerInfo(uuid) {
     }
   }))
 
+  const opsBuffer = Buffer.from(JSON.stringify(canvasInstructions))
+  const canvasBuffer = canvasSnapshot.toBuffer("image/png")
+  const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
+  canvasInfo.writeUInt32BE(opsBuffer.length, 0)
+  canvasInfo.writeInt8(rooms[roomID]["whiteboard"]["latestOp"], 4)
   connection.send(canvasInfo)
+  
   initializing && redrawCanvas(roomID)
 }
 
@@ -418,8 +422,31 @@ function broadcastOne(uuid, data, peerUsername){
       return
     }
   }
-
 }
+async function getToken() {
+  try {
+      const response = await fetch('https://dev-projectplace.us.auth0.com/oauth/token', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          "client_id":"SSFgwe9fepsAecFde32FpkMumdQfq9uU",
+          "client_secret":"kYYPqNp-MUKJnfbTlv-6knpaCxcXxANWj2hq0MCg_LwnYb3d1i249XofPMfEOKJ8",
+          "audience":"http://projectplace/backend",
+          "grant_type":"client_credentials"
+        }),
+      });
+
+      if (!response.ok) {
+          throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      console.log("received token", data);
+      return data["access_token"]
+  } catch (error) {
+      console.error('Error fetching token:', error);
+  }
+};
 
 // Canvas/Drawing
 function handleCanvasAction(data, roomID){

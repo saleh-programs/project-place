@@ -60,14 +60,26 @@ def handleError(errorMessage):
     @wraps(func)
     def wrapper(*args, **kwargs):
       try:
-        decodedToken = jwt.decode(session["user"]["access_token"], key=JWKS)
-        decodedToken.validate()
         return func(*args, **kwargs)
       except Exception as e:
         print(e)
         return jsonify({"success": False, "message": errorMessage}), 500
     return wrapper
   return decorator
+
+def authenticateClient(func):
+  def wrapper(*args, **kwargs):
+    decodedToken = jwt.decode(session["user"]["access_token"], key=JWKS)
+    decodedToken.validate()
+    return func(*args, **kwargs)
+  return wrapper
+def authenticateServer(func):
+  def wrapper(*args, **kwargs):
+    token = request.headers.get("authorization").split(" ")[1]
+    decodedToken = jwt.decode(token, key=JWKS)
+    decodedToken.validate()
+    return func(*args, **kwargs)
+  return wrapper
 
 
 with AccessDatabase() as cursor:
@@ -142,6 +154,7 @@ Not tracking email anymore (until later)
 # ----------User Resources (include images)
 @app.route("/users", methods=["GET"])
 @handleError("getting user info failed")
+@authenticateClient
 def getUserInfo():
   with AccessDatabase() as cursor:
     cursor.execute("SELECT username, currentAvatar, imageIDs, rooms FROM users WHERE userID = %s", (session["userID"],))
@@ -154,6 +167,7 @@ def getUserInfo():
 
 @app.route("/users", methods=["PUT"])
 @handleError("Failed to update user info")
+@authenticateClient
 def updateUserInfo():
   data = request.get_json()
   fields = data["fields"]
@@ -167,6 +181,7 @@ def updateUserInfo():
 
 @app.route("/users/images", methods=["POST"])
 @handleError("failed to upload image")
+@authenticateClient
 def uploadNewImage():
   rawImageData = request.get_data()
   imageType = request.content_type
@@ -177,6 +192,7 @@ def uploadNewImage():
 
 @app.route("/users/<username>/images/<imageID>", methods=["GET"])
 @handleError("failed to get image")
+@authenticateClient
 def getImage(username, imageID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
@@ -188,6 +204,7 @@ def getImage(username, imageID):
 #----------- Room Resources (include messages, canvases)
 @app.route("/rooms", methods=["POST"])
 @handleError("failed to create room")
+@authenticateClient
 def createRoom():
   data = request.get_json()
   roomName = data["roomName"]
@@ -212,6 +229,7 @@ def createRoom():
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
 @handleError("failed to validate room")
+@authenticateClient
 def checkRoomExists(roomID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT 1 FROM rooms where roomID=%s",(roomID,))
@@ -220,6 +238,7 @@ def checkRoomExists(roomID):
 
 @app.route("/rooms/<roomID>/users", methods=["PUT"])
 @handleError("failed to add room user")
+@authenticateClient
 def addRoomUser(roomID):
   with AccessDatabase() as cursor:
     cursor.execute('''
@@ -233,13 +252,9 @@ def addRoomUser(roomID):
 
 @app.route("/rooms/<roomID>/users", methods=["GET"])
 @handleError("Failed to get room users")
+@authenticateServer
 def getRoomUsers(roomID):
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    isRoomMember = cursor.fetchone() is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to get room users")
-    
+  with AccessDatabase() as cursor:    
     cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (roomID,))
     users = json.loads(cursor.fetchone()[0])
   return jsonify({"success":True,"data": {"users": users}}), 200
@@ -247,30 +262,21 @@ def getRoomUsers(roomID):
 
 @app.route("/rooms/<roomID>/messages", methods=["POST"])
 @handleError("failed to create message")
+@authenticateServer
 def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT username FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    fetchedUsername = cursor.fetchone()
-    isRoomMember = fetchedUsername is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to add messages")
-    
+  with AccessDatabase() as cursor:  
     cursor.execute("INSERT INTO messages (messageID, roomID, username, content, timestamp) VALUES (%s, %s, %s, %s, %s)", 
-    (message["messageID"], roomID, fetchedUsername[0], message["content"], message["timestamp"]))
+    (message["messageID"], roomID, message["username"], message["content"], message["timestamp"]))
     
   return jsonify({"success":True}),200
 
 @app.route("/rooms/<roomID>/messages", methods=["GET"])
 @handleError("Failed to get room messages")
+@authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    isRoomMember = cursor.fetchone() is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to see the room messages")
-    
     cursor.execute("SELECT username, content, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
     messages = cursor.fetchall()
     jsonMessages = [
@@ -288,53 +294,37 @@ def getMessages(roomID):
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["PUT"])
 @handleError("failed to update canvas snapshot")
+@authenticateServer
 def updateCanvasSnapshot(roomID):
   canvasBytes = request.get_data()
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    isRoomMember = cursor.fetchone() is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to update the canvas snapshot")
-    
+  with AccessDatabase() as cursor:    
     cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["GET"])
 @handleError("failed to get canvas snapshot")
+@authenticateServer
 def getCanvasSnapshot(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    isRoomMember = cursor.fetchone() is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to get the canvas snapshot")
-
     cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s",(roomID,))
     canvasBytes = cursor.fetchone()[0]
   return Response(canvasBytes, mimetype='application/octet-stream', status=200)
 
 @app.route("/rooms/<roomID>/canvas/instructions", methods=["PUT"])
 @handleError("failed to update canvas instructions")
+@authenticateServer
 def updateCanvasInstructions(roomID):
   data = request.get_json()
   instructions = data["instructions"]
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    isRoomMember = cursor.fetchone() is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to update the canvas instructions")
-
     cursor.execute("UPDATE canvases SET instructions = %s WHERE roomID = %s", (json.dumps(instructions), roomID))
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/instructions", methods=["GET"])
 @handleError("failed to get canvas instructions")
+@authenticateServer
 def getCanvasInstructions(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE userID = %s AND JSON_CONTAINS(rooms, %s, '$')", (session["userID"], roomID))
-    isRoomMember = cursor.fetchone() is not None
-    if (not isRoomMember):
-      raise Exception("this nosy nonmember wants to get the canvas instructions")
-
     cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
     instructions = loads(cursor.fetchone()[0])
   return {"success": True, "data": {"instructions": instructions}}, 200

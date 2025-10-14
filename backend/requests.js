@@ -95,36 +95,68 @@ async function addRoomUserReq(roomID) {
   }
   return data
 }
-async function getRoomUsersReq(roomID) {
-  const response = await fetch(baseurl + `rooms/${roomID}/users`,{
-    "method": "GET",
-    "credentials": "include"
-  })
+async function getRoomUsersReq(roomID, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "GET",
+      "headers": {"authorization": `Bearer ${token}`}
+    }
+  }else{
+    options = {
+      "method": "GET",
+      "credentials": "include"
+    }
+  }
+
+  const response = await fetch(baseurl + `rooms/${roomID}/users`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
   }
-  return data.data["users"]
+  return data["data"]["users"]
 }
 
-async function storeMessageReq(message) {
-  const response = await fetch(baseurl + `rooms/${roomID}/messages`,{
-    "method": "POST",
-    "credentials": "include",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"message": message})
-  })
+async function storeMessageReq(message, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`
+      },
+      "body": JSON.stringify({"message": message})
+    }
+  }else{
+    options = {
+      "method": "POST",
+      "credentials": "include",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"message": message})
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
   }
   return data
 }
-async function getMessagesReq(roomID) {
-  const response = await fetch(baseurl + `rooms/${roomID}/messages`,{
-    "method": "GET",
-    "credentials": "include",
-  })
+async function getMessagesReq(roomID, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "GET",
+      "headers": {"authorization": `Bearer ${token}`}
+    }
+  }else{
+    options = {
+      "method": "GET",
+      "credentials": "include",
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/messages`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -133,24 +165,46 @@ async function getMessagesReq(roomID) {
 }
 
 
-async function updateCanvasSnapshotReq(canvasBuffer,roomID){
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, {
+async function updateCanvasSnapshotReq(canvasBuffer,roomID, token=null){
+  let options;
+  if (token){
+    options = {
+    "method": "PUT",
+    "headers": {
+      "Content-Type": "application/octet-stream",
+      "authorization": `Bearer ${token}`
+    },
+    "body": canvasBuffer
+  }
+  }else{
+    options = {
     "method": "PUT",
     "credentials": "include",
     "headers": {"Content-Type": "application/octet-stream"},
     "body": canvasBuffer
-  })
+    } 
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
   return data
 }
-async function getCanvasSnapshotReq(roomID){
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, {
-    "method": "GET",
-    "credentials": "include"
-  })
+async function getCanvasSnapshotReq(roomID, token=null){
+  let options;
+  if (token){
+    options = {
+      "method": "GET",
+      "headers": {"authorization": `Bearer ${token}`}
+    }
+  }else{
+    options = {
+      "method": "GET",
+      "credentials": "include",
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, options)
   if (response.status !== 200){
     throw new Error("req failed")
   }
@@ -158,24 +212,46 @@ async function getCanvasSnapshotReq(roomID){
   return Buffer.from(webBuffer)
 }
 
-async function updateCanvasInstructionsReq(instructions, roomID) {
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, {
-    "method": "PUT",
-    "credentials": "include",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"instructions": instructions})
-  })
+async function updateCanvasInstructionsReq(instructions, roomID, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "PUT",
+      "headers": {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`
+      },
+      "body": JSON.stringify({"instructions": instructions})
+    }
+  }else{
+    options = {
+      "method": "PUT",
+      "credentials": "include",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"instructions": instructions})
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
   return data
 }
-async function getCanvasInstructionsReq(roomID){
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, {
-    "method": "GET",
-    "credentials": "include"
-  })
+async function getCanvasInstructionsReq(roomID, token=null){
+  let options;
+  if (token){
+    options = {
+      "method": "GET",
+      "headers": {"authorization": `Bearer ${token}`}
+    }
+  }else{
+    options = {
+      "method": "GET",
+      "credentials": "include",
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
