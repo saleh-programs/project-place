@@ -42,12 +42,12 @@ async function updateUserInfoReq(modifiedFields) {
   return data
 }
 async function uploadNewImageReq(imageFile) {
-  const rawImageData = new Uint8Array(await imageFile.arrayBuffer())
+  const fileInfo = new FormData()
+  fileInfo.append("img", imageFile)
   const response = await fetch(baseurl + "users/images", {
     "method": "POST",
     "credentials": "include",
-    "headers": {"Content-Type": "application/octet-stream"},
-    "body": rawImageData
+    "body": fileInfo
   })
   const data = await response.json()
   if (!data.success){

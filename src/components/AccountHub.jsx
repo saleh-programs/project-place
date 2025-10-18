@@ -20,11 +20,11 @@ function AccountHub(){
       {roomID}
       <section className={styles.header}>
         <span className={`profilePic ${styles.changeImage}`} onClick={()=>setIsChangingImage(!isChangingImage)}>
-          {/* <img src={userInfo["profilePicURL"]} alt="nth" /> */}
+          <img src={userInfo["profilePicURL"]} alt="nth" />
         </span>
         {
           isChangingImage &&
-          <ChooseImage {...{setIsChangingImage, username,userInfo,setUserInfo, sendJsonMessage}}/>
+          <ChooseImage {...{setIsChangingImage, username, userInfo,setUserInfo, sendJsonMessage}}/>
         }
         <span className={styles.username}>{username}</span>
       </section>

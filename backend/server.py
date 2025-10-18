@@ -10,7 +10,7 @@ from functools import wraps
 from authlib.integrations.flask_client import OAuth
 from authlib.jose import JsonWebToken, JsonWebKey
 import requests
-from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for
+from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for, send_file
 from flask_cors import CORS
 import uuid
 from dotenv import load_dotenv
@@ -68,12 +68,14 @@ def handleError(errorMessage):
   return decorator
 
 def authenticateClient(func):
+  @wraps(func)
   def wrapper(*args, **kwargs):
     decodedToken = jwt.decode(session["user"]["access_token"], key=JWKS)
     decodedToken.validate()
     return func(*args, **kwargs)
   return wrapper
 def authenticateServer(func):
+  @wraps(func)
   def wrapper(*args, **kwargs):
     token = request.headers.get("authorization").split(" ")[1]
     decodedToken = jwt.decode(token, key=JWKS)
@@ -88,8 +90,8 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS users (
       userID VARCHAR(100) PRIMARY KEY,
       username VARCHAR(70),
-      currentAvatar VARCHAR(50),
-      imageIDs JSON,
+      avatar VARCHAR(50),
+      images JSON,
       rooms JSON
     )
     '''
@@ -126,11 +128,7 @@ with AccessDatabase() as cursor:
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS images (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      image MEDIUMBLOB,
-      mimeType VARCHAR(100),      
-      imageID TEXT,
-      accessType VARCHAR(100),
+      path VARCHAR(300) PRIMARY KEY,
       owner VARCHAR(70)
     )
     '''
@@ -157,7 +155,7 @@ Not tracking email anymore (until later)
 @authenticateClient
 def getUserInfo():
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, currentAvatar, imageIDs, rooms FROM users WHERE userID = %s", (session["userID"],))
+    cursor.execute("SELECT username, avatar, images, rooms FROM users WHERE userID = %s", (session["userID"],))
 
     columns = cursor.column_names
     values = cursor.fetchone()
@@ -171,7 +169,15 @@ def getUserInfo():
 def updateUserInfo():
   data = request.get_json()
   fields = data["fields"]
-  modifiedFields = ", ".join(f"{col} = %s" for col in fields.keys())
+
+  modifiedFields = []
+  allowedToModify = ["username", "avatar", "images", "rooms"]
+  for col in fields.keys():
+    if col not in allowedToModify:
+      return {"success": False}
+    modifiedFields.append(f"{col} = %s")
+  modifiedFields = ", ".join(modifiedFields)
+
   newValues = tuple(list(fields.values()) + [session["userID"]])
 
   with AccessDatabase() as cursor:
@@ -183,21 +189,36 @@ def updateUserInfo():
 @handleError("failed to upload image")
 @authenticateClient
 def uploadNewImage():
-  rawImageData = request.get_data()
-  imageType = request.content_type
-  imageID = str(uuid.uuid4())
-  with AccessDatabase() as cursor:
-    cursor.execute("INSERT INTO images (image, mimeType, imageID, owner) VALUES (%s, %s, %s,%s)", (rawImageData, imageType, newImageID, session["userID"]))
-  return {"success": True, "data": {"imageID": imageID}}, 200
+  imageFile = request.files["img"]
+ 
+  extension = imageFile.filename.split(".")[-1]
+  allowedExtensions = ["png", "jpg", "jpeg", "webp"]
+  if extension not in allowedExtensions or len(extension) == len(imageFile.filename):
+    return {"success": False}, 500
 
-@app.route("/users/<username>/images/<imageID>", methods=["GET"])
+  imageID = str(uuid.uuid4()) + f".{extension}"
+  exposedPath = f"http://localhost:5000/users/images/{imageID}"
+  localPath = f"images/{imageID}"
+  imageFile.save(localPath)
+  with AccessDatabase() as cursor:
+    cursor.execute("INSERT INTO images (path, owner) VALUES (%s,%s)", (exposedPath, session["userID"]))
+  return {"success": True, "data": {"path": exposedPath}}, 200
+
+@app.route("/users/images/public/<imageID>", methods=["GET"])
 @handleError("failed to get image")
 @authenticateClient
-def getImage(username, imageID):
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT image, mimeType FROM images where imageID = %s",(imageID,))
-    imageInfo = cursor.fetchone()
-  return Response(imageInfo[0], mimetype=imageInfo[1], status=200)
+def getPublicImage(imageID):
+  if not os.path.exists(f"images/public/{imageID}"):
+    return {"success": False}, 500
+  return send_file(f"images/public/{imageID}", status=200)
+
+@app.route("/users/images/<imageID>", methods=["GET"])
+@handleError("failed to get image")
+@authenticateClient
+def getImage(imageID):
+  if not os.path.exists(f"images/{imageID}"):
+    return {"success": False}, 500
+  return send_file(f"images/{imageID}", status=200)
 
 
 
@@ -325,8 +346,9 @@ def updateCanvasInstructions(roomID):
 @authenticateServer
 def getCanvasInstructions(roomID):
   with AccessDatabase() as cursor:
+    print("am here?")
     cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
-    instructions = loads(cursor.fetchone()[0])
+    instructions = json.loads(cursor.fetchone()[0])
   return {"success": True, "data": {"instructions": instructions}}, 200
 
 # Backend only functions
@@ -336,7 +358,7 @@ def createUser():
     exists = cursor.fetchone() is not None
 
     if (not exists):
-      cursor.execute("INSERT INTO users (userID, username, currentAvatar, imageIDs) VALUES (%s, %s, %s, %s)", (session["userID"], None, "willow", "[]"))
+      cursor.execute("INSERT INTO users (userID, username, avatar, images) VALUES (%s, %s, %s, %s)", (session["userID"], None, "http://localhost:5000/users/images/willow.png", "[]"))
 
 
 #-----------------AUTH0 STUFF------------------
