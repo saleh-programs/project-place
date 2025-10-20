@@ -30,3 +30,7 @@ venv
 startDev.ps1
 startDev.sh
 logs.txt
+
+backend/images/*
+!backend/images/public
+!backend/images/public/**

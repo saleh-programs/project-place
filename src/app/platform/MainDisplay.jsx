@@ -8,11 +8,10 @@ import styles from "styles/components/MainDisplay.module.css"
 import Sidebar from "src/components/Sidebar"
 import { useRouter, usePathname } from "next/navigation"
 
-function MainDisplay({children, username, initialUserinfo}){
+function MainDisplay({children, username, initialUserInfo}){
   const router = useRouter()
   
-  const [userInfo, setUserInfo] = useState(initialUserinfo)
-
+  const [userInfo, setUserInfo] = useState(initialUserInfo)
   const [roomID, setRoomID] = useState("")
   const [userStates, setUserStates] = useState({})
 
@@ -161,7 +160,7 @@ function MainDisplay({children, username, initialUserinfo}){
 
   function rejectCall(peerName) {
       sendJsonMessage({
-      "username": username,
+      "username": username, 
       "origin": "peercall",
       "type": "callResponse",
       "data": {"status": "rejected", "peer": peerName}

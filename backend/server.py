@@ -90,7 +90,7 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS users (
       userID VARCHAR(100) PRIMARY KEY,
       username VARCHAR(70),
-      avatar VARCHAR(50),
+      avatar VARCHAR(300),
       images JSON,
       rooms JSON
     )
@@ -157,10 +157,14 @@ def getUserInfo():
   with AccessDatabase() as cursor:
     cursor.execute("SELECT username, avatar, images, rooms FROM users WHERE userID = %s", (session["userID"],))
 
-    columns = cursor.column_names
     values = cursor.fetchone()
-    userInfo = {columns[i]: values[i] for i in range(len(columns))}
-
+    print(values)
+    userInfo = {
+      "username": values[0],
+      "avatar": values[1],
+      "images": json.loads(values[2]),
+      "rooms": json.loads(values[3])
+    }
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
 @app.route("/users", methods=["PUT"])
@@ -210,7 +214,7 @@ def uploadNewImage():
 def getPublicImage(imageID):
   if not os.path.exists(f"images/public/{imageID}"):
     return {"success": False}, 500
-  return send_file(f"images/public/{imageID}", status=200)
+  return send_file(f"images/public/{imageID}"), 200
 
 @app.route("/users/images/<imageID>", methods=["GET"])
 @handleError("failed to get image")
@@ -218,7 +222,7 @@ def getPublicImage(imageID):
 def getImage(imageID):
   if not os.path.exists(f"images/{imageID}"):
     return {"success": False}, 500
-  return send_file(f"images/{imageID}", status=200)
+  return send_file(f"images/{imageID}"), 200
 
 
 
@@ -358,7 +362,7 @@ def createUser():
     exists = cursor.fetchone() is not None
 
     if (not exists):
-      cursor.execute("INSERT INTO users (userID, username, avatar, images) VALUES (%s, %s, %s, %s)", (session["userID"], None, "http://localhost:5000/users/images/willow.png", "[]"))
+      cursor.execute("INSERT INTO users (userID, username, avatar, images, rooms) VALUES (%s, %s, %s, %s, %s)", (session["userID"], None, "http://localhost:5000/users/images/public/willow.png", "[]","[]"))
 
 
 #-----------------AUTH0 STUFF------------------

@@ -1,62 +1,62 @@
 import styles from "styles/components/ChooseImage.module.css"
 import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
+import { useEffect, useState } from "react"
 
-function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo, sendJsonMessage}){
-  const publicImages = []// ["willow","dude","man"]
-  
+function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage}){
+  const [availableImages, setAvailableImages] = useState([])
+  const publicImages = [
+      "http://localhost:5000/users/images/public/willow.png",
+      "http://localhost:5000/users/images/public/man.png",
+      "http://localhost:5000/users/images/public/dude.png",
+    ]
+
+  useEffect(()=>{
+    setAvailableImages([...publicImages, ...userInfo["images"]]) 
+    console.log(userInfo["images"])
+  },[])
+
   async function setNewUserImage(imageURL){
-    const response = await updateUserInfoReq({"profilePicURL": imageURL, "username": username})
-    if (response){
-      setUserInfo(prev => {
-        return {
-          ...prev,
-          "profilePicURL": imageURL
-        }
-      })
-      sendJsonMessage({
-        "origin": "user",
-        "type": "userInfo",
-        "username": username,
-        "data": {
-          "imageURL": imageURL
-        }
-      })
-
-      setIsChangingImage(false)
+    const result = await updateUserInfoReq({"avatar": imageURL})
+    if (!result){
+      return
     }
+    setUserInfo(prev => {
+      return {
+        ...prev,
+        "avatar": imageURL
+      }
+    })
+    // sendJsonMessage({
+    //   "origin": "user",
+    //   "type": "userInfo",
+    //   "username": username, 
+    //   "data": {
+    //     "imageURL": imageURL
+    //   }
+    // })
 
+    setIsChangingImage(false)
   }
   async function uploadNewImage(e){ 
     const file = e.target.files[0]
-    const uploadImageRes = await uploadNewImageReq(file, username)
-    if (!uploadImageRes){
+    const newPath = await uploadNewImageReq(file)
+    console.log(newPath)
+    if (!newPath){
       return
     }
 
-    const oldImagesList = userInfo["images"]
-    let newImagesList = []
-    if (oldImagesList){
-      newImagesList = JSON.parse(oldImagesList)
-    }
-    newImagesList.push(uploadImageRes)
-    const newImagesListStr = JSON.stringify(newImagesList)
-    const modifyInfoRes = await updateUserInfoReq({"images": newImagesListStr, "username": username})
-    if (!modifyInfoRes){
+    let newImagesList = [...userInfo["images"], newPath]
+    const result = await updateUserInfoReq({"images": JSON.stringify(newImagesList)})
+    if (!result){
       return
     }
     setUserInfo((prev) => {
       return {
         ...prev,
-        "images": newImagesListStr
+        "images": newImagesList
       }
     })
-  }
-
-  function getUserImages(){
-    if (!userInfo["images"]){
-      return []
-    }
-    return JSON.parse(userInfo["images"])
+    setAvailableImages([...publicImages, ...newImagesList])
   }
 
   return(
@@ -64,30 +64,19 @@ function ChooseImage({setIsChangingImage, username,userInfo, setUserInfo, sendJs
       <h1>Choose your new Image</h1>
       <section className={styles.scrollableImages}>
         {
-          publicImages.map((item,i)=>{
-            const imageURL = `http://localhost:5000/getImage/${item}`
+          availableImages.map((imageURL)=>{
             return (
-            <div key={item} onClick={()=>setNewUserImage(imageURL)} className={styles.imgContainer}>
-              <img src={imageURL} alt="nth" /> 
-            </div>
-            )
-          })
-        }
-        {
-          getUserImages().map((item,i)=>{
-            const imageURL = `http://localhost:5000/getImage/${item}`
-            return (
-            <div key={item} onClick={()=>setNewUserImage(imageURL)} className={styles.imgContainer}>
-              <img src={imageURL} alt="nth" /> 
-            </div>
+              <div key={imageURL} onClick={()=>setNewUserImage(imageURL)} className={styles.imgContainer}>
+                <img src={imageURL} alt="nth" /> 
+              </div>
             )
           })
         }
       </section>
 
-      <label htmlFor="imageInput" className={styles.uploadImage}>
+      <label className={styles.uploadImage}>
         Upload a new Image
-        <input type="file" id="imageInput" hidden onChange={uploadNewImage}/>
+        <input type="file" hidden onChange={uploadNewImage}/>
       </label>
 
       <button className={styles.exit} onClick={()=>setIsChangingImage(false)}>

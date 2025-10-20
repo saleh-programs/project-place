@@ -53,7 +53,7 @@ async function uploadNewImageReq(imageFile) {
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
-  return data["data"]["imageID"]
+  return data["data"]["path"]
 }
 
 

@@ -15,12 +15,13 @@ function AccountHub(){
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
 
   const [isChangingImage, setIsChangingImage] = useState(false)
+
   return(
     <div className={styles.accountHub}>
       {roomID}
       <section className={styles.header}>
         <span className={`profilePic ${styles.changeImage}`} onClick={()=>setIsChangingImage(!isChangingImage)}>
-          <img src={userInfo["profilePicURL"]} alt="nth" />
+          <img src={userInfo["avatar"]} alt="nth" />
         </span>
         {
           isChangingImage &&
