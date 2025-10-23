@@ -6,12 +6,16 @@ import { getUniqueMessageID } from "backend/requests"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
-  const {externalChatRef, sendJsonMessage, roomID, messages, setMessages, username, userInfo, userStates, setUserStates} = useContext(ThemeContext)
+  const {externalChatRef, sendJsonMessage, roomID, messagesRef, username, userInfo, userStates, setUserStates} = useContext(ThemeContext)
 
+  const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
-  const rawMessagesRef = useRef({})
-  const [rawMessages, setRawMessages] = useState(rawMessagesRef.current)
+
+  const [groupedMessages, setGroupedMessages] = useState([])
+  const [mappedMessages, setMappedMessages] = useState({})
+
   const pendingMessages = useRef(new Set())
+
   const [darkMode, setDarkMode] = useState(false)  
 
   /*
@@ -20,7 +24,7 @@ function Chat(){
   {
     "username": string,
     "status": string,
-    "data": string,
+    "content": string,
     "metadata": {
       "timestamp": number,
       "messageID": string
@@ -36,6 +40,18 @@ function Chat(){
 
   useEffect(()=>{
     externalChatRef.current = externalChat
+    if (messagesRef.current.length > 0){
+      setGroupedMessages(prev => [...getGroupedMessages(messagesRef.current), ...prev])
+
+      const newMappedMessages = {}
+      messagesRef.current.forEach(mssg => {
+        newMappedMessages[mssg["metadata"]["messageID"]] = {
+          "status": "delivered",
+          ...mssg
+        }
+      })
+      setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
+    }
     return ()=>{
       externalChatRef.current = (param1) => {}
     }
@@ -93,48 +109,52 @@ function Chat(){
     }]
   }
 
-  function handleMessage(e) {
-    const currTime = Date.now()
-    if (messages.length > 0){
-      const lastMsg = rawMessagesRef.current[messages.at(-1)["messages"].at(-1)]
-      if (username === lastMsg["username"] && currTime - lastMsg["metadata"]["timestamp"] < 100){
-        return
-      }
+  function handleMessage() {
+    if (!canSendRef.current){
+      return
     }
+    canSendRef.current = false
+    setTimeout(()=>{
+      canSendRef.current = true
+    },100)
 
+    const currTime = Date.now()
     const messageID = getUniqueMessageID()
     const msg = {
-      "origin": "chat",
-      "type": "newMessage",
       "username": username,
-      "data": newMessage,
+      "content": newMessage,
       "metadata":{
         "timestamp": currTime,
         "messageID": messageID
       }
     }
-    sendJsonMessage(msg)
+    sendJsonMessage({
+      "origin": "chat",
+      "type": "newMessage",
+      "data": msg
+    })
     setNewMessage("")
-    const {origin, type, ...msgData} = msg
-    msgData["status"] = "pending"
 
-    pendingMessages.current.add(messageID)
-    rawMessagesRef.current = {
-      ...rawMessagesRef.current,
-      [messageID]: msgData
-    }
-    setRawMessages(rawMessagesRef.current)
-    setMessages(addGroupedMessage(messages, msgData))
+    msg["status"] = "pending"
+
+    setMappedMessages(prev => {return {...prev, [messageID]: msg }})
+    setGroupedMessages(prev => addGroupedMessage(prev, msg))
 
     setTimeout(()=>{
-        if (pendingMessages.current.has(messageID)){
-          rawMessagesRef.current = {
-              ...rawMessagesRef.current,
-            [messageID]: {...rawMessagesRef.current[messageID], "status": "failed"}
+      setMappedMessages(prev => {
+        if (prev[messageID]["status"] === "pending"){
+          return {
+            ...prev, 
+            [messageID]: {
+              ...prev[messageID],
+              "status": "failed"
+            }
           }
-          setRawMessages(rawMessagesRef.current)
-        }      
+        }
+        return prev
+    })   
     },3000)
+
   }
 
   // newMessage: update if pending image, else update grouped & raw messages
@@ -142,36 +162,44 @@ function Chat(){
   function externalChat(data){
     switch (data.type){
       case "newMessage":
-        const {origin, type, ...msg} = data
-        const msgID = data["metadata"]["messageID"]
-        if (pendingMessages.current.has(msgID)){
-          pendingMessages.current.delete(msgID)
-          rawMessagesRef.current = {
-            ...rawMessagesRef.current, 
-            [msgID]: {...rawMessagesRef.current[msgID], "status": "delivered"}
-          }
-          setRawMessages(rawMessagesRef.current)
-          return
-        }
-        
-        rawMessagesRef.current = {
-          ...rawMessagesRef.current,
-          [msgID]: {...msg, "status": "delivered"}
-        }
-        setRawMessages(rawMessagesRef.current)
-        setMessages(prev => addGroupedMessage(prev, data))
-        break
-      case "chatHistory":
-        if (data.data){
-          data.data.forEach(msg=>{
-            rawMessagesRef.current[msg["metadata"]["messageID"]] = {
-              ...msg,
-              "status": "delivered"
+        const msg = data.data
+
+        const messageID = msg["metadata"]["messageID"]
+
+        if (msg["username"] === username){
+          setMappedMessages(prev => {
+            return {
+              ...prev, 
+              [messageID]: {
+                ...prev[messageID],
+                "status": "delivered"
+              }
             }
           })
-          setRawMessages(rawMessagesRef.current)
-          setMessages(prev => [...getGroupedMessages(data.data), ...prev])
+          return
         }
+        setMappedMessages(prev => {
+          return {
+            ...prev, 
+            [messageID]: {
+              ...prev[messageID],
+              "status": "delivered"
+            }
+          }
+        })
+        setGroupedMessages(prev => addGroupedMessage(prev, msg))
+        break
+      case "chatHistory":
+        setGroupedMessages(prev => [...getGroupedMessages(messagesRef.current), ...prev])
+
+        const newMappedMessages = {}
+        messagesRef.current.forEach(mssg => {
+          newMappedMessages[mssg["metadata"]["messageID"]] = {
+            "status": "delivered",
+            ...mssg
+          }
+        })
+        setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
         break 
     }
   }
@@ -201,33 +229,34 @@ function Chat(){
       </h1>
       <section className={styles.chatDisplay}> 
         {
-          messages.map((item,i)=>{
-            const timestamp = new Date(item["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
+          groupedMessages.map((group)=>{
+            const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
             return (
-              <div key={item["timestamp"]} className={styles.messageContainer}>
+              <div key={group["timestamp"]} className={styles.messageContainer}>
                 <section className={styles.messageLeft}>
                   <span className={styles.timestamp}>
                     {timestamp}
                   </span>
                   <span className="profilePic">
-                    <img src={userStates[item["username"]]["avatar"]} alt="nth" />
+                    <img src={userStates[group["username"]]["avatar"]} alt="nth" />
                   </span>
                 </section>
                 <section className={styles.messageRight}>
                   <div className={styles.username}>
-                    {item["username"]}
+                    {group["username"]}
                   </div>
                   <div className={styles.textContainer}>
                     { 
-                      item["messages"].map((mssgID)=>{
-                      const mssg = rawMessages[mssgID]
-                      return (
-                        <div key={mssg["metadata"]["messageID"]} className={`${styles.message}`} style={{opacity: mssg["status"] !== "delivered" ? ".7": "1"}}>
-                          {mssg["data"]}
-                          {mssg["metadata"]["timestamp"]}
-                          {mssg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span>}
-                        </div>
-                      )})
+                      group["messages"].map((msgID)=>{
+                        const msg = mappedMessages[msgID]
+                        return (
+                          <div key={msgID} className={`${styles.message}`} style={{opacity: msg["status"] !== "delivered" ? ".7": "1"}}>
+                            {msg["content"]}
+                            {msg["metadata"]["timestamp"]}
+                            {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span>}
+                          </div>
+                        )
+                      })
                     }
                   </div>
 

@@ -73,10 +73,8 @@ async function createRoomReq(roomName) {
 }
 async function checkRoomExistsReq(roomID) {
   const response = await fetch(baseurl + `rooms/${roomID}/exists`,{
-    "method": "POST",
-    "credentials": "include",
-    "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"roomID":roomID})
+    "method": "GET",
+    "credentials": "include"
   })
   const data = await response.json()
   if (!data.success){
@@ -117,7 +115,7 @@ async function getRoomUsersReq(roomID, token=null) {
   return data["data"]["users"]
 }
 
-async function storeMessageReq(message, token=null) {
+async function storeMessageReq(message, roomID, token=null) {
   let options;
   if (token){
     options = {

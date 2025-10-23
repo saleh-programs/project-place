@@ -292,8 +292,8 @@ def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
   with AccessDatabase() as cursor:  
-    cursor.execute("INSERT INTO messages (messageID, roomID, username, content, timestamp) VALUES (%s, %s, %s, %s, %s)", 
-    (message["messageID"], roomID, message["username"], message["content"], message["timestamp"]))
+    cursor.execute("INSERT INTO messages (username, content, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s, %s)", 
+    (message["username"], message["content"], message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
     
   return jsonify({"success":True}),200
 

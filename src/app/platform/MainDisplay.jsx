@@ -13,9 +13,13 @@ function MainDisplay({children, username, initialUserInfo}){
   
   const [userInfo, setUserInfo] = useState(initialUserInfo)
   const [roomID, setRoomID] = useState("")
-  const [userStates, setUserStates] = useState({})
+  const [userStates, setUserStates] = useState({
+    [username]: {"avatar": initialUserInfo["avatar"]}
+  })
 
-  const [messages, setMessages] = useState([])
+  const messagesRef= useRef([])
+
+  
   const savedCanvasInfoRef = useRef({
     "snapshot": null,
     "operations": [],
@@ -47,9 +51,14 @@ function MainDisplay({children, username, initialUserInfo}){
       const data = JSON.parse(event.data)
       switch (data.origin){
         case "user":
-          updateUserStates(data)
+          // updateUserStates(data)
           break
         case "chat":
+          if (data.type === "chatHistory"){
+            messagesRef.current = data.data
+          }else if (data.type === "newMessage"){
+            messagesRef.current.push(data.data)
+          }
           externalChatRef.current(data)
           break
         case "whiteboard":
@@ -96,7 +105,7 @@ function MainDisplay({children, username, initialUserInfo}){
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
-    messages, setMessages
+    messagesRef
   }
 
   async function reconstructCanvas(data){
@@ -120,13 +129,13 @@ function MainDisplay({children, username, initialUserInfo}){
   }
 
   function updateUserStates(data){
-    switch (data["type"]){
+    switch (data.type){
       case "newUser":
         setUserStates(prev => {
           return ({
             ...prev, 
             [data["username"]]: {
-                "imageURL": data["imageURL"],
+                "avatar": data["imageURL"],
                 "status": "idle",
                 "location": "chat"
             }})
@@ -147,7 +156,7 @@ function MainDisplay({children, username, initialUserInfo}){
         console.log(data)
         data["data"].forEach(user => {
            users[user["username"]] = {
-            "imageURL": user["imageURL"],
+            "avatar": user["avatar"],
             "status": "idle",
             "location": "chat"          
           }

@@ -125,13 +125,11 @@ function handleMessage(data, uuid){
 
 //Process messages respective of origins
 async function processChat(data, uuid){
-  const {origin, type, ...msgToStore} = data
-  await storeMessageReq({...msgToStore, "roomID": users[uuid]["roomID"]}, token)
-
-  broadcastAll(uuid, data, toSender=true)
+  await storeMessageReq(data.data, users[uuid]["roomID"], token)
+  broadcastAll(uuid, data, true);
 }
 function processWhiteboard(data, uuid){
-  broadcastAll(uuid, data, toSender=false)
+  broadcastAll(uuid, data, false)
   handleCanvasAction(data, users[uuid]["roomID"] )
 }
 async function processGroupcall(data, uuid){
