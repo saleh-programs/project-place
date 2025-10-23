@@ -12,7 +12,7 @@ function Chat(){
   const rawMessagesRef = useRef({})
   const [rawMessages, setRawMessages] = useState(rawMessagesRef.current)
   const pendingMessages = useRef(new Set())
-  const [darkMode, setDarkMode] = useState(false)
+  const [darkMode, setDarkMode] = useState(false)  
 
   /*
 
@@ -46,57 +46,50 @@ function Chat(){
   // (messages in a group are sent in a 30 second interval from same user)
   function getGroupedMessages(messageList){
     const interval = 30000
-    const groupedMessages = []
+    const groups = []
     let group = null;
     let i = 0
+    
     while (i < messageList.length){
       const [user, timestamp, messageID] = [messageList[i]["username"], messageList[i]["metadata"]["timestamp"], messageList[i]["metadata"]["messageID"]]
-      group = {
-        "username": user,
-        "timestamp": timestamp,
-        "messages": [messageID]
-      }
-      i += 1
-      while (i < messageList.length){
-        const [nextUser, nextTimestamp, nextMessageID] = [messageList[i]["username"], messageList[i]["metadata"]["timestamp"], messageList[i]["metadata"]["messageID"]]
-        if (user === nextUser && nextTimestamp - timestamp < interval){
-          group["messages"].push(nextMessageID)
-          i += 1
-        }else{
-          groupedMessages.push(group)
-          group = null
-          break
+
+      if (!group || group["username"] !== user || timestamp - group["timestamp"] > interval){
+        group && groups.push(group)
+        group = {
+          "username": user,
+          "timestamp": timestamp,
+          "messages": [messageID]
         }
+        i += 1
+        continue
       }
+
+      i += 1
+      group["messages"].push(messageID)
     }
     if (group){
-      groupedMessages.push(group)
+      groups.push(group)
     }
-    return groupedMessages
+    
+    return groups
   }
+
   // Groups incoming messages
-  function addGroupedMessage(groupedMessages, message){
+  function addGroupedMessage(groups, message){
     const interval = 30000
     const [user, timestamp, messageID] = [message["username"], message["metadata"]["timestamp"], message["metadata"]["messageID"]]
-    if (groupedMessages.length === 0){
-      return [...groupedMessages, {
+    const lastGroup = groups.at(-1)
+    
+    if (groups.length === 0 || user !== lastGroup["username"] || timestamp - lastGroup["timestamp"] > interval){
+      return [...groups,{
         "username": user,
         "timestamp": timestamp,
         "messages": [messageID]
       }]
     }
-    const [lastUser, lastTimestamp] = [groupedMessages.at(-1)["username"], rawMessagesRef.current[groupedMessages.at(-1)["messages"].at(-1)]["metadata"]["timestamp"]]
-    if (user === lastUser && timestamp - lastTimestamp < interval){
-      const lastGroup = groupedMessages.at(-1)
-      return [...groupedMessages.slice(0, -1),{
-        ...lastGroup,
-        "messages": [...lastGroup["messages"], message["metadata"]["messageID"]]
-      }]
-    }
-    return [...groupedMessages, {
-      "username": message["username"],
-      "timestamp": message["metadata"]["timestamp"],
-      "messages": [message["metadata"]["messageID"]]
+    return [...groups.slice(0, -1),{
+      ...lastGroup,
+      "messages": [...lastGroup["messages"], messageID]
     }]
   }
 
@@ -143,7 +136,6 @@ function Chat(){
         }      
     },3000)
   }
-
 
   // newMessage: update if pending image, else update grouped & raw messages
   // chatHistory: add all existing chats to grouped & raw messages
@@ -218,7 +210,7 @@ function Chat(){
                     {timestamp}
                   </span>
                   <span className="profilePic">
-                    <img src={userStates[item["username"]]["imageURL"]} alt="nth" />
+                    <img src={userStates[item["username"]]["avatar"]} alt="nth" />
                   </span>
                 </section>
                 <section className={styles.messageRight}>

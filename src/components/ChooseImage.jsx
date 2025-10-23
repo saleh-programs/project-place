@@ -12,7 +12,6 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
 
   useEffect(()=>{
     setAvailableImages([...publicImages, ...userInfo["images"]]) 
-    console.log(userInfo["images"])
   },[])
 
   async function setNewUserImage(imageURL){

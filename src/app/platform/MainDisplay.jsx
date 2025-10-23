@@ -1,6 +1,6 @@
 "use client"
 import * as mediasoupClient from "mediasoup-client"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -174,7 +174,6 @@ function MainDisplay({children, username, initialUserInfo}){
         <Sidebar/>
         <div className={`pageContainer ${!roomID ? styles.dimScreen: ""}`}>
           {children}
-          hey
           {Object.keys(callOffers).map((name) => {
             return (
             <div key={name} className={styles.callNotification}>
