@@ -18,13 +18,18 @@ function MainDisplay({children, username, initialUserInfo}){
   })
 
   const messagesRef= useRef([])
-
-  
   const savedCanvasInfoRef = useRef({
     "snapshot": null,
     "operations": [],
     "latestOp": -1
   })
+
+  const siteHistoryRef = useRef({
+    "chatHistoryReceived": false,
+    "canvasHistoryReceived": false,
+    "userHistoryReceived": false
+  })
+
   const device = useRef(null)
   const [callOffers, setCallOffers] = useState({})
   const callOffersRef = useRef(callOffers)
@@ -36,7 +41,6 @@ function MainDisplay({children, username, initialUserInfo}){
   const externalPeercallRef = useRef((param1)=>{})
 
 
-  //Bug note when we go back to chat: if user not on chat page history not updated
   const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
       "username": username,
@@ -52,12 +56,29 @@ function MainDisplay({children, username, initialUserInfo}){
       switch (data.origin){
         case "user":
           // updateUserStates(data)
+
           break
         case "chat":
           if (data.type === "chatHistory"){
             messagesRef.current = data.data
-          }else if (data.type === "newMessage"){
+            siteHistoryRef.current["chatHistoryReceived"] = true;
+          }else if (data.type === "newMessage"){ 
             messagesRef.current.push(data.data)
+          }else if(data.type === "edit"){
+            messagesRef.current = messagesRef.current.map(msg => {
+              if (msg["metadata"]["messageID"] === data.data["messageID"]){
+                return {
+                  ...msg,
+                  "content": data.data["content"],
+                  "metadata": {...msg["metadata"], "edited": true}
+                }
+              }
+              return msg
+            })
+          }else if (data.type === "delete"){
+            messagesRef.current = messagesRef.current.filter(msg => {
+              return msg["metadata"]["messageID"] !== data.data["messageID"]
+            })
           }
           externalChatRef.current(data)
           break
@@ -101,7 +122,7 @@ function MainDisplay({children, username, initialUserInfo}){
   },roomID !== "")
 
   const shared = {
-    username,userInfo, setUserInfo, userStates, setUserStates,
+    siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,
@@ -126,6 +147,7 @@ function MainDisplay({children, username, initialUserInfo}){
     img.close()
 
     externalWhiteboardRef.current("restoreCanvas")
+    siteHistoryRef.current["canvasHistoryReceived"] = true;
   }
 
   function updateUserStates(data){
@@ -161,8 +183,8 @@ function MainDisplay({children, username, initialUserInfo}){
             "location": "chat"          
           }
         })
-        console.log(users)
         setUserStates(users)
+        siteHistoryRef.current["userHistoryReceived"] = true;
         break
     }
   }

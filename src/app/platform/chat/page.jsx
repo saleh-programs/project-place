@@ -6,15 +6,15 @@ import { getUniqueMessageID } from "backend/requests"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
-  const {externalChatRef, sendJsonMessage, roomID, messagesRef, username, userInfo, userStates, setUserStates} = useContext(ThemeContext)
+  const {externalChatRef, sendJsonMessage, roomID, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef} = useContext(ThemeContext)
 
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
+  const [editID, setEditID] = useState(null)
+  const [editMessage, setEditMessage] = useState("")
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
-
-  const pendingMessages = useRef(new Set())
 
   const [darkMode, setDarkMode] = useState(false)  
 
@@ -23,11 +23,12 @@ function Chat(){
   Message Structure:
   {
     "username": string,
-    "status": string,
     "content": string,
     "metadata": {
       "timestamp": number,
-      "messageID": string
+      "messageID": string,
+      "edited": boolean,
+      "status": string
       },
   }
   Grouped Message Structure:
@@ -40,17 +41,20 @@ function Chat(){
 
   useEffect(()=>{
     externalChatRef.current = externalChat
-    if (messagesRef.current.length > 0){
-      setGroupedMessages(prev => [...getGroupedMessages(messagesRef.current), ...prev])
+    if (siteHistoryRef.current["chatHistoryReceived"]){
+      setGroupedMessages(getGroupedMessages(messagesRef.current))
 
       const newMappedMessages = {}
-      messagesRef.current.forEach(mssg => {
-        newMappedMessages[mssg["metadata"]["messageID"]] = {
-          "status": "delivered",
-          ...mssg
+      messagesRef.current.forEach(msg => {
+        newMappedMessages[msg["metadata"]["messageID"]] = {
+          ...msg,
+          "metadata": {
+            ...msg["metadata"],
+            "status": "delivered"
+          }
         }
       })
-      setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
+      setMappedMessages(newMappedMessages)
     }
     return ()=>{
       externalChatRef.current = (param1) => {}
@@ -83,9 +87,7 @@ function Chat(){
       i += 1
       group["messages"].push(messageID)
     }
-    if (group){
-      groups.push(group)
-    }
+    group && groups.push(group)
     
     return groups
   }
@@ -125,29 +127,34 @@ function Chat(){
       "content": newMessage,
       "metadata":{
         "timestamp": currTime,
-        "messageID": messageID
+        "messageID": messageID,
+        "edited": false
       }
     }
     sendJsonMessage({
       "origin": "chat",
       "type": "newMessage",
+      "username": username,
       "data": msg
     })
     setNewMessage("")
 
-    msg["status"] = "pending"
+    msg["metadata"]["status"] = "pending"
 
     setMappedMessages(prev => {return {...prev, [messageID]: msg }})
     setGroupedMessages(prev => addGroupedMessage(prev, msg))
 
     setTimeout(()=>{
       setMappedMessages(prev => {
-        if (prev[messageID]["status"] === "pending"){
+        if (prev[messageID]["metadata"]["status"] === "pending"){
           return {
             ...prev, 
             [messageID]: {
               ...prev[messageID],
-              "status": "failed"
+              "metadata": {
+                ...prev[messageID]["metadata"],
+                "status": "failed"
+              }
             }
           }
         }
@@ -157,13 +164,52 @@ function Chat(){
 
   }
 
+  function deleteMessage(messageID){
+    sendJsonMessage({
+      "origin": "chat",
+      "type": "delete",
+      "username": username,
+      "data": {"messageID": messageID}
+    })
+  }
+  function changeMessage(){
+    sendJsonMessage({
+      "origin": "chat",
+      "type": "edit",
+      "username": username,
+      "data": {"messageID": editID, "content": editMessage}
+    })
+  }
+  function toggleEdit(messageID, content){
+    if (editI === messageID){
+      setEditId(null)
+      setEditMessage("")
+    }else{
+      setEditId(messageID)
+      setEditMessage(content)
+    }
+  }
   // newMessage: update if pending image, else update grouped & raw messages
   // chatHistory: add all existing chats to grouped & raw messages
   function externalChat(data){
     switch (data.type){
+      case "chatHistory":
+        setGroupedMessages(getGroupedMessages(messagesRef.current))
+
+        const newMappedMessages = {}
+        messagesRef.current.forEach(msg => {
+          newMappedMessages[msg["metadata"]["messageID"]] = {
+            ...msg,
+            "metadata": {
+              ...msg["metadata"],
+              "status": "delivered"
+            }
+          }
+        })
+        setMappedMessages(newMappedMessages)
+        break 
       case "newMessage":
         const msg = data.data
-
         const messageID = msg["metadata"]["messageID"]
 
         if (msg["username"] === username){
@@ -172,7 +218,10 @@ function Chat(){
               ...prev, 
               [messageID]: {
                 ...prev[messageID],
-                "status": "delivered"
+                "metadata": {
+                  ...prev[messageID]["metadata"],
+                  "status": "delivered"
+                }
               }
             }
           })
@@ -183,31 +232,56 @@ function Chat(){
             ...prev, 
             [messageID]: {
               ...prev[messageID],
-              "status": "delivered"
+              "metadata": {
+                ...prev[messageID]["metadata"],
+                "status": "delivered"
+              }
             }
           }
         })
         setGroupedMessages(prev => addGroupedMessage(prev, msg))
         break
-      case "chatHistory":
-        setGroupedMessages(prev => [...getGroupedMessages(messagesRef.current), ...prev])
-
-        const newMappedMessages = {}
-        messagesRef.current.forEach(mssg => {
-          newMappedMessages[mssg["metadata"]["messageID"]] = {
-            "status": "delivered",
-            ...mssg
+      case "edit":
+        setMappedMessages(prev => {
+          const id = data.data["messageID"]
+          if (!(id in prev)){
+            return prev
+          }
+          return {
+            ...prev,
+            [id]: {
+              ...prev[id],
+              "content": data.data["content"],
+              "metadata": {...prev[id]["metadata"], "edited": true}
+            }
           }
         })
-        setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
-        break 
+        break
+      case "delete":
+        setMappedMessages(prev => {
+          if (!(id in prev)){
+            return prev
+          }
+          const newMappedMessages = {...prev}
+          delete newMappedMessages[data.data["messageID"]]
+          return newMappedMessages
+        })
+        setGroupedMessages(getGroupedMessages(messagesRef.current))
+        break
+
     }
   }
+
   // Toggle dark/light mode
   function toggleAppearance(e){
     setDarkMode(e.target.checked)
     const toggleElem = document.querySelector(`.${styles.toggleAppearance}`)
-    if (e.target.checked){
+    if (e.target.checked){    sendJsonMessage({
+      "origin": "chat",
+      "type": "delete",
+      "username": username,
+      "data": {"messageID": messageID}
+    })
       toggleElem.classList.add(`${styles.enableDarkMode}`)
     }else{
       toggleElem.classList.remove(`${styles.enableDarkMode}`)
@@ -250,10 +324,20 @@ function Chat(){
                       group["messages"].map((msgID)=>{
                         const msg = mappedMessages[msgID]
                         return (
-                          <div key={msgID} className={`${styles.message}`} style={{opacity: msg["status"] !== "delivered" ? ".7": "1"}}>
-                            {msg["content"]}
-                            {msg["metadata"]["timestamp"]}
-                            {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span>}
+                          <div key={msgID} className={`${styles.message}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
+                            {editID === msgID ? <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/> : msg["content"]}
+                            {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}>*edited*</span>}  
+                                                      
+                            {msg["status"] === "failed" 
+                            ?
+                             <span style={{color:"red"}}> FAIL</span>
+                            :
+                              <>
+                              <button onClick={()=>deleteMessage(msg["metadata"]["messageID"])}>Delete</button>
+                              <button onClick={()=>toggleEdit(msgID, msg["content"])}>{editID === msgID ? "Cancel": "Edit"}</button>
+                              {editID === msgID && <button onClick={changeMessage}>Submit</button>}
+                              </>
+                            }
                           </div>
                         )
                       })

@@ -125,7 +125,18 @@ function handleMessage(data, uuid){
 
 //Process messages respective of origins
 async function processChat(data, uuid){
-  await storeMessageReq(data.data, users[uuid]["roomID"], token)
+  switch(data.type){
+    case "newMessage":
+      await storeMessageReq(data.data, users[uuid]["roomID"], token)
+      break
+    case "edit":
+      await editMessageReq(data.data, users[uuid]["roomID"], token)
+      break
+    case "delete":
+      await deleteMessageReq(data.data, users[uuid]["roomID"], token)
+      break
+  } 
+  
   broadcastAll(uuid, data, true);
 }
 function processWhiteboard(data, uuid){
