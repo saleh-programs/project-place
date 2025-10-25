@@ -99,7 +99,8 @@ with AccessDatabase() as cursor:
   cursor.execute(
     '''
     CREATE TABLE IF NOT EXISTS messages (
-      messageID VARCHAR(50) PRIMARY KEY,
+      id INTEGER AUTO_INCREMENT PRIMARY KEY,
+      messageID VARCHAR(50) UNIQUE,
       roomID VARCHAR(10),
       content TEXT,
       username VARCHAR(70),
@@ -140,11 +141,7 @@ with AccessDatabase() as cursor:
 # 
 '''
 DONT FORGET !!!!!!!!!! ------------------------------------------------------------------------------: 
-changed data to content. 
-changed urls. 
-changed room ids. 
 will load pfps from memory instead.
-actual data is another layer in.
 Not tracking email anymore (until later)
 !!!!!!!!!!!!!!!!!!
  '''

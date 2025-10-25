@@ -317,6 +317,8 @@ checkRoomExistsReq = handleError(checkRoomExistsReq)
 getRoomUsersReq = handleError(getRoomUsersReq)
 addRoomUserReq = handleError(addRoomUserReq)
 storeMessageReq = handleError(storeMessageReq)
+editMessageReq = handleError(editMessageReq)
+deleteMessageReq = handleError(deleteMessageReq)
 getMessagesReq = handleError(getMessagesReq)
 updateCanvasSnapshotReq = handleError(updateCanvasSnapshotReq)
 getCanvasSnapshotReq = handleError(getCanvasSnapshotReq)
@@ -335,5 +337,5 @@ function getUniqueMessageID(){
 }
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
-  createRoomReq, checkRoomExistsReq, storeMessageReq, getMessagesReq, getUserInfoReq, updateUserInfoReq, 
+  createRoomReq, checkRoomExistsReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getUserInfoReq, updateUserInfoReq, 
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}

@@ -146,7 +146,7 @@ function Chat(){
 
     setTimeout(()=>{
       setMappedMessages(prev => {
-        if (prev[messageID]["metadata"]["status"] === "pending"){
+        if (messageID in prev && prev[messageID]["metadata"]["status"] === "pending"){
           return {
             ...prev, 
             [messageID]: {
@@ -179,13 +179,15 @@ function Chat(){
       "username": username,
       "data": {"messageID": editID, "content": editMessage}
     })
+    setEditID(null)
+    setEditMessage("")
   }
   function toggleEdit(messageID, content){
-    if (editI === messageID){
-      setEditId(null)
+    if (editID === messageID){
+      setEditID(null)
       setEditMessage("")
     }else{
-      setEditId(messageID)
+      setEditID(messageID)
       setEditMessage(content)
     }
   }
@@ -212,34 +214,26 @@ function Chat(){
         const msg = data.data
         const messageID = msg["metadata"]["messageID"]
 
-        if (msg["username"] === username){
-          setMappedMessages(prev => {
-            return {
-              ...prev, 
-              [messageID]: {
-                ...prev[messageID],
-                "metadata": {
-                  ...prev[messageID]["metadata"],
-                  "status": "delivered"
-                }
-              }
-            }
-          })
-          return
-        }
+        // temp solution for dev, when working on different tabs with same username
+        //would prefer at end of func. note.
+        setMappedMessages(prev=>{
+            !(messageID in prev) && setGroupedMessages(groups => addGroupedMessage(groups, msg))
+            return prev
+        })
+        // msg["username"] !== username && setGroupedMessages(prev => addGroupedMessage(prev, msg))
+
         setMappedMessages(prev => {
           return {
             ...prev, 
             [messageID]: {
-              ...prev[messageID],
+              ...msg,
               "metadata": {
-                ...prev[messageID]["metadata"],
+                ...msg["metadata"],
                 "status": "delivered"
               }
             }
           }
         })
-        setGroupedMessages(prev => addGroupedMessage(prev, msg))
         break
       case "edit":
         setMappedMessages(prev => {
@@ -259,7 +253,7 @@ function Chat(){
         break
       case "delete":
         setMappedMessages(prev => {
-          if (!(id in prev)){
+          if (!(data.data["messageID"] in prev)){
             return prev
           }
           const newMappedMessages = {...prev}
@@ -326,12 +320,9 @@ function Chat(){
                         return (
                           <div key={msgID} className={`${styles.message}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
                             {editID === msgID ? <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/> : msg["content"]}
-                            {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}>*edited*</span>}  
-                                                      
-                            {msg["status"] === "failed" 
-                            ?
-                             <span style={{color:"red"}}> FAIL</span>
-                            :
+                            {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}  
+                            {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
+                            {msg["username"] === username && msg["status"] !== "failed" &&
                               <>
                               <button onClick={()=>deleteMessage(msg["metadata"]["messageID"])}>Delete</button>
                               <button onClick={()=>toggleEdit(msgID, msg["content"])}>{editID === msgID ? "Cancel": "Edit"}</button>
