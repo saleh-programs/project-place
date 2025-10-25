@@ -103,7 +103,8 @@ with AccessDatabase() as cursor:
       roomID VARCHAR(10),
       content TEXT,
       username VARCHAR(70),
-      timestamp BIGINT
+      timestamp BIGINT,
+      edited BOOLEAN
     )
     '''
   )
@@ -294,6 +295,29 @@ def storeMessage(roomID):
   with AccessDatabase() as cursor:  
     cursor.execute("INSERT INTO messages (username, content, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s, %s)", 
     (message["username"], message["content"], message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
+    
+  return jsonify({"success":True}),200
+
+@app.route("/rooms/<roomID>/messages", methods=["PATCH"])
+@handleError("failed to edit message")
+@authenticateServer
+def editMessage(roomID):
+  data = request.get_json()
+  messageID = data["messageID"]
+  content = data["content"]
+  with AccessDatabase() as cursor:  
+    cursor.execute("UPDATE messages SET content = %s, edited = TRUE WHERE messageID = %s", (content, messageID))
+    
+  return jsonify({"success":True}),200
+
+@app.route("/rooms/<roomID>/messages", methods=["DELETE"])
+@handleError("failed to delete message")
+@authenticateServer
+def deleteMessage(roomID):
+  data = request.get_json()
+  messageID = data["messageID"]
+  with AccessDatabase() as cursor:  
+    cursor.execute("DELETE FROM messages WHERE messageID = %s", (messageID,))
     
   return jsonify({"success":True}),200
 

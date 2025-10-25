@@ -141,6 +141,58 @@ async function storeMessageReq(message, roomID, token=null) {
   }
   return data
 }
+async function editMessageReq({messageID, content}, roomID, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "PATCH",
+      "headers": {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`
+      },
+      "body": JSON.stringify({"messageID": messageID, "content": content})
+    }
+  }else{
+    options = {
+      "method": "PATCH",
+      "credentials": "include",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"messageID": messageID, "content": content})
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data
+}
+async function deleteMessageReq({messageID}, roomID, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "DELETE",
+      "headers": {
+        "Content-Type": "application/json",
+        "authorization": `Bearer ${token}`
+      },
+      "body": JSON.stringify({"messageID": messageID})
+    }
+  }else{
+    options = {
+      "method": "DELETE",
+      "credentials": "include",
+      "headers": {"Content-Type": "application/json"},
+      "body": JSON.stringify({"messageID": messageID})
+    }
+  }
+  const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data
+}
 async function getMessagesReq(roomID, token=null) {
   let options;
   if (token){

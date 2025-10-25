@@ -5,7 +5,7 @@ import url from "url"
 import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
-import { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq } from "../requests.js"
+import { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
 import { draw, fill, clear } from "../../utils/canvasArt.js"
 
 const httpServer = http.createServer()
