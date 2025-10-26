@@ -115,6 +115,20 @@ async function getRoomUsersReq(roomID, token=null) {
   return data["data"]["users"]
 }
 
+async function uploadFileReq(file) {
+  const fileInfo = new FormData()
+  fileInfo.append("file", file)
+  const response = await fetch(baseurl + `rooms/files`,{
+    "method": "POST",
+    "credentials": "include",
+    "body": fileInfo
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data.data["path"]
+}
 async function storeMessageReq(message, roomID, token=null) {
   let options;
   if (token){
@@ -316,6 +330,7 @@ createRoomReq = handleError(createRoomReq)
 checkRoomExistsReq = handleError(checkRoomExistsReq)
 getRoomUsersReq = handleError(getRoomUsersReq)
 addRoomUserReq = handleError(addRoomUserReq)
+uploadFileReq = handleError(uploadFileReq)
 storeMessageReq = handleError(storeMessageReq)
 editMessageReq = handleError(editMessageReq)
 deleteMessageReq = handleError(deleteMessageReq)
@@ -337,5 +352,5 @@ function getUniqueMessageID(){
 }
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
-  createRoomReq, checkRoomExistsReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getUserInfoReq, updateUserInfoReq, 
+  createRoomReq, checkRoomExistsReq, uploadFileReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getUserInfoReq, updateUserInfoReq, 
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}

@@ -105,7 +105,8 @@ with AccessDatabase() as cursor:
       content TEXT,
       username VARCHAR(70),
       timestamp BIGINT,
-      edited BOOLEAN
+      edited BOOLEAN,
+      isFile BOOLEAN
     )
     '''
   )
@@ -173,7 +174,7 @@ def updateUserInfo():
   fields = data["fields"]
 
   modifiedFields = []
-  allowedToModify = ["username", "avatar", "images", "rooms"]
+  allowedToModify = {"username", "avatar", "images", "rooms"}
   for col in fields.keys():
     if col not in allowedToModify:
       return {"success": False}
@@ -190,10 +191,10 @@ def updateUserInfo():
 @app.route("/users/images", methods=["POST"])
 @handleError("failed to upload image")
 @authenticateClient
-def uploadNewImage():
+def uploadImage():
   imageFile = request.files["img"]
  
-  extension = imageFile.filename.split(".")[-1]
+  extension = imageFile.filename.split(".")[-1].lower()
   allowedExtensions = ["png", "jpg", "jpeg", "webp"]
   if extension not in allowedExtensions or len(extension) == len(imageFile.filename):
     return {"success": False}, 500
@@ -249,6 +250,31 @@ def createRoom():
     cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]", roomID))
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
+@app.route("/rooms/files", methods=["POST"])
+@handleError("failed to upload file")
+@authenticateClient
+def uploadFile(roomID):
+  file = request.files["file"]
+  extension = file.filename.split(".")[-1].lower()
+
+  allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
+  if extension not in allowedExtensions or len(extension) == len(file.filename):
+    return {"success": False}, 500
+
+  fileID = str(uuid.uuid4()) + f".{extension}"
+  exposedPath = f"http://localhost:5000/rooms/files/{fileID}"
+  localPath = f"files/{fileID}"
+  file.save(localPath)
+
+  return jsonify({"success":True, "data": {"path": exposedPath}}),200
+
+@app.route("/rooms/files/<fileID>", methods=["GET"])
+@handleError("failed to get file")
+@authenticateClient
+def getFile(fileID):
+  if not os.path.exists(f"files/{fileID}"):
+    return {"success": False}, 500
+  return send_file(f"files/{fileID}"), 200
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
 @handleError("failed to validate room")
@@ -290,10 +316,11 @@ def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
   with AccessDatabase() as cursor:  
-    cursor.execute("INSERT INTO messages (username, content, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s, %s)", 
-    (message["username"], message["content"], message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
-    
+    cursor.execute("INSERT INTO messages (username, content, messageID, timestamp, isFile, roomID) VALUES (%s, %s, %s, %s, %s, %s)", 
+    (message["username"], message["content"], message["metadata"]["messageID"], message["metadata"]["timestamp"], message["metadata"]["isFile"], roomID))
+
   return jsonify({"success":True}),200
+
 
 @app.route("/rooms/<roomID>/messages", methods=["PATCH"])
 @handleError("failed to edit message")
