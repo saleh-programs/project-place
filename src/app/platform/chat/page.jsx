@@ -8,8 +8,15 @@ import styles from "styles/platform/Chat.module.css"
 function Chat(){
   const {externalChatRef, sendJsonMessage, roomID, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef} = useContext(ThemeContext)
 
+  const mainScrollableRef = useRef(null)
+  const lazyLoading = useRef({
+    "allLoaded": false,
+    "loading": false,
+    "oldestID": null,
+    "olderMessages": []
+  })
+
   const canSendRef = useRef(true)
-  
   const [newMessage, setNewMessage] = useState("")
   const [editID, setEditID] = useState(null)
   const [editMessage, setEditMessage] = useState("")
@@ -58,9 +65,46 @@ function Chat(){
         }
       })
       setMappedMessages(newMappedMessages)
+      lazyLoading.current["allLoaded"] = messagesRef.current.length === 0 
+      lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
     }
+    async function onScroll(){
+      if (lazyLoading.current["allLoaded"] || lazyLoading.current["loading"] || mainScrollableRef.current.scrollTop > 0){
+        return
+      }
+      lazyLoading.current["loading"] = true
+      const olderMessages = lazyLoading.current["oldestID"] ?  await getOlderChatHistoryReq(lazyLoading.current["oldestID"], roomID) : null
+      if (!olderMessages){
+        lazyLoading.current["loading"] = false
+        return
+      }
+      if (olderMessages.length === 0){
+        lazyLoading.current["allLoaded"] = true
+      }else{
+        lazyLoading.current["olderMessages"] = [...olderMessages,...lazyLoading.current["olderMessages"]]
+        lazyLoading.current["oldestID"] = olderMessages[0]["metadata"]["messageID"]
+        mainScrollableRef.current.scrollTop += 50
+        
+        const newMappedMessages = {}
+        olderMessages.forEach(msg => {
+          newMappedMessages[msg["metadata"]["messageID"]] = {
+            ...msg,
+            "metadata": {
+              ...msg["metadata"],
+              "status": "delivered"
+            }
+          }
+        })
+        setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
+        setGroupedMessages(getGroupedMessages([...lazyLoading.current["olderMessages"], ...messagesRef.current]))
+      }
+      lazyLoading.current["loading"] = false
+      
+    }
+    mainScrollableRef.current.addEventListener("scroll", onScroll)
     return ()=>{
       externalChatRef.current = (param1) => {}
+      mainScrollableRef.current.removeEventListener("scroll", onScroll)
     }
   },[])
 
@@ -260,6 +304,8 @@ function Chat(){
           }
         })
         setMappedMessages(newMappedMessages)
+        lazyLoading.current["allLoaded"] = messagesRef.current.length === 0 
+        lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
         break 
       case "newMessage":
         const msg = data.data
@@ -311,7 +357,20 @@ function Chat(){
           delete newMappedMessages[data.data["messageID"]]
           return newMappedMessages
         })
-        setGroupedMessages(getGroupedMessages(messagesRef.current))
+        setGroupedMessages(prev => {
+          const newGroups = [...prev]
+          for (let i = newGroups.length-1; i >= 0; i--){
+            const group = newGroups[i]
+            if (group["messages"].includes(data.data["messageID"])){
+              newGroups[i] = {
+                ...group,
+                "messages": group["messages"].filter(id => id !== data.data["messageID"])
+              }
+              return newGroups
+            }
+          }
+          return prev
+        })
         break
 
     }
@@ -346,7 +405,7 @@ function Chat(){
           <span></span>
         </label>
       </h1>
-      <section className={styles.chatDisplay}> 
+      <section ref={mainScrollableRef} className={styles.chatDisplay}> 
         {
           groupedMessages.map((group)=>{
             const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
