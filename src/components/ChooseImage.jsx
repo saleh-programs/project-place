@@ -39,7 +39,6 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
   async function uploadNewImage(e){ 
     const file = e.target.files[0]
     const newPath = await uploadNewImageReq(file)
-    console.log(newPath)
     if (!newPath){
       return
     }
@@ -56,6 +55,7 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
       }
     })
     setAvailableImages([...publicImages, ...newImagesList])
+    e.target.value = ""
   }
 
   return(

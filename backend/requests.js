@@ -115,9 +115,11 @@ async function getRoomUsersReq(roomID, token=null) {
   return data["data"]["users"]
 }
 
-async function uploadFileReq(file) {
+async function uploadFilesReq(files) {
   const fileInfo = new FormData()
-  fileInfo.append("file", file)
+  for (const file of files){
+    fileInfo.append("files", file)
+  }
   const response = await fetch(baseurl + `rooms/files`,{
     "method": "POST",
     "credentials": "include",
@@ -127,7 +129,7 @@ async function uploadFileReq(file) {
   if (!data.success){
     throw new Error(data.message ||"req failed")
   }
-  return data.data["path"]
+  return data.data["paths"]
 }
 async function storeMessageReq(message, roomID, token=null) {
   let options;
@@ -155,7 +157,7 @@ async function storeMessageReq(message, roomID, token=null) {
   }
   return data
 }
-async function editMessageReq({messageID, content}, roomID, token=null) {
+async function editMessageReq({messageID, text}, roomID, token=null) {
   let options;
   if (token){
     options = {
@@ -164,14 +166,14 @@ async function editMessageReq({messageID, content}, roomID, token=null) {
         "Content-Type": "application/json",
         "authorization": `Bearer ${token}`
       },
-      "body": JSON.stringify({"messageID": messageID, "content": content})
+      "body": JSON.stringify({"messageID": messageID, "text": text})
     }
   }else{
     options = {
       "method": "PATCH",
       "credentials": "include",
       "headers": {"Content-Type": "application/json"},
-      "body": JSON.stringify({"messageID": messageID, "content": content})
+      "body": JSON.stringify({"messageID": messageID, "text": text})
     }
   }
   const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
@@ -330,7 +332,7 @@ createRoomReq = handleError(createRoomReq)
 checkRoomExistsReq = handleError(checkRoomExistsReq)
 getRoomUsersReq = handleError(getRoomUsersReq)
 addRoomUserReq = handleError(addRoomUserReq)
-uploadFileReq = handleError(uploadFileReq)
+uploadFilesReq = handleError(uploadFilesReq)
 storeMessageReq = handleError(storeMessageReq)
 editMessageReq = handleError(editMessageReq)
 deleteMessageReq = handleError(deleteMessageReq)
@@ -352,5 +354,5 @@ function getUniqueMessageID(){
 }
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
-  createRoomReq, checkRoomExistsReq, uploadFileReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getUserInfoReq, updateUserInfoReq, 
+  createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getUserInfoReq, updateUserInfoReq, 
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}

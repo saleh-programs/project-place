@@ -102,11 +102,11 @@ with AccessDatabase() as cursor:
       id INTEGER AUTO_INCREMENT PRIMARY KEY,
       messageID VARCHAR(50) UNIQUE,
       roomID VARCHAR(10),
-      content TEXT,
+      files JSON,
+      text TEXT,
       username VARCHAR(70),
       timestamp BIGINT,
-      edited BOOLEAN,
-      isFile BOOLEAN
+      edited BOOLEAN
     )
     '''
   )
@@ -251,22 +251,23 @@ def createRoom():
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
 @app.route("/rooms/files", methods=["POST"])
-@handleError("failed to upload file")
+@handleError("failed to upload files")
 @authenticateClient
-def uploadFile(roomID):
-  file = request.files["file"]
-  extension = file.filename.split(".")[-1].lower()
+def uploadFiles():
+  files = request.files.getlist("files")
+  exposedPaths = []
+  for file in files:
+    extension = file.filename.split(".")[-1].lower()
 
-  allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
-  if extension not in allowedExtensions or len(extension) == len(file.filename):
-    return {"success": False}, 500
+    allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
+    if extension not in allowedExtensions or len(extension) == len(file.filename):
+      return {"success": False}, 500
 
-  fileID = str(uuid.uuid4()) + f".{extension}"
-  exposedPath = f"http://localhost:5000/rooms/files/{fileID}"
-  localPath = f"files/{fileID}"
-  file.save(localPath)
-
-  return jsonify({"success":True, "data": {"path": exposedPath}}),200
+    fileID = str(uuid.uuid4()) + f".{extension}"
+    exposedPaths.append(f"http://localhost:5000/rooms/files/{fileID}")
+    localPath = f"files/{fileID}"
+    file.save(localPath)
+  return jsonify({"success":True, "data": {"paths": exposedPaths}}),200
 
 @app.route("/rooms/files/<fileID>", methods=["GET"])
 @handleError("failed to get file")
@@ -308,7 +309,7 @@ def getRoomUsers(roomID):
     users = json.loads(cursor.fetchone()[0])
   return jsonify({"success":True,"data": {"users": users}}), 200
 
-
+ 
 @app.route("/rooms/<roomID>/messages", methods=["POST"])
 @handleError("failed to create message")
 @authenticateServer
@@ -316,8 +317,8 @@ def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
   with AccessDatabase() as cursor:  
-    cursor.execute("INSERT INTO messages (username, content, messageID, timestamp, isFile, roomID) VALUES (%s, %s, %s, %s, %s, %s)", 
-    (message["username"], message["content"], message["metadata"]["messageID"], message["metadata"]["timestamp"], message["metadata"]["isFile"], roomID))
+    cursor.execute("INSERT INTO messages (username, text, files, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s, %s, %s)", 
+    (message["username"], message["text"], json.dumps(message["files"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
 
   return jsonify({"success":True}),200
 
@@ -328,9 +329,9 @@ def storeMessage(roomID):
 def editMessage(roomID):
   data = request.get_json()
   messageID = data["messageID"]
-  content = data["content"]
+  text = data["text"]
   with AccessDatabase() as cursor:  
-    cursor.execute("UPDATE messages SET content = %s, edited = TRUE WHERE messageID = %s", (content, messageID))
+    cursor.execute("UPDATE messages SET text = %s, edited = TRUE WHERE messageID = %s", (text, messageID))
     
   return jsonify({"success":True}),200
 
@@ -341,6 +342,14 @@ def deleteMessage(roomID):
   data = request.get_json()
   messageID = data["messageID"]
   with AccessDatabase() as cursor:  
+    cursor.execute("SELECT files FROM messages WHERE messageID = %s", (messageID,))
+    files = cursor.fetchone()
+    if (files):
+      files = json.loads(files[0])
+      for f in files:
+        if os.path.exists(f"files/{os.path.basename(f)}"):
+          os.remove(f"files/{os.path.basename(f)}")
+
     cursor.execute("DELETE FROM messages WHERE messageID = %s", (messageID,))
     
   return jsonify({"success":True}),200
@@ -350,15 +359,16 @@ def deleteMessage(roomID):
 @authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, content, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
+    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
     messages = cursor.fetchall()
     jsonMessages = [
       {
         "username": tpl[0],
-        "content": tpl[1],
+        "text": tpl[1],
+        "files": json.loads(tpl[2]),
         "metadata": {
-          "timestamp": tpl[2],
-          "messageID": tpl[3] 
+          "timestamp": tpl[3],
+          "messageID": tpl[4] 
         }
       } for tpl in messages
     ]

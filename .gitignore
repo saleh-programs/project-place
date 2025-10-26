@@ -34,3 +34,5 @@ logs.txt
 backend/images/*
 !backend/images/public
 !backend/images/public/**
+
+backend/files/*

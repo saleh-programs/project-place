@@ -1,17 +1,19 @@
 "use client"
 import { useState, useContext, useEffect, useRef } from "react"
-import ThemeContext from "src/assets/ThemeContext"
+import ThemeContext from "src/assets/ThemeContext.js"
 
-import { getUniqueMessageID } from "backend/requests"
+import { getUniqueMessageID, uploadFilesReq } from "backend/requests.js"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
   const {externalChatRef, sendJsonMessage, roomID, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef} = useContext(ThemeContext)
 
   const canSendRef = useRef(true)
+  
   const [newMessage, setNewMessage] = useState("")
   const [editID, setEditID] = useState(null)
   const [editMessage, setEditMessage] = useState("")
+  const filesRef = useRef(null)
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
@@ -23,7 +25,8 @@ function Chat(){
   Message Structure:
   {
     "username": string,
-    "content": string,
+    "text": string,
+    "files": []
     "metadata": {
       "timestamp": number,
       "messageID": string,
@@ -111,7 +114,7 @@ function Chat(){
     }]
   }
 
-  function handleMessage() {
+  async function handleMessage() {
     if (!canSendRef.current){
       return
     }
@@ -120,11 +123,14 @@ function Chat(){
       canSendRef.current = true
     },100)
 
+    filesRef.current.files.length > 0 && await handleFileMessage()
+
     const currTime = Date.now()
     const messageID = getUniqueMessageID()
     const msg = {
       "username": username,
-      "content": newMessage,
+      "text": newMessage,
+      "files": [],
       "metadata":{
         "timestamp": currTime,
         "messageID": messageID,
@@ -138,7 +144,6 @@ function Chat(){
       "data": msg
     })
     setNewMessage("")
-
     msg["metadata"]["status"] = "pending"
 
     setMappedMessages(prev => {return {...prev, [messageID]: msg }})
@@ -163,6 +168,52 @@ function Chat(){
     },3000)
 
   }
+  async function handleFileMessage() {
+    const currTime = Date.now()
+    const filePaths = await uploadFilesReq(filesRef.current.files)
+    if (!filePaths){
+      return
+    }
+    const messageID = getUniqueMessageID()
+    const msg = {
+      "username": username,
+      "text": "",
+      "files": filePaths,
+      "metadata":{
+        "timestamp": currTime,
+        "messageID": messageID,
+        "edited": false
+      }
+    }
+    sendJsonMessage({
+      "origin": "chat",
+      "type": "newMessage",
+      "username": username,
+      "data": msg
+    })
+    filesRef.current.value = ""
+    msg["metadata"]["status"] = "pending"
+    setMappedMessages(prev => {return {...prev, [messageID]: msg }})
+    setGroupedMessages(prev => addGroupedMessage(prev, msg))
+
+    setTimeout(()=>{
+      setMappedMessages(prev => {
+        if (messageID in prev && prev[messageID]["metadata"]["status"] === "pending"){
+          return {
+            ...prev, 
+            [messageID]: {
+              ...prev[messageID],
+              "metadata": {
+                ...prev[messageID]["metadata"],
+                "status": "failed"
+              }
+            }
+          }
+        }
+        return prev
+    })   
+    },3000)
+  }
 
   function deleteMessage(messageID){
     sendJsonMessage({
@@ -177,18 +228,18 @@ function Chat(){
       "origin": "chat",
       "type": "edit",
       "username": username,
-      "data": {"messageID": editID, "content": editMessage}
+      "data": {"messageID": editID, "text": editMessage}
     })
     setEditID(null)
     setEditMessage("")
   }
-  function toggleEdit(messageID, content){
+  function toggleEdit(messageID, text){
     if (editID === messageID){
       setEditID(null)
       setEditMessage("")
     }else{
       setEditID(messageID)
-      setEditMessage(content)
+      setEditMessage(text)
     }
   }
   // newMessage: update if pending image, else update grouped & raw messages
@@ -245,7 +296,7 @@ function Chat(){
             ...prev,
             [id]: {
               ...prev[id],
-              "content": data.data["content"],
+              "text": data.data["text"],
               "metadata": {...prev[id]["metadata"], "edited": true}
             }
           }
@@ -319,13 +370,21 @@ function Chat(){
                         const msg = mappedMessages[msgID]
                         return (
                           <div key={msgID} className={`${styles.message}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
-                            {editID === msgID ? <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/> : msg["content"]}
+                            {msg["files"].map(filePath => {
+                              return <img key={filePath} src={filePath} alt="No File Found" />
+                            })}
+                            {editID === msgID 
+                              ?
+                             <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
+                              :
+                              msg["text"]
+                            }
                             {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}  
                             {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
                             {msg["username"] === username && msg["status"] !== "failed" &&
                               <>
                               <button onClick={()=>deleteMessage(msg["metadata"]["messageID"])}>Delete</button>
-                              <button onClick={()=>toggleEdit(msgID, msg["content"])}>{editID === msgID ? "Cancel": "Edit"}</button>
+                              {msg["files"].length === 0 && <button onClick={()=>toggleEdit(msgID, msg["text"])}>{editID === msgID ? "Cancel": "Edit"}</button>}
                               {editID === msgID && <button onClick={changeMessage}>Submit</button>}
                               </>
                             }
@@ -335,7 +394,7 @@ function Chat(){
                     }
                   </div>
 
-                </section>
+                </section> 
               </div>
             )
           })
@@ -344,7 +403,9 @@ function Chat(){
       <section className={styles.chatHub}>
         {roomID &&
           <section className={styles.newChat}>
-            Send Message <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
+            <input ref={filesRef} type="file" multiple 
+            accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'/>
+            <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
             <button onClick={handleMessage}>Send</button>
           </section>
         }
