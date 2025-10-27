@@ -229,6 +229,17 @@ async function getMessagesReq(roomID, token=null) {
   }
   return data["data"]["messages"]
 }
+async function getOlderMessagesReq(messageID, roomID){
+  const response = await fetch(baseurl + `rooms/${roomID}/messages?messageID=${messageID}`, {
+    "method": "GET",
+    "credentials": "include",
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+  return data["data"]["messages"]
+}
 
 
 async function updateCanvasSnapshotReq(canvasBuffer,roomID, token=null){

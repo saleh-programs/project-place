@@ -359,8 +359,13 @@ def deleteMessage(roomID):
 @authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s", (roomID,))
-    messages = cursor.fetchall()
+    if (request.args.get("messageID")){
+      cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s AND messageID < %s LIMIT 100", (roomID, request.args.get("messageID"),))
+    }else{
+      cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s LIMIT 100", (roomID,))
+
+    }
+
     jsonMessages = [
       {
         "username": tpl[0],

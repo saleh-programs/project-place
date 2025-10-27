@@ -2,7 +2,7 @@
 import { useState, useContext, useEffect, useRef } from "react"
 import ThemeContext from "src/assets/ThemeContext.js"
 
-import { getUniqueMessageID, uploadFilesReq } from "backend/requests.js"
+import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
@@ -116,7 +116,7 @@ function Chat(){
 
   async function loadMoreHistory(){
     lazyLoading.current["loading"] = true
-    const olderMessages = lazyLoading.current["oldestID"] ? await getOlderChatHistoryReq(lazyLoading.current["oldestID"], roomID) : null
+    const olderMessages = lazyLoading.current["oldestID"] ? await getOlderMessagesReq(lazyLoading.current["oldestID"], roomID) : null
     if (!olderMessages){
       lazyLoading.current["loading"] = false
       return
