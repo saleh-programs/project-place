@@ -13,8 +13,12 @@ function Chat(){
     "allLoaded": false,
     "loading": false,
     "oldestID": null,
+    "shownRange": [],
+    "numGroups": 0,
     "olderMessages": []
   })
+  const [lazyDisplayWindow, setLazyDisplayWindow] = useState([0, 50])
+  const [isStickyBottom, setIsStickyBottom] = useRef(true)
 
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
@@ -67,38 +71,40 @@ function Chat(){
       setMappedMessages(newMappedMessages)
       lazyLoading.current["allLoaded"] = messagesRef.current.length === 0 
       lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
+      
+      if (messagesRef.current.length > 200){
+        setLazyDisplayWindow([messagesRef.current.length - 100, messagesRef.current.length + 100])
+        
+      }
     }
     async function onScroll(){
-      if (lazyLoading.current["allLoaded"] || lazyLoading.current["loading"] || mainScrollableRef.current.scrollTop > 0){
+      const position = mainScrollableRef.current.scrollTop / (mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight)
+      const {allLoaded, loading, shownRange, numGroups} = lazyLoading.current
+
+      if (!allLoaded && !loading && position < .01 && shownRange[0] === 0){
+        loadMoreHistory()
+      }
+
+      //We don't need to start worrying about display window until these sizes are big enough....
+      if (messagesRef.current.length + lazyLoading.current["olderMessages"].length < 300){
         return
       }
-      lazyLoading.current["loading"] = true
-      const olderMessages = lazyLoading.current["oldestID"] ?  await getOlderChatHistoryReq(lazyLoading.current["oldestID"], roomID) : null
-      if (!olderMessages){
-        lazyLoading.current["loading"] = false
-        return
+
+      //load earlier ranges into display window
+      if (position < .15 && shownRange[0] > 0){
+        const decrement = Math.min(shownRange[0], 50) 
+        shownRange[0] -= decrement
+        shownRange[1] -= decrement
+        setLazyDisplayWindow([...shownRange])
       }
-      if (olderMessages.length === 0){
-        lazyLoading.current["allLoaded"] = true
-      }else{
-        lazyLoading.current["olderMessages"] = [...olderMessages,...lazyLoading.current["olderMessages"]]
-        lazyLoading.current["oldestID"] = olderMessages[0]["metadata"]["messageID"]
-        mainScrollableRef.current.scrollTop += 50
-        
-        const newMappedMessages = {}
-        olderMessages.forEach(msg => {
-          newMappedMessages[msg["metadata"]["messageID"]] = {
-            ...msg,
-            "metadata": {
-              ...msg["metadata"],
-              "status": "delivered"
-            }
-          }
-        })
-        setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
-        setGroupedMessages(getGroupedMessages([...lazyLoading.current["olderMessages"], ...messagesRef.current]))
+      //load later ranges into display window
+      if (position > .85 && shownRange[1] < numGroups-1){
+        const increment = Math.min((numGroups-1) - shownRange[1], 50) 
+        shownRange[0] += increment
+        shownRange[1] -= increment
+        setLazyDisplayWindow([...shownRange])
       }
-      lazyLoading.current["loading"] = false
+
       
     }
     mainScrollableRef.current.addEventListener("scroll", onScroll)
@@ -108,6 +114,36 @@ function Chat(){
     }
   },[])
 
+  async function loadMoreHistory(){
+    lazyLoading.current["loading"] = true
+    const olderMessages = lazyLoading.current["oldestID"] ? await getOlderChatHistoryReq(lazyLoading.current["oldestID"], roomID) : null
+    if (!olderMessages){
+      lazyLoading.current["loading"] = false
+      return
+    }
+
+    if (olderMessages.length === 0){
+      lazyLoading.current["allLoaded"] = true
+    }else{
+      lazyLoading.current["olderMessages"] = [...olderMessages,...lazyLoading.current["olderMessages"]]
+      lazyLoading.current["oldestID"] = olderMessages[0]["metadata"]["messageID"]
+      mainScrollableRef.current.scrollTop += 10 //can figure out exactly how much later to make it align
+      
+      const newMappedMessages = {}
+      olderMessages.forEach(msg => {
+        newMappedMessages[msg["metadata"]["messageID"]] = {
+          ...msg,
+          "metadata": {
+            ...msg["metadata"],
+            "status": "delivered"
+          }
+        }
+      })
+      setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
+      setGroupedMessages(getGroupedMessages([...lazyLoading.current["olderMessages"], ...messagesRef.current]))
+    }
+    lazyLoading.current["loading"] = false
+  }
 
   // Groups all messages from chat history 
   // (messages in a group are sent in a 30 second interval from same user)
@@ -407,7 +443,7 @@ function Chat(){
       </h1>
       <section ref={mainScrollableRef} className={styles.chatDisplay}> 
         {
-          groupedMessages.map((group)=>{
+          groupedMessages.slice(lazyDisplayWindow[0], lazyDisplayWindow[1]).map((group)=>{
             const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
             return (
               <div key={group["timestamp"]} className={styles.messageContainer}>
