@@ -13,12 +13,10 @@ function Chat(){
     "allLoaded": false,
     "loading": false,
     "oldestID": null,
-    "shownRange": [],
-    "numGroups": 0,
-    "olderMessages": []
+    "displayListRangeRef": [0, 150],
+    "numGroups": 0
   })
-  const [lazyDisplayWindow, setLazyDisplayWindow] = useState([0, 50])
-  const [isStickyBottom, setIsStickyBottom] = useRef(true)
+  const [displayListRange, setDisplayListRange] = useState([0, 150])
 
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
@@ -71,38 +69,64 @@ function Chat(){
       setMappedMessages(newMappedMessages)
       lazyLoading.current["allLoaded"] = messagesRef.current.length === 0 
       lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
-      
-      if (messagesRef.current.length > 200){
-        setLazyDisplayWindow([messagesRef.current.length - 100, messagesRef.current.length + 100])
-        
+      if (lazyLoading.current["numGroups"] > lazyLoading.current["displayListRangeRef"][1]){
+        setDisplayListRange([(lazyLoading.current["numGroups"] + 30) - 150, lazyLoading.current["numGroups"] + 30])
+        lazyLoading.current["displayListRangeRef"] = [(lazyLoading.current["numGroups"] + 30) - 150, lazyLoading.current["numGroups"] + 30]
       }
+      requestAnimationFrame(()=>{
+        mainScrollableRef.current.scrollTop = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+      })
     }
-    async function onScroll(){
+    function onScroll(){
       const position = mainScrollableRef.current.scrollTop / (mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight)
       const {allLoaded, loading, shownRange, numGroups} = lazyLoading.current
 
-      if (!allLoaded && !loading && position < .01 && shownRange[0] === 0){
+      if (!allLoaded && !loading && position === 0 && shownRange[0] === 0){
         loadMoreHistory()
+        return 
       }
 
       //We don't need to start worrying about display window until these sizes are big enough....
-      if (messagesRef.current.length + lazyLoading.current["olderMessages"].length < 300){
+      if (numGroups < 150){
         return
       }
 
       //load earlier ranges into display window
       if (position < .15 && shownRange[0] > 0){
-        const decrement = Math.min(shownRange[0], 50) 
+        const decrement = Math.min(shownRange[0], 30) 
         shownRange[0] -= decrement
         shownRange[1] -= decrement
-        setLazyDisplayWindow([...shownRange])
+        setDisplayListRange([...shownRange])
+        lazyLoading.current["displayListRangeRef"] = [...shownRange]
+
+        setGroupedMessages(groups => {
+          let groupElemRect = document.getElementById(groups[shownRange[0] + decrement]["timestamp"]).getBoundingClientRect()
+          const oldGroupPos = groupElemRect.top
+          requestAnimationFrame(()=>{
+            groupElemRect = document.getElementById(groups[shownRange[0] + decrement]["timestamp"]).getBoundingClientRect()
+            mainScrollableRef.current.scrollTop += groupElemRect.top - oldGroupPos
+          })
+          return groups
+        })
       }
       //load later ranges into display window
-      if (position > .85 && shownRange[1] < numGroups-1){
-        const increment = Math.min((numGroups-1) - shownRange[1], 50) 
+      if (position > .85 && shownRange[1] < (numGroups-1)+30){
+        const increment = Math.min(((numGroups-1)+30) - shownRange[1], 30) 
         shownRange[0] += increment
-        shownRange[1] -= increment
-        setLazyDisplayWindow([...shownRange])
+        shownRange[1] += increment
+        setDisplayListRange([...shownRange])
+        lazyLoading.current["displayListRangeRef"] = [...shownRange]
+
+
+        setGroupedMessages(groups => {
+          let groupElemRect = document.getElementById(groups[shownRange[0]]["timestamp"]).getBoundingClientRect()
+          const oldGroupPos = groupElemRect.top
+          requestAnimationFrame(()=>{
+            groupElemRect = document.getElementById(groups[shownRange[0]]["timestamp"]).getBoundingClientRect()
+            mainScrollableRef.current.scrollTop += groupElemRect.top - oldGroupPos
+          })
+          return groups
+        })
       }
 
       
@@ -124,11 +148,11 @@ function Chat(){
 
     if (olderMessages.length === 0){
       lazyLoading.current["allLoaded"] = true
+      lazyLoading.current["loading"] = false
     }else{
-      lazyLoading.current["olderMessages"] = [...olderMessages,...lazyLoading.current["olderMessages"]]
       lazyLoading.current["oldestID"] = olderMessages[0]["metadata"]["messageID"]
-      mainScrollableRef.current.scrollTop += 10 //can figure out exactly how much later to make it align
       
+      oldScrollHeight = mainScrollableRef.current.scrollHeight
       const newMappedMessages = {}
       olderMessages.forEach(msg => {
         newMappedMessages[msg["metadata"]["messageID"]] = {
@@ -139,10 +163,17 @@ function Chat(){
           }
         }
       })
-      setMappedMessages(prev => {return {...newMappedMessages, ...prev}})
-      setGroupedMessages(getGroupedMessages([...lazyLoading.current["olderMessages"], ...messagesRef.current]))
+      setMappedMessages(prev => {
+        return {...newMappedMessages, ...prev}
+      })
+      setGroupedMessages(prev => {
+        prependGroupedMessages(prev, olderMessages)
+      })
+      requestAnimationFrame(()=>{
+        mainScrollableRef.current.scrollTop += mainScrollableRef.current.scrollHeight - oldScrollHeight
+        lazyLoading.current["loading"] = false
+      })
     }
-    lazyLoading.current["loading"] = false
   }
 
   // Groups all messages from chat history 
@@ -172,26 +203,40 @@ function Chat(){
     }
     group && groups.push(group)
     
+    lazyLoading.current["numGroups"] = groups.length
     return groups
   }
+  function appendGroupedMessages(groups, messageList){
+    const newGroups = getGroupedMessages(messageList)
+    const leftGroup = groups.at(-1)
+    const rightGroup = newGroups[0]
 
-  // Groups incoming messages
-  function addGroupedMessage(groups, message){
-    const interval = 30000
-    const [user, timestamp, messageID] = [message["username"], message["metadata"]["timestamp"], message["metadata"]["messageID"]]
-    const lastGroup = groups.at(-1)
-    
-    if (groups.length === 0 || user !== lastGroup["username"] || timestamp - lastGroup["timestamp"] > interval){
-      return [...groups,{
-        "username": user,
-        "timestamp": timestamp,
-        "messages": [messageID]
-      }]
+    let combinedGroups = []
+
+    if (!leftGroup || leftGroup["username"] !== rightGroup["username"] || rightGroup["timestamp"] - leftGroup["timestamp"] > interval){
+      combinedGroups = [...groups, ...newGroups]
+    }else{
+      for (let i = 0; i < rightGroup["messages"].length; i++){
+        leftGroup["messages"].push(id)
+      }
+      combinedGroups = [...groups, ...newGroups.slice(1)]
     }
-    return [...groups.slice(0, -1),{
-      ...lastGroup,
-      "messages": [...lastGroup["messages"], messageID]
-    }]
+    lazyLoading.current["numGroups"] = combinedGroups.length
+    return combinedGroups
+  }
+  function prependGroupedMessages(groups, messageList){
+    const newGroups = getGroupedMessages(messageList)
+
+    const leftGroup = newGroups.at(-1)
+    const rightGroup = groups[0]
+
+    if (!leftGroup || leftGroup["username"] !== rightGroup["username"] || rightGroup["timestamp"] - leftGroup["timestamp"] > interval){
+      return [...newGroups, ...groups]
+    }
+    for (let i = 0; i < rightGroup["messages"].length; i++){
+      leftGroup["messages"].push(id)
+    }
+    return [...newGroups, ...groups.slice(1)]
   }
 
   async function handleMessage() {
@@ -227,8 +272,13 @@ function Chat(){
     msg["metadata"]["status"] = "pending"
 
     setMappedMessages(prev => {return {...prev, [messageID]: msg }})
-    setGroupedMessages(prev => addGroupedMessage(prev, msg))
-
+    setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
+    const oldScrollBottom = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+    requestAnimationFrame(()=>{
+      if (mainScrollableRef.current.scrollTop === oldScrollBottom){
+        mainScrollableRef.current.scrollTop = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+      }
+    })
     setTimeout(()=>{
       setMappedMessages(prev => {
         if (messageID in prev && prev[messageID]["metadata"]["status"] === "pending"){
@@ -274,7 +324,7 @@ function Chat(){
     filesRef.current.value = ""
     msg["metadata"]["status"] = "pending"
     setMappedMessages(prev => {return {...prev, [messageID]: msg }})
-    setGroupedMessages(prev => addGroupedMessage(prev, msg))
+    setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
 
     setTimeout(()=>{
       setMappedMessages(prev => {
@@ -342,18 +392,37 @@ function Chat(){
         setMappedMessages(newMappedMessages)
         lazyLoading.current["allLoaded"] = messagesRef.current.length === 0 
         lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
+        if (lazyLoading.current["numGroups"] > lazyLoading.current["displayListRangeRef"][1]){
+          setDisplayListRange([(lazyLoading.current["numGroups"] + 30) - 150, lazyLoading.current["numGroups"] + 30])
+          lazyLoading.current["displayListRangeRef"] = [(lazyLoading.current["numGroups"] + 30) - 150, lazyLoading.current["numGroups"] + 30]
+        }
+        requestAnimationFrame(()=>{
+          mainScrollableRef.current.scrollTop = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+        })
         break 
       case "newMessage":
         const msg = data.data
         const messageID = msg["metadata"]["messageID"]
 
         // temp solution for dev, when working on different tabs with same username
-        //would prefer at end of func. note.
+        //would prefer at end of func. note. 
         setMappedMessages(prev=>{
-            !(messageID in prev) && setGroupedMessages(groups => addGroupedMessage(groups, msg))
+            if (!(messageID in prev)){
+              const oldScrollBottom = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+              setGroupedMessages(groups => appendGroupedMessages(groups, [msg]))
+              requestAnimationFrame(()=>{
+                if (mainScrollableRef.current.scrollTop === oldScrollBottom){
+                  mainScrollableRef.current.scrollTop = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+                  if (lazyLoading.current["numGroups"] > lazyLoading.current["displayListRangeRef"][1]){
+                    setDisplayListRange([(lazyLoading.current["numGroups"] + 30) - 150, lazyLoading.current["numGroups"] + 30])
+                    lazyLoading.current["displayListRangeRef"] = [(lazyLoading.current["numGroups"] + 30) - 150, lazyLoading.current["numGroups"] + 30]
+                  }
+                }
+              })
+            }
             return prev
         })
-        // msg["username"] !== username && setGroupedMessages(prev => addGroupedMessage(prev, msg))
+        // msg["username"] !== username && setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
 
         setMappedMessages(prev => {
           return {
@@ -408,7 +477,6 @@ function Chat(){
           return prev
         })
         break
-
     }
   }
 
@@ -443,10 +511,10 @@ function Chat(){
       </h1>
       <section ref={mainScrollableRef} className={styles.chatDisplay}> 
         {
-          groupedMessages.slice(lazyDisplayWindow[0], lazyDisplayWindow[1]).map((group)=>{
+          groupedMessages.slice(displayListRange[0], displayListRange[1]).map((group)=>{
             const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
             return (
-              <div key={group["timestamp"]} className={styles.messageContainer}>
+              <div id={`${group["timestamp"]}`} key={group["timestamp"]} className={styles.messageContainer}>
                 <section className={styles.messageLeft}>
                   <span className={styles.timestamp}>
                     {timestamp}

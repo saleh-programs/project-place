@@ -363,7 +363,6 @@ def getMessages(roomID):
       cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s AND messageID < %s LIMIT 100", (roomID, request.args.get("messageID"),))
     }else{
       cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s LIMIT 100", (roomID,))
-
     }
 
     jsonMessages = [
