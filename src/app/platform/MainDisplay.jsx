@@ -1,6 +1,6 @@
 "use client"
 import * as mediasoupClient from "mediasoup-client"
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -13,6 +13,7 @@ function MainDisplay({children, username, initialUserInfo}){
   
   const [userInfo, setUserInfo] = useState(initialUserInfo)
   const [roomID, setRoomID] = useState("")
+  const roomIDRef = useRef("")
   const [userStates, setUserStates] = useState({
     [username]: {"avatar": initialUserInfo["avatar"]}
   })
@@ -125,9 +126,12 @@ function MainDisplay({children, username, initialUserInfo}){
     siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
-    roomID, setRoomID,
+    roomID, setRoomID,roomIDRef,
     messagesRef
   }
+  useEffect(()=>{
+    roomIDRef.current = roomID
+  },[roomID])
 
   async function reconstructCanvas(data){
     const canvasBuffer = await data.arrayBuffer()

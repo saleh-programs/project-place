@@ -26,14 +26,9 @@
   flex-direction: column;
   gap: 20px;
   padding-top: 20px;
+  scrollbar-width: none;
   &::-webkit-scrollbar{
-    width: 10px;
-  }
-  &::-webkit-scrollbar-track{
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb{
-    background: gray;
+    display: none;
   }
 }
 

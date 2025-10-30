@@ -36,3 +36,4 @@ backend/images/*
 !backend/images/public/**
 
 backend/files/*
+dummy.js

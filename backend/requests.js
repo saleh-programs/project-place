@@ -230,7 +230,7 @@ async function getMessagesReq(roomID, token=null) {
   return data["data"]["messages"]
 }
 async function getOlderMessagesReq(messageID, roomID){
-  const response = await fetch(baseurl + `rooms/${roomID}/messages?messageID=${messageID}`, {
+  const response = await fetch(baseurl + `rooms/${roomID}/messages/more?messageID=${messageID}`, {
     "method": "GET",
     "credentials": "include",
   })
@@ -348,6 +348,7 @@ storeMessageReq = handleError(storeMessageReq)
 editMessageReq = handleError(editMessageReq)
 deleteMessageReq = handleError(deleteMessageReq)
 getMessagesReq = handleError(getMessagesReq)
+getOlderMessagesReq = handleError(getOlderMessagesReq)
 updateCanvasSnapshotReq = handleError(updateCanvasSnapshotReq)
 getCanvasSnapshotReq = handleError(getCanvasSnapshotReq)
 updateCanvasInstructionsReq = handleError(updateCanvasInstructionsReq)
@@ -365,5 +366,5 @@ function getUniqueMessageID(){
 }
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
-  createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getUserInfoReq, updateUserInfoReq, 
+  createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq, getUserInfoReq, updateUserInfoReq, 
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}

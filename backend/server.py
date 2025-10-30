@@ -359,14 +359,12 @@ def deleteMessage(roomID):
 @authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    if (request.args.get("messageID")){
-      cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s AND messageID < %s LIMIT 100", (roomID, request.args.get("messageID"),))
-    }else{
-      cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s LIMIT 100", (roomID,))
-    }
-
-    jsonMessages = [
-      {
+    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
+    messages = cursor.fetchall()
+    jsonMessages = []
+    for i in range(len(messages)-1,-1,-1):
+      tpl = messages[i]
+      jsonMessages.append({
         "username": tpl[0],
         "text": tpl[1],
         "files": json.loads(tpl[2]),
@@ -374,9 +372,35 @@ def getMessages(roomID):
           "timestamp": tpl[3],
           "messageID": tpl[4] 
         }
-      } for tpl in messages
-    ]
+      })
   return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
+
+@app.route("/rooms/<roomID>/messages/more", methods=["GET"])
+@handleError("Failed to get more room messages")
+@authenticateClient
+def getMoreMessages(roomID):
+  with AccessDatabase() as cursor:
+    messageID = request.args.get("messageID")
+
+    cursor.execute("SELECT id FROM messages WHERE messageID = %s", (messageID,))
+    lastID = cursor.fetchone()[0]
+    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s AND id < %s ORDER BY id DESC LIMIT 100", (roomID, lastID))
+    messages = cursor.fetchall()
+
+    jsonMessages = []
+    for i in range(len(messages)-1,-1,-1):
+      tpl = messages[i]
+      jsonMessages.append({
+        "username": tpl[0],
+        "text": tpl[1],
+        "files": json.loads(tpl[2]),
+        "metadata": {
+          "timestamp": tpl[3],
+          "messageID": tpl[4] 
+        }
+      })
+  return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
+
 
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["PUT"])
