@@ -5,11 +5,7 @@ import styles from "styles/platform/VideoChat.module.css"
 
 import { useRouter } from "next/navigation"
 function VideoChat(){
-  const {userStates} = useContext(ThemeContext)
   const router = useRouter()
-
-  const [selectedPeerCall, setSelectedPeerCall] = useState(false)
-
 
   return(
     <div className={styles.videochatPage}>

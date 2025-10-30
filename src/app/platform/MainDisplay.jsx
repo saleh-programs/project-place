@@ -150,7 +150,7 @@ function MainDisplay({children, username, initialUserInfo}){
     savedCanvasInfoRef.current["snapshot"] = tempCxt.getImageData(0,0,1000,1000)
     img.close()
 
-    externalWhiteboardRef.current("restoreCanvas")
+    externalWhiteboardRef.current("canvasReceived")
     siteHistoryRef.current["canvasHistoryReceived"] = true;
   }
 

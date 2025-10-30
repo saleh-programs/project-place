@@ -136,13 +136,13 @@ async function processChat(data, uuid){
       await deleteMessageReq(data.data, users[uuid]["roomID"], token)
       break
   } 
-  
   broadcastAll(uuid, data, true);
 }
 function processWhiteboard(data, uuid){
   broadcastAll(uuid, data, false)
   handleCanvasAction(data, users[uuid]["roomID"] )
 }
+
 async function processGroupcall(data, uuid){
   const roomID = users[uuid]["roomID"]
   const roomCallInfo = rooms[roomID]["groupcall"]
@@ -206,6 +206,7 @@ async function processGroupcall(data, uuid){
       const producer = await userCallInfo["sendTransport"].produce({kind, rtpParameters})
       userCallInfo["producers"].push(producer)
       roomCallInfo["producers"][producer.id] = producer
+      console.log(userCallInfo)
 
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
@@ -259,13 +260,17 @@ async function processGroupcall(data, uuid){
       }
       break
     case "receivePeers":
+      console.log("time to reveive?", roomCallInfo["callParticipants"], userCallInfo)
       for (let i = 0; i < roomCallInfo["callParticipants"].length; i++){
         const userID = roomCallInfo["callParticipants"][i]
+        console.log("...")
         if (userID == uuid) {
+          console.log("skipped")
           continue
         }
-        for (let j = 0; j < userCallInfo["producers"].length; j++){
-          const producer = userCallInfo["producers"][j] 
+        const peerCallInfo = users[userID]["groupcall"]
+        for (let j = 0; j < peerCallInfo["producers"].length; j++){
+          const producer = peerCallInfo["producers"][j] 
           const options = {
             producerId: producer.id,
             rtpCapabilities: userCallInfo["rtpCapabilities"]
@@ -283,6 +288,7 @@ async function processGroupcall(data, uuid){
           userCallInfo["consumers"].push(consumer)
           roomCallInfo["consumers"][consumer.id] = consumer
           
+          console.log("get here?")
           connections[uuid].send(JSON.stringify({
             "origin": "groupcall",
             "type": "addConsumer",

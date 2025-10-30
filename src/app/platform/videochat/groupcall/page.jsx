@@ -3,7 +3,7 @@ import { useContext,useRef, useState, useEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 
 function GroupCall(){
-    const { device, externalGroupcallRef, sendJsonMessage, username, callOffers } = useContext(ThemeContext)
+    const { device, externalGroupcallRef, sendJsonMessage, username } = useContext(ThemeContext)
 
     const [isJoined, setIsJoined] = useState(false)
     const connectionStateRef = useRef("disconnected")
@@ -17,7 +17,7 @@ function GroupCall(){
         },
         "recvTransport": {
             "ref": null,
-            "connectCallback": null
+            "connectCallback": null 
         },
         "consumers": {},
         "producers": [],
@@ -41,12 +41,12 @@ function GroupCall(){
             disconnect()
         }
     },[])
+    useEffect(()=>{
+        console.log(streams)
+    },[streams])
 
     function disconnect(){
-        console.log("in disconn")
-
         if (connectionStateRef.current !== "connected"){
-            console.log("disconn")
             return
         }
 
@@ -92,7 +92,6 @@ function GroupCall(){
         })
     }
     async function joinGroupCall() {
-        console.log(device.current)
         if (!device.current || connectionStateRef.current !== "disconnected"){
             return
         }
@@ -164,6 +163,7 @@ function GroupCall(){
             callInfo.current["recvTransport"]["connectCallback"] = callback
         })
 
+        console.log("get me")
         sendJsonMessage({
             "username": username,
             "origin": "groupcall",
@@ -215,7 +215,6 @@ function GroupCall(){
             kind,
             rtpParameters
         })
-        console.log("consumer adding")
 
         callInfo.current["consumers"][uuid].push(consumer)
         setStreams(prev => {
@@ -285,7 +284,6 @@ function GroupCall(){
         const info = callInfo.current
         switch (data.type){
             case "getParticipants":
-                console.log("added participants", data.data)
                 const newStreams = {}
                 for (let i = 0; i < data.data.length; i++){
                     info["consumers"][data.data[i]] = []
@@ -301,7 +299,6 @@ function GroupCall(){
                 break
             case "sendProduce":
                 info["sendTransport"]["produceCallback"]({id: data.data})
-
                 // Now we can GIVE this media.
                 sendJsonMessage({
                     "origin": "groupcall",
@@ -314,7 +311,7 @@ function GroupCall(){
                 info["recvTransport"]["connectCallback"]()
                 break
             case "addConsumer":
-
+                console.log("here we add?")
                 addConsumer(data.data)
                 break
             case "userJoined":

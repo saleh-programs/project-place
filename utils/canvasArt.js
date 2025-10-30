@@ -2,16 +2,13 @@ import Queue from "./Queue.js"
 
 function draw(commands, canvas, erase, options){
     const context = canvas.getContext("2d")
-    const {
-      lineWidth, 
-      color, 
-      persistent=false} = options
+    const {lineWidth, color, persistent=false} = options
 
     if (persistent){
       for (let i = 0; i < commands.length; i++){
         context.lineTo(...commands[i])
-        context.stroke()
       }
+      context.stroke()
       return
     }
 
@@ -23,13 +20,12 @@ function draw(commands, canvas, erase, options){
     context.moveTo(...commands[0])
     for (let i = 1; i < commands.length; i++){
       context.lineTo(...commands[i])
-      context.stroke()
     }
+    context.stroke()
 }
-function fill([X,Y], canvas, options){
-  const cxt = canvas.getContext('2d')
-  const {color} = options
 
+function fill([X,Y], canvas, color){
+  const cxt = canvas.getContext('2d')
   // store starting color
   const startImage = cxt.getImageData(X, Y,1,1)
   const startColor = startImage.data
@@ -90,6 +86,7 @@ function fill([X,Y], canvas, options){
   }
   cxt.putImageData(canvasImage,0,0)
 }
+
 function clear(canvas){
   canvas.getContext("2d").clearRect(0,0,canvas.width, canvas.height)
 }
