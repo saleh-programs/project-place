@@ -7,6 +7,8 @@ import {v4 as uuidv4} from "uuid"
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
 import { draw, fill, clear } from "../../utils/canvasArt.js"
+import { writeFileSync } from "fs"
+import { buffer } from "stream/consumers"
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -139,8 +141,28 @@ async function processChat(data, uuid){
   broadcastAll(uuid, data, true);
 }
 function processWhiteboard(data, uuid){
+  if (data.type === "getCanvas"){
+    const roomCanvasInfo = rooms[users[uuid]["roomID"]]?.["whiteboard"]
+    if (!roomCanvasInfo) return
+    const tempCanvas = createCanvas(1000,1000)
+    tempCanvas.getContext("2d").putImageData(roomCanvasInfo["snapshot"],0,0)
+
+    const opsBuffer = Buffer.from(JSON.stringify(roomCanvasInfo["operations"]))
+    const canvasBuffer = tempCanvas.toBuffer("image/png")
+
+    const canvasInfo = Buffer.concat([Buffer.alloc(5), opsBuffer, canvasBuffer])
+    canvasInfo.writeUInt32BE(opsBuffer.length, 0)
+    canvasInfo.writeInt8(roomCanvasInfo["latestOp"], 4)
+    connections[uuid].send(canvasInfo)
+    return
+  }
+
   broadcastAll(uuid, data, false)
-  handleCanvasAction(data, users[uuid]["roomID"] )
+  handleCanvasAction(data, users[uuid]["roomID"])
+
+
+  const buffer = rooms[users[uuid]["roomID"]]["whiteboard"]["canvas"].toBuffer("image/png")
+  writeFileSync("test.png", buffer)
 }
 
 async function processGroupcall(data, uuid){
@@ -351,11 +373,16 @@ async function sendServerInfo(uuid) {
   }else{
     initializing = true
     const canvas = createCanvas(1000,1000)
+    const cxt = canvas.getContext("2d")
+    Object.assign(cxt, {
+      "lineCap": "round",
+      "lineJoin": "round"
+    })
     roomHistories.push(
       getCanvasSnapshotReq(roomID, token)
       .then(buffer => loadImage(buffer))
       .then(img => {
-        canvas.getContext("2d").drawImage(img,0,0);
+        cxt.drawImage(img,0,0);
         return canvas
       }))
     roomHistories.push(getCanvasInstructionsReq(roomID, token))
@@ -433,7 +460,7 @@ function broadcastOne(uuid, data, peerUsername){
   const userList = rooms[users[uuid]["roomID"]]["users"]
   for (let i = 0; i < userList.length; i++){
     if (peerUsername === users[userList[i]]["username"]){
-      conn.send(JSON.stringify(data))
+      connections[userList[i]].send(JSON.stringify(data))
       return
     }
   }
@@ -515,13 +542,13 @@ function updateServerCanvas(data, roomID){
     
   switch (data.type){
     case "doneDrawing":
-      draw(data["data"], mainCanvas, false, data["metadata"])
+      draw(data["data"], mainCanvas, data["metadata"])
       break
     case "doneErasing":
-      draw(data["data"], mainCanvas, true, data["metadata"])
+      draw(data["data"], mainCanvas, data["metadata"])
       break
     case "fill":
-      fill(data["data"], mainCanvas, data["metadata"])
+      fill(data["data"], mainCanvas, data["metadata"]["color"])
       break
     case "clear":
       clear(mainCanvas)

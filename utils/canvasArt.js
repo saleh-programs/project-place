@@ -1,12 +1,15 @@
 import Queue from "./Queue.js"
 
-function draw(commands, canvas, erase, options){
+function draw(commands, canvas, options){
     const context = canvas.getContext("2d")
-    const {lineWidth, color, persistent=false} = options
+    const {lineWidth, color, persistent=false, prev=null, erasing=false} = options
 
     if (persistent){
+      let last = prev;
       for (let i = 0; i < commands.length; i++){
-        context.lineTo(...commands[i])
+        const midpoint = [Math.round((commands[i][0] + last[0])/2),Math.round((commands[i][1] + last[1])/2)]
+        context.quadraticCurveTo(...last, ...midpoint)
+        last = commands[i]
       }
       context.stroke()
       return
@@ -14,15 +17,18 @@ function draw(commands, canvas, erase, options){
 
     context.lineWidth = lineWidth
     context.strokeStyle = color
-    context.globalCompositeOperation = erase ? "destination-out" : "source-over"
+    context.globalCompositeOperation = erasing ? "destination-out" : "source-over"
 
     context.beginPath()
     context.moveTo(...commands[0])
     for (let i = 1; i < commands.length; i++){
-      context.lineTo(...commands[i])
+      const midpoint = [Math.round((commands[i][0] + commands[i-1][0])/2),Math.round((commands[i][1] + commands[i-1][1])/2)]
+      context.quadraticCurveTo(...commands[i-1], ...midpoint)
     }
+    context.lineTo(...commands.at(-1))
     context.stroke()
 }
+
 
 function fill([X,Y], canvas, color){
   const cxt = canvas.getContext('2d')

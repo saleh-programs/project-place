@@ -5,7 +5,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import styles from "styles/platform/Whiteboard.module.css"
 
 import { draw, fill, clear } from "utils/canvasArt.js"
-
+import { throttle } from "utils/miscellaneous.js"
 
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRef} = useContext(ThemeContext)
@@ -43,6 +43,11 @@ function Whiteboard(){
 
   useEffect(()=>{
     if (roomID){
+      sendJsonMessage({
+        "username": username,
+        "origin": "whiteboard",
+        "type": "getCanvas"
+      })
       cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
       hiddenCanvasRef.current = Object.assign(document.createElement("canvas"), {
         "width":canvasRef.current.width, 
@@ -50,12 +55,12 @@ function Whiteboard(){
       })
       hiddenCxt.current = hiddenCanvasRef.current.getContext("2d", {willReadFrequently: true})
 
-      // const customizations = {
-      //   "lineCap": "round",
-      //   "lineJoin": "round"
-      // }
-      // Object.assign(cxtRef.current, customizations)
-      // Object.assign(hiddenCxt.current, customizations)
+      const customizations = {
+        "lineCap": "round",
+        "lineJoin": "round"
+      }
+      Object.assign(cxtRef.current, customizations)
+      Object.assign(hiddenCxt.current, customizations)
       savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
     }
   },[roomID])
@@ -136,14 +141,14 @@ function Whiteboard(){
     const storeOp = cxtRef.current.globalCompositeOperation 
     switch (action){
       case "draw":
-        draw(data["data"], hiddenCanvasRef.current, false, data["metadata"])
+        draw(data["data"], hiddenCanvasRef.current, data["metadata"])
 
         cxtRef.current.globalCompositeOperation = "source-over"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         cxtRef.current.globalCompositeOperation = storeOp
         break
       case "erase":
-        draw(data["data"], hiddenCanvasRef.current, false, data["metadata"])
+        draw(data["data"], hiddenCanvasRef.current, data["metadata"])
 
         cxtRef.current.globalCompositeOperation = "destination-out"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
@@ -213,15 +218,17 @@ function Whiteboard(){
       "batchStroke": [],
       "startPoint": startPoint
     }
+    const [sendBatchStrokesThrottled, cancelBatchSend] = throttle(sendBatchStrokes)
 
-    const isErasing = canvasInfo.current["type"] === "erase"
-    draw([strokes.current["startPoint"]], canvasRef.current, isErasing, {
+    draw([strokes.current["startPoint"]], canvasRef.current, {
       "lineWidth": canvasInfo.current["lineWidth"],
-      "color": canvasInfo.current["color"]
+      "color": canvasInfo.current["color"],
+      "erasing": canvasInfo.current["type"] === "erase"
     })
 
     let done = false
-    let pos;
+    let pos = startPoint
+    let last = pos;
     function onMoveStroke(e){
       pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
       if(done){
@@ -229,16 +236,22 @@ function Whiteboard(){
       }
       done = true
       requestAnimationFrame(()=>{
-        draw([pos], canvasRef.current, isErasing, {persistent: true})
+        draw([pos], canvasRef.current, {persistent: true, prev: last})
         strokes.current["batchStroke"].push(pos)
         strokes.current["fullStroke"].push(pos)
-        sendBatchStrokes()   
+        sendBatchStrokesThrottled()   
+        last = pos
         done = false
       })  
     }     
 
     function onReleaseStroke(e){
-      requestAnimationFrame(sendStroke)
+      requestAnimationFrame(()=>{
+        cancelBatchSend()
+        cxtRef.current.lineTo(...last)
+        cxtRef.current.stroke()
+        sendStroke()
+      })
 
       canvasRef.current.removeEventListener("mousemove", onMoveStroke)
       document.removeEventListener("mouseup", onReleaseStroke) 
