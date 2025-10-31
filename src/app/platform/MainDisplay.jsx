@@ -205,9 +205,9 @@ function MainDisplay({children, username, initialUserInfo}){
   }
   return(
     <ThemeContext.Provider value={shared}>
-      <div className="siteWrapper">
+      <div className={styles.siteWrapper}>
         <Sidebar/>
-        <div className={`pageContainer ${!roomID ? styles.dimScreen: ""}`}>
+        <div className={styles.pageContainer}>
           {children}
           {Object.keys(callOffers).map((name) => {
             return (

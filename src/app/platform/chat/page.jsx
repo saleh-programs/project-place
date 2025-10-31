@@ -494,12 +494,11 @@ function Chat(){
       toggleElem.classList.remove(`${styles.enableDarkMode}`)
     }
   }
-
+ 
   return(
-    <div className={styles.chatPage}
-    style={{"color":darkMode ? "white" : "black","backgroundColor": darkMode ? "rgba(44, 45, 50,.97)" : "white"}}>
+    <div className={styles.chatPage}>
       <h1 className={styles.title}>
-        Chat
+        <img src="/9.png" alt="f" />
         <label className={styles.toggleAppearance}>
           <input 
           type="checkbox"
@@ -562,16 +561,20 @@ function Chat(){
           })
         } 
       </section>
-      <section className={styles.chatHub}>
-        {roomID &&
-          <section className={styles.newChat}>
-            <input ref={filesRef} type="file" multiple 
+      {roomID &&
+        <section className={styles.chatHub}>
+            <label className={styles.fileInput}>
+              <img src={"de"} alt="upload" />
+              <input ref={filesRef} type="file" multiple hidden
             accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'/>
-            <input type="text" placeholder="New Message" value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
-            <button onClick={handleMessage}>Send</button>
+            </label>
+
+            <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
+            <button onClick={handleMessage}>
+            <img src="" alt="send" />
+            </button>
           </section>
         }
-      </section>
     </div>
   )
 }

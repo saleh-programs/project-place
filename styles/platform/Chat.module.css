@@ -1,5 +1,6 @@
+
 .chatPage{
-  height: 100vh;
+  height: 100%;
 
   display: flex;
   flex-direction: column;
@@ -21,7 +22,6 @@
 .chatDisplay{
   flex: 1;
   overflow-y: auto;
- 
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -104,6 +104,48 @@
 }
 .message{
 }
+
 .chatHub{
   border: 1px solid;
+  height: 50px;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 30px;
+}
+.fileInput{
+  display: inline-block;
+  border: 1px solid ;
+  border-radius: 20px;
+  background-color: rgb(221, 218, 218);
+  width: 40px;
+  height: 40px;
+  justify-content: center;
+
+  position: relative;
+}
+.fileInput img{
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.chatInput{
+  border: none;                 
+  border-radius: 2px;
+  box-shadow: 0 0 2px 1px rgb(142, 186, 206) ;
+  flex: 1;
+  height: 100%;
+  resize: none;
+
+  font-size: 1.2rem;
+  letter-spacing: 3px;
+}
+.chatInput:focus{
+  border: none;
+}
+.chatHub button{
+  height: 100%;
+  background-color: white;
 }

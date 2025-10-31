@@ -1,8 +1,17 @@
+.siteWrapper{
+  display: flex;
+  height: 100vh;
+}
+.pageContainer{
+  flex: 1;
+  height: 100vh;
+}
+
 .callNotification{
-    position: fixed;
-    top: 0;
-    right: 0;
-    border: 2px solid;
-    padding: 10px;
-    background-color: rgb(255, 0, 0);
+  position: fixed;
+  top: 0;
+  right: 0;
+  border: 2px solid;
+  padding: 10px;
+  background-color: rgb(255, 0, 0);
 }

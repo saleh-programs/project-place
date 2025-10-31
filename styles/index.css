@@ -1,38 +1,16 @@
-*{
-  box-sizing: border-box;
-}
-html, body, #root, .siteWrapper{
+html, body, #root{
   height: 100vh;
   margin: 0;
   font-size: 15px;
 }
-.siteWrapper{
-  display: flex;
-  height: 100vh;
-}
-.pageContainer{
-  flex: 1;
-  height: 100vh;
-
-  display: flex;
-}
-
 
 /* globals */
-.profilePic{
-  /* border: 1px solid rgb(213, 213, 213); */
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  overflow: hidden;
-  display: block;
+*{
+  box-sizing: border-box;
 }
-.profilePic img{
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 button:hover{
   cursor: pointer;  
+} 
+textarea{
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }

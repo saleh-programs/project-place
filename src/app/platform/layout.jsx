@@ -4,6 +4,7 @@ import { getUserInfoReq } from "../../../backend/requests"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 
+
 async function PlatformLayout({ children }) {
   const allCookies = await cookies()
   const session = allCookies.get("session")?.value
@@ -14,7 +15,6 @@ async function PlatformLayout({ children }) {
   if (!username){
     redirect(`/accountsetup`) 
   } 
-
   return (
     <MainDisplay {...{username, initialUserInfo}}>
       {children}
