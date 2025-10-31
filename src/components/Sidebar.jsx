@@ -51,7 +51,6 @@ function Sidebar(){
       <section className={styles.sidePanelMain} ref={sideBarRef}>
         <section className={styles.features}>
           <button onClick={()=>router.push("/platform/chat")}>Chat</button>
-          <button onClick={()=>router.push("/platform/documents")}>Documents</button>
           <button onClick={()=>router.push("/platform/whiteboard")}>Whiteboard</button>
           <button onClick={()=>router.push("/platform/videochat")}>Video Chat</button>
         </section>
