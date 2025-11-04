@@ -10,7 +10,7 @@ import JoinRoom from "./JoinRoom"
 import ChooseImage from "./ChooseImage"
 
 function AccountHub(){
-  const {roomID, setRoomID, username, userInfo, setUserInfo, sendJsonMessage} = useContext(ThemeContext)
+  const {roomID, setRoomID, username, userInfo, setUserInfo, sendJsonMessage, setDarkMode} = useContext(ThemeContext)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
 
@@ -19,6 +19,16 @@ function AccountHub(){
   return(
     <div className={styles.accountHub}>
       {roomID}
+        <label className={styles.toggleAppearance}>
+          dark mode
+          <input 
+          type="checkbox"
+          onClick={(e)=>setDarkMode(e.target.checked)
+
+          }
+          /> 
+          <span></span>
+        </label>
       <section className={styles.header}>
         <span className={`profilePic ${styles.changeImage}`} onClick={()=>setIsChangingImage(!isChangingImage)}>
           <img src={userInfo["avatar"]} alt="nth" />

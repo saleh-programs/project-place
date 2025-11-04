@@ -1,14 +1,14 @@
 "use client"
 import { useRef, useEffect, useContext } from "react"
 import ThemeContext from "src/assets/ThemeContext"
-
+import Animation from "src/components/Animation"
 import styles from "styles/platform/Whiteboard.module.css"
 
 import { draw, fill, clear } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRef} = useContext(ThemeContext)
+  const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRe, darkMode} = useContext(ThemeContext)
 
   const canvasRef = useRef(null)
   const cxtRef = useRef(null)
@@ -334,7 +334,7 @@ function Whiteboard(){
   return (
     <div className={styles.whiteboardPage}>
       <h1 className={styles.title}>
-        Whiteboard
+        <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/whiteboard?34" : "/light/whiteboard?34"} type="once" speed={10}/> 
       </h1>
       {roomID &&
       <div className={styles.mainContent}>

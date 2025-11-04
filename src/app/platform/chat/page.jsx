@@ -1,12 +1,13 @@
 "use client"
 import { useState, useContext, useEffect, useRef, useLayoutEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext.js"
+import Animation from "src/components/Animation"
 
 import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
 import styles from "styles/platform/Chat.module.css"
 
 function Chat(){
-  const {externalChatRef, sendJsonMessage, roomID, roomIDRef, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef} = useContext(ThemeContext)
+  const {externalChatRef, sendJsonMessage, roomID, roomIDRef, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef, darkMode} = useContext(ThemeContext)
 
   const mainScrollableRef = useRef(null)
   const lazyLoading = useRef({
@@ -27,8 +28,6 @@ function Chat(){
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
-
-  const [darkMode, setDarkMode] = useState(false)  
   /*
 
   Message Structure:
@@ -484,28 +483,11 @@ function Chat(){
     }
   }
 
-  // Toggle dark/light mode
-  function toggleAppearance(e){
-    setDarkMode(e.target.checked)
-    const toggleElem = document.querySelector(`.${styles.toggleAppearance}`)
-    if (e.target.checked){ 
-      toggleElem.classList.add(`${styles.enableDarkMode}`)
-    }else{
-      toggleElem.classList.remove(`${styles.enableDarkMode}`)
-    }
-  }
  
   return(
     <div className={styles.chatPage}>
       <h1 className={styles.title}>
-        <img src="/9.png" alt="f" />
-        <label className={styles.toggleAppearance}>
-          <input 
-          type="checkbox"
-          onClick={toggleAppearance}
-          />
-          <span></span>
-        </label>
+        <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={5}/> 
       </h1>
       <section ref={mainScrollableRef} className={styles.chatDisplay}> 
         {
@@ -568,11 +550,9 @@ function Chat(){
               <input ref={filesRef} type="file" multiple hidden
             accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'/>
             </label>
-
+ 
             <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
-            <button onClick={handleMessage}>
-            <img src="" alt="send" />
-            </button>
+            <Animation path={"/submit?3"} type="button" speed={20} onClick={handleMessage}/>
           </section>
         }
     </div>

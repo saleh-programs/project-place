@@ -17,6 +17,7 @@ function MainDisplay({children, username, initialUserInfo}){
   const [userStates, setUserStates] = useState({
     [username]: {"avatar": initialUserInfo["avatar"]}
   })
+  const [darkMode, setDarkMode] = useState(false)
 
   const messagesRef= useRef([])
   const savedCanvasInfoRef = useRef({
@@ -123,7 +124,7 @@ function MainDisplay({children, username, initialUserInfo}){
   },roomID !== "")
 
   const shared = {
-    siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates,
+    siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates, setDarkMode, darkMode,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
     roomID, setRoomID,roomIDRef,
@@ -153,6 +154,7 @@ function MainDisplay({children, username, initialUserInfo}){
     externalWhiteboardRef.current("canvasReceived")
     siteHistoryRef.current["canvasHistoryReceived"] = true;
   }
+
 
   function updateUserStates(data){
     switch (data.type){
