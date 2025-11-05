@@ -275,7 +275,7 @@ def uploadFiles():
 def getFile(fileID):
   if not os.path.exists(f"files/{fileID}"):
     return {"success": False}, 500
-  return send_file(f"files/{fileID}"), 200
+  return send_file(f"files/{fileID}")
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
 @handleError("failed to validate room")

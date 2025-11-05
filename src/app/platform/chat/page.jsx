@@ -2,6 +2,7 @@
 import { useState, useContext, useEffect, useRef, useLayoutEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext.js"
 import Animation from "src/components/Animation"
+import FileViewer from "src/components/FileViewer"
 
 import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
 import styles from "styles/platform/Chat.module.css"
@@ -75,6 +76,7 @@ function Chat(){
       lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
     }
     let called = false
+    let stickTimer
     function onScroll(){
       if (called){
         return
@@ -82,13 +84,16 @@ function Chat(){
       called = true
       requestAnimationFrame(()=>{
         called = false
-        if (mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight === 0){
+        const maxScrollTop = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
+        if (maxScrollTop === 0){
           return
         }
-        const position = (mainScrollableRef.current.scrollTop / (mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight)) * 100 //0-100
+        const position = (mainScrollableRef.current.scrollTop / maxScrollTop) * 100 //0-100
         const {allLoaded, displayListRangeRef, numGroups} = lazyLoading.current
 
-        lazyLoading.current["stickToBottom"] = position > 99
+        clearTimeout(stickTimer)
+        stickTimer = setTimeout(()=>{lazyLoading.current["stickToBottom"] = (maxScrollTop - mainScrollableRef.current.scrollTop) < 50},20)
+        
         if (mainScrollableRef.current.scrollTop < 1){
           mainScrollableRef.current.scrollTop = 1
         }
@@ -514,7 +519,7 @@ function Chat(){
                         return (
                           <div key={msgID} className={`${styles.message}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
                             {msg["files"].map(filePath => {
-                              return <img key={filePath} src={filePath} alt="No File Found" />
+                              return <FileViewer key={filePath} url={filePath}/>
                             })}
                             {editID === msgID 
                               ?
@@ -559,4 +564,4 @@ function Chat(){
   )
 }
 
-export default Chat
+export default Chat 
