@@ -9,7 +9,10 @@ function Sidebar(){
   const router = useRouter()
   const sideBarRef = useRef(null)
 
-  function startDrag(){
+  function startDrag(e){
+    e.preventDefault()
+    const imgOffset = e.clientX - e.currentTarget.getBoundingClientRect().left
+
     const collapseBoundary = 50
     const leftBoundary = 100
     const rightBoundary = 800
@@ -22,17 +25,15 @@ function Sidebar(){
       }
       done = true
       requestAnimationFrame(()=>{
-        sideBarRef.current.style.width = `${e.clientX}px`
-
+        sideBarRef.current.style.width = `${e.clientX - imgOffset}px`
         sideBarRef.current.style.display = ""
+        
         if (e.clientX < collapseBoundary){
           sideBarRef.current.style.display = "none"
         }else if (e.clientX < leftBoundary){
           sideBarRef.current.style.width = `${leftBoundary}px`
         }else if (e.clientX > rightBoundary){
           sideBarRef.current.style.width = `${rightBoundary}px`
-        }else{
-          sideBarRef.current.style.width = `${e.clientX}px`
         }
         done = false
       })
@@ -57,7 +58,7 @@ function Sidebar(){
         <AccountHub/>
       </section>
       <section className={styles.sidePanelHandle}>
-        <img src={null} alt="smth" onMouseDown={startDrag}/>
+        <img src="/sb_handle.png" alt="smth" onMouseDown={startDrag}/>
       </section>
     </div>  
       )
