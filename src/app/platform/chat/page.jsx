@@ -122,10 +122,20 @@ function Chat(){
       })
     }
 
+    let lastHeight = mainScrollableElem.scrollHeight
+    const watchHeight = () => {
+      if (lastHeight !== mainScrollableElem.scrollHeight && lazyLoading.current["stickToBottom"]){
+        mainScrollableElem.scrollTop = mainScrollableElem.scrollHeight - mainScrollableElem.clientHeight
+      }
+      lastHeight = mainScrollableElem.scrollHeight
+      requestAnimationFrame(watchHeight)
+    }
+    requestAnimationFrame(watchHeight)
     mainScrollableElem.addEventListener("scroll", onScroll)
     return ()=>{
       externalChatRef.current = (param1) => {}
       mainScrollableElem.removeEventListener("scroll", onScroll)
+      cancelAnimationFrame(watchHeight)
     }
   },[])
   function renderEarlierValues(){
@@ -193,7 +203,6 @@ function Chat(){
   useLayoutEffect(()=>{
     lazyLoading.current["numGroups"] = groupedMessages.length
     if (lazyLoading.current["stickToBottom"]){
-      mainScrollableRef.current.scrollTop = mainScrollableRef.current.scrollHeight - mainScrollableRef.current.clientHeight
       if (groupedMessages.length >= displayListRange[1]){
         renderLaterValues()
       }
@@ -548,8 +557,11 @@ function Chat(){
           })
         } 
       </section>
+      <button style={{width:"250px"}} onClick={(e)=>e.target.innerText=`${lazyLoading.current["stickToBottom"]} and ${mainScrollableRef.current.scrollHeight}`}>check</button>
       {roomID &&
         <section className={styles.chatHub}>
+            <Animation path={"/submit?3"} type="button" speed={20} onClick={handleMessage}/>
+
             <label className={styles.fileInput}>
               <img src={"de"} alt="upload" />
               <input ref={filesRef} type="file" multiple hidden
@@ -557,7 +569,6 @@ function Chat(){
             </label>
  
             <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
-            <Animation path={"/submit?3"} type="button" speed={20} onClick={handleMessage}/>
           </section>
         }
     </div>
