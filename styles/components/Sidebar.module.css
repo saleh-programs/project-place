@@ -1,5 +1,6 @@
 .sidePanel{
   display: flex;
+  position: relative;
 }
 .sidePanelMain{
   flex: 1;
@@ -7,14 +8,14 @@
   flex-direction: column;
 }
 .sidePanelHandle{
-  position: relative;
-  border: 1px solid;
-}
-.sidePanelHandle img{
   position: absolute;
   top: 50%;
-  left: 50%;
   transform: translateY(-50%);
+  z-index: 100;
+  border: 1px solid;
+  left: 100%;
+  display: flex;
+  align-items: center;
 }
 .features{
   display: flex;

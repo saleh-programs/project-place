@@ -1,6 +1,9 @@
-
+.darkMode{
+  background-color: rgb(33, 36, 42);
+  color: rgb(255, 255, 255);
+}
 .chatPage{
-  height: 100%;
+  height: 100vh;
 
   display: flex;
   flex-direction: column;
@@ -8,72 +11,138 @@
 }
 .title{
   padding: 5px;
-  border-bottom: 1px solid;
+  box-shadow: 2px 5px 10px rgba(112, 112, 113, 0.395);
   margin: 0; 
   height: 100px;
+  z-index: 0;
+
   display: flex;
   justify-content: center;
   align-items: end;
 }
 
+
+
 .chatDisplay{
   flex: 1;
-  overflow-y: auto;
+  font-family: "Exo 2";
+  overflow-y: auto; 
+  scrollbar-width: none;
+  padding-top: 5px;
+
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding-top: 20px;
-  scrollbar-width: none;
-  &::-webkit-scrollbar{
-    display: none;
-  }
 }
 
-
-.messageContainer{
+.groupContainer{
   display: flex;
   gap: 3px;
   padding-inline: 5px;
 }
-.messageLeft{
+
+.groupLeft{
   display: flex;
   flex-direction: column;
   align-items: center;
-
-  position: relative;
 }
 .timestamp{
   font-size: .7rem;
   opacity: .7;
-  position: absolute;
-  top: -10px;
-  left: 5px;
-  width: 80px;
 }
-.messageRight{
+.groupLeft img{
+  border-radius: 50%;
+  width: 50px;
+  aspect-ratio: 1/1;
+}
+
+.groupRight{
+  width: 100%;
+
   display: flex;
   flex-direction: column;
+  gap: 5px;
 }
+
 .username{
-  margin-block: 5px;
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 1.02rem;
 }
-.textContainer{
+ 
+.messages{
   padding-left: 8px;
   display: flex;
   flex-direction: column;
 }
 .message{
+  position: relative;
+  padding-right: 35px;
 }
+.message:hover{
+  background-color: rgb(247, 247, 247);
+}
+.darkMode .message:hover{
+  background-color: rgb(50, 53, 60);
+}
+.message.show{
+  background-color: rgb(247, 247, 247);
+}
+.darkMode .message.show{
+  background-color: rgb(50, 53, 60);
+
+}
+.message:hover .toggleOptions img{
+  display: block;
+}
+
+.toggleOptions img{
+  position: absolute;
+  top: 0;
+  left: 100%;
+  transform: translatex(-30px);
+  display: none;
+}
+.toggleOptions img.show{
+  display: block;
+}
+.options{
+  position: absolute;
+
+  top: 0;
+  left: 100%;
+  transform: translate(-50px,4px);
+
+  padding: 0;
+  width: 55px;
+  text-align: center;
+  list-style: none;
+  font-size: 1.1rem;
+  border-radius: 5px;
+
+  
+  color: white;
+  background-color: rgb(13, 53, 17);
+}
+.options li{
+  width: 100%;
+  border-top: 1px solid wheat;
+}
+.options li:hover{
+  cursor: pointer;
+  color: rgb(6, 40, 17);
+  background-color: antiquewhite;
+}
+
+
+
 
 .chatHub{
   border: 1px solid;
-  height: 50px;
+  height: 70px;
   display: flex;
   flex-direction: row;
   gap: 10px;
   align-items: center;
-  padding: 3px 30px;
+  /* padding: 3px 30px; */
 }
 .fileInput{
   display: inline-block;
@@ -109,4 +178,4 @@
 .chatHub button{
   height: 100%;
   background-color: white;
-}
+} 

@@ -6,7 +6,7 @@ function Animation({path, type="loop", speed=1, onClick=null}){
 
     useEffect(()=>{
         const [folder, numFiles] = path.split("?");
-        
+        frame.current = 0;
         let raf
         let dt = Date.now()
         const updateImg = ()=>{
@@ -17,6 +17,7 @@ function Animation({path, type="loop", speed=1, onClick=null}){
             const currTime = Date.now()
             imgRef.current.src = `${folder}/${Math.floor(frame.current)}.png`
             frame.current += ((currTime - dt) / 1000) * speed
+            console.log(frame.current, imgRef.current.src)
             dt = currTime
 
             if (frame.current >= Number(numFiles)){
@@ -35,7 +36,7 @@ function Animation({path, type="loop", speed=1, onClick=null}){
         return () => {
             cancelAnimationFrame(raf)
         }
-    }, [])
+    }, [path])
 
     function replay(){
         onClick()

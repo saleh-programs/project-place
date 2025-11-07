@@ -23,8 +23,13 @@ function Chat(){
 
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
-  const [editID, setEditID] = useState(null)
+  const [selectedID, setSelectedID] = useState(null)
   const [editMessage, setEditMessage] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
+  const editRefs = useRef({
+    "isEditing": false,
+    "selectedID": null
+  })
   const filesRef = useRef(null)
 
   const [groupedMessages, setGroupedMessages] = useState([])
@@ -53,6 +58,7 @@ function Chat(){
   useEffect(()=>{
     const mainScrollableElem = mainScrollableRef.current
     externalChatRef.current = externalChat
+
     if (siteHistoryRef.current["chatHistoryReceived"]){
       const newGroups = getGroupedMessages(messagesRef.current)
       const newRange = [(newGroups.length + 10) - 20, newGroups.length + 10]
@@ -75,6 +81,7 @@ function Chat(){
       lazyLoading.current["allLoaded"] = messagesRef.current.length === 0 
       lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
     }
+
     let called = false
     let stickTimer
     function onScroll(){
@@ -131,9 +138,26 @@ function Chat(){
       requestAnimationFrame(watchHeight)
     }
     requestAnimationFrame(watchHeight)
+
+
+    const unselectMessages = (e) => {
+      const elem = document.getElementById(editRefs.current["selectedID"])
+      console.log(elem, editRefs.current["selectedID"])
+      elem && console.log(!elem.contains(e.target))
+      if (elem && !elem.contains(e.target)){
+        setSelectedID(null)
+        setIsEditing(false)
+        editRefs.current = {
+          "selectedID": null,
+          "isEditing": false
+        }
+      }
+    }
+    document.addEventListener("mousedown", unselectMessages)
     mainScrollableElem.addEventListener("scroll", onScroll)
     return ()=>{
       externalChatRef.current = (param1) => {}
+      document.removeEventListener("mousedown", unselectMessages)
       mainScrollableElem.removeEventListener("scroll", onScroll)
       cancelAnimationFrame(watchHeight)
     }
@@ -384,18 +408,13 @@ function Chat(){
       "origin": "chat",
       "type": "edit",
       "username": username,
-      "data": {"messageID": editID, "text": editMessage}
+      "data": {"messageID": selectedID, "text": editMessage}
     })
-    setEditID(null)
-    setEditMessage("")
-  }
-  function toggleEdit(messageID, text){
-    if (editID === messageID){
-      setEditID(null)
-      setEditMessage("")
-    }else{
-      setEditID(messageID)
-      setEditMessage(text)
+    setSelectedID(null)
+    setIsEditing(false)
+    editRefs.current = {
+      "isEditing": false,
+      "selectedID": null
     }
   }
   // newMessage: update if pending image, else update grouped & raw messages
@@ -496,68 +515,93 @@ function Chat(){
         break
     }
   }
-
- 
+  
+  
   return(
-    <div className={styles.chatPage}>
+    <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`}>
       <h1 className={styles.title}>
-        <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={5}/> 
+        <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={8}/> 
       </h1>
       <section ref={mainScrollableRef} className={styles.chatDisplay}> 
         {
           groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group)=>{
             const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
             return (
-              <div key={group["timestamp"]} className={styles.messageContainer}>
-                <section className={styles.messageLeft}>
+              <div key={group["timestamp"]} className={styles.groupContainer}>
+                <section className={styles.groupLeft}>
                   <span className={styles.timestamp}>
                     {timestamp}
                   </span>
-                  <span className="profilePic">
-                    <img src={userStates[group["username"]]["avatar"]} alt="nth" />
-                  </span>
+                  <img src={userStates[group["username"]]["avatar"]} alt="nth" />
                 </section>
-                <section className={styles.messageRight}>
+                <section className={styles.groupRight}>
                   <div className={styles.username}>
                     {group["username"]}
                   </div>
-                  <div className={styles.textContainer}>
+                  <div className={styles.messages}>
                     { 
                       group["messages"].map((msgID)=>{
                         const msg = mappedMessages[msgID]
                         return (
-                          <div key={msgID} className={`${styles.message}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
+                          <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
                             {msg["files"].map(filePath => {
                               return <FileViewer key={filePath} url={filePath}/>
                             })}
-                            {editID === msgID 
+                            {selectedID === msgID && isEditing  
                               ?
-                             <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
+                              <>
+                                <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
+                                <button onClick={changeMessage}>Submit</button>
+                              </>
                               :
                               msg["text"]
                             }
                             {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}  
                             {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
-                            {msg["username"] === username && msg["status"] !== "failed" &&
-                              <>
-                              <button onClick={()=>deleteMessage(msg["metadata"]["messageID"])}>Delete</button>
-                              {msg["files"].length === 0 && <button onClick={()=>toggleEdit(msgID, msg["text"])}>{editID === msgID ? "Cancel": "Edit"}</button>}
-                              {editID === msgID && <button onClick={changeMessage}>Submit</button>}
-                              </>
-                            }
+                            <div className={styles.toggleOptions}>
+                              <img 
+                                className={selectedID === msgID ? styles.show : ""}
+                                src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options" 
+                                onClick={()=>{
+                                  if (isEditing){
+                                    return
+                                  }
+                                  editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
+                                  setSelectedID(editRefs.current["selectedID"])
+                                }}
+                              />
+                              {
+                                selectedID === msgID && !isEditing &&
+                                <ul className={styles.options}>
+                                    {msg["files"].length === 0 &&
+                                    <li onClick={()=>{
+                                      setIsEditing(true)
+                                      editRefs.current["isEditing"] = true
+                                      setEditMessage(msg["text"])
+                                      console.log("het")
+                                    }
+                                    }>Edit
+                                    </li>}
+                                    <li onClick={()=>{
+                                      setSelectedID(null)
+                                      editRefs.current["selectedID"] = null
+                                      deleteMessage(msgID)
+                                    }}>Delete</li>
+                                  </ul>
+                              }
+                            </div>
+
                           </div>
                         )
                       })
                     }
                   </div>
-
                 </section> 
               </div>
             )
           })
         } 
       </section>
-      <button style={{width:"250px"}} onClick={(e)=>e.target.innerText=`${lazyLoading.current["stickToBottom"]} and ${mainScrollableRef.current.scrollHeight}`}>check</button>
       {roomID &&
         <section className={styles.chatHub}>
             <Animation path={"/submit?3"} type="button" speed={20} onClick={handleMessage}/>

@@ -11,6 +11,7 @@ function Sidebar(){
 
   function startDrag(e){
     e.preventDefault()
+    console.log("here?")
     const imgOffset = e.clientX - e.currentTarget.getBoundingClientRect().left
 
     const collapseBoundary = 50
