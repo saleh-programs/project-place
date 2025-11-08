@@ -7,6 +7,8 @@ function Animation({path, type="loop", speed=1, onClick=null}){
     const canvasRef = useRef(null)
     const cxtRef = useRef(null)
 
+    const rafRef = useRef(null)
+
     const [dimensions, setDimensions] = useState(null)
 
     useEffect(()=>{
@@ -25,9 +27,9 @@ function Animation({path, type="loop", speed=1, onClick=null}){
         cxtRef.current = canvasRef.current.getContext("2d")
         frame.current = 0;
 
-        let raf
         let last = Date.now()
         const updateCanvas = () => {
+            cxtRef.current.clearRect(0,0,dimensions[0],dimensions[1])
             cxtRef.current.drawImage(frameList.current[Math.floor(frame.current)], 0, 0)
             const currTime = Date.now()
             frame.current += ((currTime - last) / 1000) * speed
@@ -39,24 +41,25 @@ function Animation({path, type="loop", speed=1, onClick=null}){
                     return
                 }
             }
-            raf = requestAnimationFrame(updateCanvas)
+            rafRef.current = requestAnimationFrame(updateCanvas)
         }
 
         if (type !== "button"){
             updateCanvas()
         }
         return () => {
-            cancelAnimationFrame(raf)
+            cancelAnimationFrame(rafRef.current)
         }
     }, [dimensions])
 
     function replay(){
+        cancelAnimationFrame(rafRef.current)
         onClick()
         frame.current = 1
         
-        let raf
         let last = Date.now()
         const updateCanvas = () => {
+            cxtRef.current.clearRect(0,0,dimensions[0],dimensions[1])
             cxtRef.current.drawImage(frameList.current[Math.floor(frame.current)], 0, 0)
             const currTime = Date.now()
             frame.current += ((currTime - last) / 1000) * speed
@@ -64,12 +67,13 @@ function Animation({path, type="loop", speed=1, onClick=null}){
 
             if (frame.current >= frameList.current.length){
                 frame.current = 0
-                requestAnimationFrame(()=>{
+                rafRef.current = requestAnimationFrame(()=>{
+                    cxtRef.current.clearRect(0,0,dimensions[0],dimensions[1])
                     cxtRef.current.drawImage(frameList.current[0], 0, 0)
                 })
                 return
             }
-            raf = requestAnimationFrame(updateCanvas)
+            rafRef.current = requestAnimationFrame(updateCanvas)
         }
         updateCanvas()
     }
