@@ -1,71 +1,85 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
+import {preload} from "src/assets/preloadedImages.js"
 
 function Animation({path, type="loop", speed=1, onClick=null}){
-    const imgRef = useRef(null)
-    const frame = useRef(0);
+    const frame = useRef(0)
+    const frameList = useRef([])
+    const canvasRef = useRef(null)
+    const cxtRef = useRef(null)
+
+    const [dimensions, setDimensions] = useState(null)
 
     useEffect(()=>{
-        const [folder, numFiles] = path.split("?");
-        frame.current = 0;
-        let raf
-        let dt = Date.now()
-        const updateImg = ()=>{
-            if (!imgRef.current){
-                raf = requestAnimationFrame(updateImg)
-                return
-            }
-            const currTime = Date.now()
-            imgRef.current.src = `${folder}/${Math.floor(frame.current)}.png`
-            frame.current += ((currTime - dt) / 1000) * speed
-            console.log(frame.current, imgRef.current.src)
-            dt = currTime
+        const [frames, loadingFrames] = preload(path)
+        loadingFrames.then(()=>{
+            setDimensions([frames[0].width, frames[0].height])
+            frameList.current = frames
+        })
+    },[path])
 
-            if (frame.current >= Number(numFiles)){
+    useEffect(()=>{
+        if (!dimensions){
+            return
+        }
+
+        cxtRef.current = canvasRef.current.getContext("2d")
+        frame.current = 0;
+
+        let raf
+        let last = Date.now()
+        const updateCanvas = () => {
+            cxtRef.current.drawImage(frameList.current[Math.floor(frame.current)], 0, 0)
+            const currTime = Date.now()
+            frame.current += ((currTime - last) / 1000) * speed
+            last = currTime
+
+            if (frame.current >= frameList.current.length){
                 frame.current = 0
                 if (type !== "loop"){ 
                     return
                 }
             }
-            raf = requestAnimationFrame(updateImg)
+            raf = requestAnimationFrame(updateCanvas)
         }
-        if (type !== "button"){
-            updateImg()
-        }
-        
 
+        if (type !== "button"){
+            updateCanvas()
+        }
         return () => {
             cancelAnimationFrame(raf)
         }
-    }, [path])
+    }, [dimensions])
 
     function replay(){
         onClick()
         frame.current = 1
-        const [folder, numFiles] = path.split("?");
         
         let raf
-        let dt = Date.now()
-        const updateImg = ()=>{
+        let last = Date.now()
+        const updateCanvas = () => {
+            cxtRef.current.drawImage(frameList.current[Math.floor(frame.current)], 0, 0)
             const currTime = Date.now()
-            imgRef.current.src = `${folder}/${Math.floor(frame.current)}.png`
-            frame.current += ((currTime - dt) / 1000) * speed
-            dt = currTime
+            frame.current += ((currTime - last) / 1000) * speed
+            last = currTime
 
-            if (frame.current >= Number(numFiles)){
+            if (frame.current >= frameList.current.length){
                 frame.current = 0
                 requestAnimationFrame(()=>{
-                    imgRef.current.src = `${folder}/0.png`
+                    cxtRef.current.drawImage(frameList.current[0], 0, 0)
                 })
                 return
             }
-            raf = requestAnimationFrame(updateImg)
+            raf = requestAnimationFrame(updateCanvas)
         }
-        updateImg()
+        updateCanvas()
     }
     
+    if (!dimensions){
+        return <></>
+    }
     return(
         <>
-            <img ref={imgRef} src={`${path.split("?")[0]}/0.png`} onClick={replay} alt="animation"/>
+            <canvas ref={canvasRef} width={dimensions[0]} height={dimensions[1]} onClick={replay}/>
         </>
     )
 }

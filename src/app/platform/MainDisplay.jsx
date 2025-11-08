@@ -130,6 +130,7 @@ function MainDisplay({children, username, initialUserInfo}){
     roomID, setRoomID,roomIDRef,
     messagesRef
   }
+
   useEffect(()=>{
     roomIDRef.current = roomID
   },[roomID])

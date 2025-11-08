@@ -142,7 +142,6 @@ function Chat(){
 
     const unselectMessages = (e) => {
       const elem = document.getElementById(editRefs.current["selectedID"])
-      console.log(elem, editRefs.current["selectedID"])
       elem && console.log(!elem.contains(e.target))
       if (elem && !elem.contains(e.target)){
         setSelectedID(null)
@@ -274,7 +273,7 @@ function Chat(){
     }
 
     for (let i = 0; i < rightGroup["messages"].length; i++){
-      leftGroup["messages"].push(rightGroup["messages"][i])
+      leftGroup["messages"].push(rightGroup["messconsoages"][i])
     }
     return [...groups, ...newGroups.slice(1)]
   }
