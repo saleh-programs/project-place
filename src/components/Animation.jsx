@@ -46,6 +46,9 @@ function Animation({path, type="loop", speed=1, onClick=null}){
 
         if (type !== "button"){
             updateCanvas()
+        }else{
+            cxtRef.current.clearRect(0,0,dimensions[0],dimensions[1])
+            cxtRef.current.drawImage(frameList.current[Math.floor(frame.current)], 0, 0)
         }
         return () => {
             cancelAnimationFrame(rafRef.current)

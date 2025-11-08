@@ -515,7 +515,8 @@ function Chat(){
     }
   }
   
-  
+  let lastSeenDay = null
+  const today = new Date().toDateString()
   return(
     <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`}>
       <h1 className={styles.title}>
@@ -525,85 +526,99 @@ function Chat(){
         {
           groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group)=>{
             const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
+            
+            const day = new Date(group["timestamp"]).toDateString()
+            const newDay = day !== lastSeenDay
+            if (newDay){
+              lastSeenDay = day
+            }
             return (
-              <div key={group["timestamp"]} className={styles.groupContainer}>
-                <section className={styles.groupLeft}>
-                  <span className={styles.timestamp}>
-                    {timestamp}
-                  </span>
-                  <img src={userStates[group["username"]]["avatar"]} alt="nth" />
-                </section>
-                <section className={styles.groupRight}>
-                  <div className={styles.username}>
-                    {group["username"]}
-                  </div>
-                  <div className={styles.messages}>
-                    { 
-                      group["messages"].map((msgID)=>{
-                        const msg = mappedMessages[msgID]
-                        return (
-                          <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
-                            {msg["files"].map(filePath => {
-                              return <FileViewer key={filePath} url={filePath}/>
-                            })}
-                            {selectedID === msgID && isEditing  
-                              ?
-                              <>
-                                <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
-                                <button onClick={changeMessage}>Submit</button>
-                              </>
-                              :
-                              msg["text"]
-                            }
-                            {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}  
-                            {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
-                            <div className={styles.toggleOptions}>
-                              <img 
-                                className={selectedID === msgID ? styles.show : ""}
-                                src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options" 
-                                onClick={()=>{
-                                  if (isEditing){
-                                    return
-                                  }
-                                  editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
-                                  setSelectedID(editRefs.current["selectedID"])
-                                }}
-                              />
-                              {
-                                selectedID === msgID && !isEditing &&
-                                <ul className={styles.options}>
-                                    {msg["files"].length === 0 &&
-                                    <li onClick={()=>{
-                                      setIsEditing(true)
-                                      editRefs.current["isEditing"] = true
-                                      setEditMessage(msg["text"])
-                                      console.log("het")
-                                    }
-                                    }>Edit
-                                    </li>}
-                                    <li onClick={()=>{
-                                      setSelectedID(null)
-                                      editRefs.current["selectedID"] = null
-                                      deleteMessage(msgID)
-                                    }}>Delete</li>
-                                  </ul>
+              <>
+                {newDay && 
+                <div>
+                  {day === today ? "Today" : day}
+                  <br />
+                </div>
+                }
+                <div key={group["timestamp"]} className={styles.groupContainer}>
+                  <section className={styles.groupLeft}>
+                    <span className={styles.timestamp}>
+                      {timestamp}
+                    </span>
+                    <img src={userStates[group["username"]]["avatar"]} alt="nth" />
+                  </section>
+                  <section className={styles.groupRight}>
+                    <div className={styles.username}>
+                      {group["username"]}
+                    </div>
+                    <div className={styles.messages}>
+                      { 
+                        group["messages"].map((msgID)=>{
+                          const msg = mappedMessages[msgID]
+                          return (
+                            <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
+                              {msg["files"].map(filePath => {
+                                return <FileViewer key={filePath} url={filePath}/>
+                              })}
+                              {selectedID === msgID && isEditing  
+                                ?
+                                <>
+                                  <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
+                                  <button onClick={changeMessage}>Submit</button>
+                                </>
+                                :
+                                msg["text"]
                               }
-                            </div>
+                              {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}  
+                              {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
+                              <div className={styles.toggleOptions}>
+                                <img 
+                                  className={selectedID === msgID ? styles.show : ""}
+                                  src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options" 
+                                  onClick={()=>{
+                                    if (isEditing){
+                                      return
+                                    }
+                                    editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
+                                    setSelectedID(editRefs.current["selectedID"])
+                                  }}
+                                />
+                                {
+                                  selectedID === msgID && !isEditing &&
+                                  <ul className={styles.options}>
+                                      {msg["files"].length === 0 &&
+                                      <li onClick={()=>{
+                                        setIsEditing(true)
+                                        editRefs.current["isEditing"] = true
+                                        setEditMessage(msg["text"])
+                                        console.log("het")
+                                      }
+                                      }>Edit
+                                      </li>}
+                                      <li onClick={()=>{
+                                        setSelectedID(null)
+                                        editRefs.current["selectedID"] = null
+                                        deleteMessage(msgID)
+                                      }}>Delete</li>
+                                    </ul>
+                                }
+                              </div>
 
-                          </div>
-                        )
-                      })
-                    }
-                  </div>
-                </section> 
-              </div>
+                            </div>
+                          )
+                        })
+                      }
+                    </div>
+                  </section> 
+                </div>
+              </>
             )
           })
         } 
       </section>
       {roomID &&
         <section className={styles.chatHub}>
-            <Animation path={"/submit?3"} type="button" speed={20} onClick={handleMessage}/>
+            <Animation path={"/submit?4"} type="button" speed={5} onClick={handleMessage}/>
 
             <label className={styles.fileInput}>
               <img src={"de"} alt="upload" />

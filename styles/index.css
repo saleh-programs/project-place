@@ -1,9 +1,9 @@
-/* @font-face {
+@font-face {
   font-family: "Exo 2";
   src: url("/fonts/Exo2-VariableFont_wght.ttf") format("truetype");
   font-weight: 100 900;
   font-style: normal;
-} */
+}
 
 html, body, #root{
   height: 100vh;

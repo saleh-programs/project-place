@@ -8,6 +8,7 @@
   background-color: rgb(50, 110, 207);
   padding: 30px;
   border-radius: 10px;
+  z-index: 100;
 } 
 
 .escape{
