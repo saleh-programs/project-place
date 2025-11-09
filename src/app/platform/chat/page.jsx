@@ -37,7 +37,7 @@ function Chat(){
 
   const virtualizer = useVirtualizer({
     count: groupedMessages.length,
-    estimateSize: ()=>500,
+    estimateSize: ()=>1000,
     getScrollElement: () => mainScrollableRef.current,
   })
   /*
@@ -495,7 +495,6 @@ function Chat(){
                 ref={virtualizer.measureElement}
                 style={{
                   transform:`translateY(${vItem.start}px)`,
-                  // height: `${vItem.size}px`,
                   position: "absolute",
                   top: 0,
                   left: 0,
@@ -521,8 +520,9 @@ function Chat(){
                               const msg = mappedMessages[msgID]
                               return (
                                 <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
-                                  {msg["files"].map(filePath => {
-                                    return <FileViewer key={filePath} url={filePath}/>
+                                  {msg["files"].map((filePath, i) => {
+                                    console.log(msg)
+                                    return <FileViewer key={filePath} url={filePath} dimensions={msg["metadata"]["dimensions"][i]}/>
                                   })}
                                   {selectedID === msgID && isEditing
                                     ?

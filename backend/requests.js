@@ -129,7 +129,7 @@ async function uploadFilesReq(files) {
   if (!data.success){
     throw new Error(data.message ||"req failed")
   }
-  return data.data["paths"]
+  return data.data
 }
 async function storeMessageReq(message, roomID, token=null) {
   let options;

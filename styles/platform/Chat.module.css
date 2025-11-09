@@ -94,10 +94,19 @@
   position: relative;
   padding-right: 35px;
 }
-.message > a img, .message > video{
-  min-width: 10%;
-  max-width: 80%;
+.message > a img{
+  /* height: 100px; */
   border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.072);
+}
+.message > a audio{
+  height: 50px;
+
+}
+.message > a embed,.message > video{
+  height: 200px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.072);
 }
 .message button{
   background-color: aliceblue;

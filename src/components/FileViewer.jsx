@@ -37,7 +37,7 @@ const extensionToMimeType = {
     
 }
 
-function FileViewer({url}){
+function FileViewer({url, dimensions}){
     function getFile(){
         const extension = url.split(".").at(-1).toLowerCase()
         let mimeType = "application/octet-stream"
@@ -51,7 +51,8 @@ function FileViewer({url}){
 
         switch (fileCategory){
             case "image":
-                return <img src={url} alt="file" />
+                const height = Math.min(200,Math.max(50,dimensions[1]))
+                return <img style={{height: `${height}px`}} src={url} alt="file" />
             case "video":
                 return <video src={url} controls/>
             case "audio":

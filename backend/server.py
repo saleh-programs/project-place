@@ -103,6 +103,7 @@ with AccessDatabase() as cursor:
       messageID VARCHAR(50) UNIQUE,
       roomID VARCHAR(10),
       files JSON,
+      dimensions JSON,
       text TEXT,
       username VARCHAR(70),
       timestamp BIGINT,
@@ -248,7 +249,7 @@ def createRoom():
     canvasImg.save(buffer, format="PNG")
     canvasBytes = buffer.getvalue()
     cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]", roomID))
-  return jsonfify({"success": True, "data": {"roomID": roomID}}), 200
+  return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
 @app.route("/rooms/files", methods=["POST"])
 @handleError("failed to upload files")
@@ -269,7 +270,7 @@ def uploadFiles():
     localPath = f"files/{fileID}"
     file.save(localPath)
 
-    const fileType = file.mimetype.split("/")[0]
+    fileType = file.mimetype.split("/")[0]
     if (fileType == "image"):
       with Image.open(localPath) as img:
         w,h = img.size
@@ -327,8 +328,8 @@ def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
   with AccessDatabase() as cursor:  
-    cursor.execute("INSERT INTO messages (username, text, files, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s, %s, %s)", 
-    (message["username"], message["text"], json.dumps(message["files"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
+    cursor.execute("INSERT INTO messages (username, text, files,dimensions, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s,%s, %s, %s)", 
+    (message["username"], message["text"], json.dumps(message["files"]),json.dumps(message["metadata"]["dimensions"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
 
   return jsonify({"success":True}),200
 
@@ -369,7 +370,7 @@ def deleteMessage(roomID):
 @authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
+    cursor.execute("SELECT username, text, files, dimensions,timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
     messages = cursor.fetchall()
     jsonMessages = []
     for i in range(len(messages)-1,-1,-1):
@@ -379,8 +380,9 @@ def getMessages(roomID):
         "text": tpl[1],
         "files": json.loads(tpl[2]),
         "metadata": {
-          "timestamp": tpl[3],
-          "messageID": tpl[4] 
+          "dimensions": json.loads(tpl[3]),
+          "timestamp": tpl[4],
+          "messageID": tpl[5],
         }
       })
   return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
@@ -394,7 +396,7 @@ def getMoreMessages(roomID):
 
     cursor.execute("SELECT id FROM messages WHERE messageID = %s", (messageID,))
     lastID = cursor.fetchone()[0]
-    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s AND id < %s ORDER BY id DESC LIMIT 100", (roomID, lastID))
+    cursor.execute("SELECT username, text, files, dimensions, timestamp, messageID FROM messages WHERE roomID = %s AND id < %s ORDER BY id DESC LIMIT 100", (roomID, lastID))
     messages = cursor.fetchall()
 
     jsonMessages = []
@@ -405,8 +407,9 @@ def getMoreMessages(roomID):
         "text": tpl[1],
         "files": json.loads(tpl[2]),
         "metadata": {
-          "timestamp": tpl[3],
-          "messageID": tpl[4] 
+          "dimensions": json.loads(tpl[3]),
+          "timestamp": tpl[4],
+          "messageID": tpl[5] 
         }
       })
   return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
