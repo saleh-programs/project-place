@@ -38,33 +38,42 @@ const extensionToMimeType = {
 }
 
 function FileViewer({url}){
-    const extension = url.split(".").at(-1).toLowerCase()
-    let mimeType = "application/octet-stream"
-    if (extension.length === url.length){
-        return
+    function getFile(){
+        const extension = url.split(".").at(-1).toLowerCase()
+        let mimeType = "application/octet-stream"
+        if (extension.length === url.length){
+            return
+        }
+        if (Object.hasOwn(extensionToMimeType, extension)){
+            mimeType = extensionToMimeType[extension]
+        }
+        const [fileCategory, fileKind] = mimeType.split("/")
+
+        switch (fileCategory){
+            case "image":
+                return <img src={url} alt="file" />
+            case "video":
+                return <video src={url} controls/>
+            case "audio":
+                return <audio src={url} controls/>
+            case "application":
+                if (fileKind === "pdf"){
+                    return <embed src={url} />
+                }
+                if (["zip", "x-tar", "x-rar-compressed", "x-7z-compressed"].includes(fileKind)){
+                    return <img src="/compressed_file_icon.png" alt="file" />
+                }
+                return <img src="/uncommon_file_icon.png" alt="file" />
+            case "text":
+                return <img src="/file_icon.png" alt="file" />
+        }
+        return  <img src="/uncommon_file_icon.png" alt="file" />
     }
-    if (Object.hasOwn(extensionToMimeType, extension)){
-        mimeType = extensionToMimeType[extension]
+
+    const fileElem = getFile()
+    if (fileElem.type === "video"){
+        return fileElem
     }
-    const [fileCategory, fileKind] = mimeType.split("/")
-    switch (fileCategory){
-        case "image":
-            return <img src={url} alt="file" />
-        case "video":
-            return <video src={url} controls/>
-        case "audio":
-            return <audio src={url} controls/>
-        case "application":
-            if (fileKind === "pdf"){
-                return <embed src={url} />
-            }
-            if (["zip", "x-tar", "x-rar-compressed", "x-7z-compressed"].includes(fileKind)){
-                return <img src="/compressed_file_icon.png" alt="file" />
-            }
-            return <img src="/uncommon_file_icon.png" alt="file" />
-        case "text":
-            return <img src="/file_icon.png" alt="file" />
-    }
-    return  <img src="/uncommon_file_icon.png" alt="file" />
+    return <a href={url} target="_blank">{fileElem}</a>
 }
 export default FileViewer

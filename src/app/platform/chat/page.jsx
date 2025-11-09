@@ -3,6 +3,7 @@ import { useState, useContext, useEffect, useRef, useLayoutEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext.js"
 import Animation from "src/components/Animation"
 import FileViewer from "src/components/FileViewer"
+import { Fragment } from "react"
 
 import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
 import styles from "styles/platform/Chat.module.css"
@@ -61,8 +62,8 @@ function Chat(){
 
     if (siteHistoryRef.current["chatHistoryReceived"]){
       const newGroups = getGroupedMessages(messagesRef.current)
-      const newRange = [(newGroups.length + 10) - 20, newGroups.length + 10]
 
+      const newRange = newGroups.length < 20 ? [0,20] : [(newGroups.length + 10) - 20, newGroups.length + 10]
       setGroupedMessages(newGroups)
       setDisplayListRange([...newRange])
       lazyLoading.current["displayListRangeRef"] = [...newRange]
@@ -131,6 +132,9 @@ function Chat(){
 
     let lastHeight = mainScrollableElem.scrollHeight
     const watchHeight = () => {
+      if (lastHeight !== mainScrollableElem.scrollHeight){
+        console.log(lastHeight)
+      }
       if (lastHeight !== mainScrollableElem.scrollHeight && lazyLoading.current["stickToBottom"]){
         mainScrollableElem.scrollTop = mainScrollableElem.scrollHeight - mainScrollableElem.clientHeight
       }
@@ -167,6 +171,7 @@ function Chat(){
     const decrement = Math.min(rangeRef[0], 10) 
     const newRange = [rangeRef[0]-decrement, rangeRef[1]-decrement]
     lazyLoading.current["displayListRangeRef"] = [...newRange]
+
     setDisplayListRange([...newRange])
     mainScrollableRef.current.scrollTop += 10
     lazyLoading.current["loading"] = true
@@ -221,6 +226,7 @@ function Chat(){
   }
   useEffect(()=> {
     lazyLoading.current["loading"] = false
+    console.log(displayListRange)
   }, [displayListRange])
 
   useLayoutEffect(()=>{
@@ -273,7 +279,7 @@ function Chat(){
     }
 
     for (let i = 0; i < rightGroup["messages"].length; i++){
-      leftGroup["messages"].push(rightGroup["messconsoages"][i])
+      leftGroup["messages"].push(rightGroup["messages"][i])
     }
     return [...groups, ...newGroups.slice(1)]
   }
@@ -422,8 +428,8 @@ function Chat(){
     switch (data.type){
       case "chatHistory":
         const newGroups = getGroupedMessages(messagesRef.current)
-        const newRange = [(newGroups.length + 10) - 20, newGroups.length + 10]
 
+        const newRange = newGroups.length < 20 ? [0,20] : [(newGroups.length + 10) - 20, newGroups.length + 10]
         setGroupedMessages(newGroups)
         setDisplayListRange([...newRange])
         lazyLoading.current["displayListRangeRef"] = [...newRange]
@@ -533,14 +539,15 @@ function Chat(){
               lastSeenDay = day
             }
             return (
-              <>
+              <Fragment key={group["messages"][0]}>
                 {newDay && 
-                <div>
+                <div className={styles.dateHeader}>
+                  <span></span>
                   {day === today ? "Today" : day}
-                  <br />
+                  <span></span>
                 </div>
                 }
-                <div key={group["timestamp"]} className={styles.groupContainer}>
+                <div className={styles.groupContainer}>
                   <section className={styles.groupLeft}>
                     <span className={styles.timestamp}>
                       {timestamp}
@@ -564,7 +571,7 @@ function Chat(){
                                 ?
                                 <>
                                   <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
-                                  <button onClick={changeMessage}>Submit</button>
+                                  <button onClick={changeMessage}>Edit</button>
                                 </>
                                 :
                                 msg["text"]
@@ -591,7 +598,6 @@ function Chat(){
                                         setIsEditing(true)
                                         editRefs.current["isEditing"] = true
                                         setEditMessage(msg["text"])
-                                        console.log("het")
                                       }
                                       }>Edit
                                       </li>}
@@ -611,7 +617,7 @@ function Chat(){
                     </div>
                   </section> 
                 </div>
-              </>
+              </Fragment>
             )
           })
         } 

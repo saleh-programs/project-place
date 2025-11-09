@@ -32,8 +32,28 @@
 
   display: flex;
   flex-direction: column;
+  gap: 10px;
 }
 
+.dateHeader{
+  padding: 0px 15px 10px 15px;
+  font-weight: 500;
+  font-size: 1.1rem;
+
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dateHeader span:nth-of-type(1){
+  border-bottom: 1px dotted;
+  opacity: .2;
+  flex-basis: 5px;
+} 
+.dateHeader span:nth-of-type(2){
+  border-bottom: 1px dotted;
+  opacity: .2;
+  flex: 1;
+}
 .groupContainer{
   display: flex;
   gap: 3px;
@@ -76,6 +96,24 @@
 .message{
   position: relative;
   padding-right: 35px;
+}
+.message > a img, .message > video{
+  min-width: 10%;
+  max-width: 80%;
+  border-radius: 10px;
+}
+.message button{
+  background-color: aliceblue;
+  border: 1px solid;
+}
+.message input{
+  width: 100%;
+  border: 1px solid rgba(29, 28, 28, 0.289);
+  border-radius: 5px;
+  padding: 3px;
+}
+.message input:focus{
+  outline: 1px solid forestgreen;
 }
 .message:hover{
   background-color: rgb(247, 247, 247);
