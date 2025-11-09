@@ -30,9 +30,6 @@
   scrollbar-width: none;
   padding-top: 5px;
 
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .dateHeader{

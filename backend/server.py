@@ -248,7 +248,7 @@ def createRoom():
     canvasImg.save(buffer, format="PNG")
     canvasBytes = buffer.getvalue()
     cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]", roomID))
-  return jsonify({"success": True, "data": {"roomID": roomID}}), 200
+  return jsonfify({"success": True, "data": {"roomID": roomID}}), 200
 
 @app.route("/rooms/files", methods=["POST"])
 @handleError("failed to upload files")
@@ -256,6 +256,7 @@ def createRoom():
 def uploadFiles():
   files = request.files.getlist("files")
   exposedPaths = []
+  dimensions = []
   for file in files:
     extension = file.filename.split(".")[-1].lower()
 
@@ -267,7 +268,16 @@ def uploadFiles():
     exposedPaths.append(f"http://localhost:5000/rooms/files/{fileID}")
     localPath = f"files/{fileID}"
     file.save(localPath)
-  return jsonify({"success":True, "data": {"paths": exposedPaths}}),200
+
+    const fileType = file.mimetype.split("/")[0]
+    if (fileType == "image"):
+      with Image.open(localPath) as img:
+        w,h = img.size
+        dimensions.append([w, h])
+    else:
+      dimensions.append(None)
+    
+  return jsonify({"success":True, "data": {"paths": exposedPaths, "dimensions": dimensions}}),200
 
 @app.route("/rooms/files/<fileID>", methods=["GET"])
 @handleError("failed to get file")

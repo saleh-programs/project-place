@@ -1,5 +1,6 @@
 "use client"
 import { useState, useContext, useEffect, useRef, useLayoutEffect } from "react"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import ThemeContext from "src/assets/ThemeContext.js"
 import Animation from "src/components/Animation"
 import FileViewer from "src/components/FileViewer"
@@ -16,11 +17,9 @@ function Chat(){
     "allLoaded": false,
     "loading": false,
     "oldestID": null,
-    "displayListRangeRef": [0, 20],
     "numGroups": 0,
     "stickToBottom": true
   })
-  const [displayListRange, setDisplayListRange] = useState([0, 20])
 
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
@@ -35,6 +34,12 @@ function Chat(){
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
+
+  const virtualizer = useVirtualizer({
+    count: groupedMessages.length,
+    estimateSize: ()=>500,
+    getScrollElement: () => mainScrollableRef.current,
+  })
   /*
 
   Message Structure:
@@ -46,7 +51,8 @@ function Chat(){
       "timestamp": number,
       "messageID": string,
       "edited": boolean,
-      "status": string
+      "status": string,
+      "dimensions": []
       },
   }
   Grouped Message Structure:
@@ -63,10 +69,7 @@ function Chat(){
     if (siteHistoryRef.current["chatHistoryReceived"]){
       const newGroups = getGroupedMessages(messagesRef.current)
 
-      const newRange = newGroups.length < 20 ? [0,20] : [(newGroups.length + 10) - 20, newGroups.length + 10]
       setGroupedMessages(newGroups)
-      setDisplayListRange([...newRange])
-      lazyLoading.current["displayListRangeRef"] = [...newRange]
 
       const newMappedMessages = {}
       messagesRef.current.forEach(msg => {
@@ -103,40 +106,24 @@ function Chat(){
         stickTimer = setTimeout(()=>{lazyLoading.current["stickToBottom"] = (maxScrollTop - mainScrollableRef.current.scrollTop) < 50},20)
         
         if (mainScrollableRef.current.scrollTop < 1){
-          mainScrollableRef.current.scrollTop = 1
+          // mainScrollableRef.current.scrollTop = 1
         }
         if (lazyLoading.current["loading"]){
           return
         }
         
-        if (!allLoaded && displayListRangeRef[0] === 0 && position < 2 ){
-          loadMoreHistory()
+        if (!allLoaded && position < 2 ){
+          // loadMoreHistory()
           return 
         }
-        //we don't worry about display window unless we have enough groups
-        if (numGroups < 20){
-          return
-        }
 
-        // debug()
-        //load earlier ranges into display window/platform/chat
-        if (position < 10 && displayListRangeRef[0] > 0){
-          renderEarlierValues()
-        }
-        //load later ranges into display window
-        if (position > 90 && displayListRangeRef[1] < numGroups + 10){
-          renderLaterValues()
-        }
       })
     }
 
     let lastHeight = mainScrollableElem.scrollHeight
     const watchHeight = () => {
-      if (lastHeight !== mainScrollableElem.scrollHeight){
-        console.log(lastHeight)
-      }
       if (lastHeight !== mainScrollableElem.scrollHeight && lazyLoading.current["stickToBottom"]){
-        mainScrollableElem.scrollTop = mainScrollableElem.scrollHeight - mainScrollableElem.clientHeight
+        // mainScrollableElem.scrollTop = mainScrollableElem.scrollHeight - mainScrollableElem.clientHeight
       }
       lastHeight = mainScrollableElem.scrollHeight
       requestAnimationFrame(watchHeight)
@@ -165,27 +152,7 @@ function Chat(){
       cancelAnimationFrame(watchHeight)
     }
   },[])
-  function renderEarlierValues(){
-    const rangeRef = lazyLoading.current["displayListRangeRef"]
 
-    const decrement = Math.min(rangeRef[0], 10) 
-    const newRange = [rangeRef[0]-decrement, rangeRef[1]-decrement]
-    lazyLoading.current["displayListRangeRef"] = [...newRange]
-
-    setDisplayListRange([...newRange])
-    mainScrollableRef.current.scrollTop += 10
-    lazyLoading.current["loading"] = true
-  }
-  function renderLaterValues(){
-    const rangeRef = lazyLoading.current["displayListRangeRef"]
-
-    const increment = Math.min((lazyLoading.current["numGroups"] + 10) - rangeRef[1], 10) 
-    const newRange = [rangeRef[0]+increment, rangeRef[1]+increment]
-    lazyLoading.current["displayListRangeRef"] = [...newRange]
-    setDisplayListRange([...newRange])
-    mainScrollableRef.current.scrollTop -= 10
-    lazyLoading.current["loading"] = true
-  }
   async function loadMoreHistory(){
     lazyLoading.current["loading"] = true
     const olderMessages = lazyLoading.current["oldestID"] ? await getOlderMessagesReq(lazyLoading.current["oldestID"], roomIDRef.current) : null
@@ -213,29 +180,11 @@ function Chat(){
       setMappedMessages(prev => {
         return {...newMappedMessages, ...prev}
       })
-      setGroupedMessages(prev => {
-        const newGroups = prependGroupedMessages(prev, olderMessages)
-        const numGroupsAdded = newGroups.length-prev.length
-        if (numGroupsAdded !== 0){
-          lazyLoading.current["displayListRangeRef"] = [numGroupsAdded, numGroupsAdded + 20]
-          renderEarlierValues()
-        }
-        return newGroups
-      })
+      setGroupedMessages(prev => prependGroupedMessages(prev, olderMessages))
     }
   }
-  useEffect(()=> {
-    lazyLoading.current["loading"] = false
-    console.log(displayListRange)
-  }, [displayListRange])
-
-  useLayoutEffect(()=>{
+  useEffect(()=>{
     lazyLoading.current["numGroups"] = groupedMessages.length
-    if (lazyLoading.current["stickToBottom"]){
-      if (groupedMessages.length >= displayListRange[1]){
-        renderLaterValues()
-      }
-    }
   },[groupedMessages])
 
 
@@ -320,7 +269,8 @@ function Chat(){
       "metadata":{
         "timestamp": currTime,
         "messageID": messageID,
-        "edited": false
+        "edited": false,
+        "dimensions": []
       }
     }
     sendJsonMessage({
@@ -363,11 +313,12 @@ function Chat(){
     const msg = {
       "username": username,
       "text": "",
-      "files": filePaths,
+      "files": filePaths["paths"],
       "metadata":{
         "timestamp": currTime,
         "messageID": messageID,
-        "edited": false
+        "edited": false,
+        "dimensions": filePaths["dimensions"]
       }
     }
     sendJsonMessage({
@@ -429,10 +380,7 @@ function Chat(){
       case "chatHistory":
         const newGroups = getGroupedMessages(messagesRef.current)
 
-        const newRange = newGroups.length < 20 ? [0,20] : [(newGroups.length + 10) - 20, newGroups.length + 10]
         setGroupedMessages(newGroups)
-        setDisplayListRange([...newRange])
-        lazyLoading.current["displayListRangeRef"] = [...newRange]
 
         const newMappedMessages = {}
         messagesRef.current.forEach(msg => {
@@ -528,102 +476,111 @@ function Chat(){
       <h1 className={styles.title}>
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={8}/> 
       </h1>
-      <section ref={mainScrollableRef} className={styles.chatDisplay}> 
-        {
-          groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group)=>{
-            const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
-            
-            const day = new Date(group["timestamp"]).toDateString()
-            const newDay = day !== lastSeenDay
-            if (newDay){
-              lastSeenDay = day
-            }
-            return (
-              <Fragment key={group["messages"][0]}>
-                {newDay && 
-                <div className={styles.dateHeader}>
-                  <span></span>
-                  {day === today ? "Today" : day}
-                  <span></span>
-                </div>
-                }
-                <div className={styles.groupContainer}>
-                  <section className={styles.groupLeft}>
-                    <span className={styles.timestamp}>
-                      {timestamp}
-                    </span>
-                    <img src={userStates[group["username"]]["avatar"]} alt="nth" />
-                  </section>
-                  <section className={styles.groupRight}>
-                    <div className={styles.username}>
-                      {group["username"]}
-                    </div>
-                    <div className={styles.messages}>
-                      { 
-                        group["messages"].map((msgID)=>{
-                          const msg = mappedMessages[msgID]
-                          return (
-                            <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
-                              {msg["files"].map(filePath => {
-                                return <FileViewer key={filePath} url={filePath}/>
-                              })}
-                              {selectedID === msgID && isEditing  
-                                ?
-                                <>
-                                  <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
-                                  <button onClick={changeMessage}>Edit</button>
-                                </>
-                                :
-                                msg["text"]
-                              }
-                              {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}  
-                              {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
-                              <div className={styles.toggleOptions}>
-                                <img 
-                                  className={selectedID === msgID ? styles.show : ""}
-                                  src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options" 
-                                  onClick={()=>{
-                                    if (isEditing){
-                                      return
-                                    }
-                                    editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
-                                    setSelectedID(editRefs.current["selectedID"])
-                                  }}
-                                />
-                                {
-                                  selectedID === msgID && !isEditing &&
-                                  <ul className={styles.options}>
-                                      {msg["files"].length === 0 &&
-                                      <li onClick={()=>{
-                                        setIsEditing(true)
-                                        editRefs.current["isEditing"] = true
-                                        setEditMessage(msg["text"])
-                                      }
-                                      }>Edit
-                                      </li>}
-                                      <li onClick={()=>{
-                                        setSelectedID(null)
-                                        editRefs.current["selectedID"] = null
-                                        deleteMessage(msgID)
-                                      }}>Delete</li>
-                                    </ul>
-                                }
-                              </div>
+      <div ref={mainScrollableRef} className={styles.chatDisplay}> 
+        <div style={{position: "relative", height: `${virtualizer.getTotalSize()}px`}}>
+          {
+            virtualizer.getVirtualItems().map((vItem)=>{
+              const group = groupedMessages[vItem.index]
 
-                            </div>
-                          )
-                        })
-                      }
+              const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
+          
+              const day = new Date(group["timestamp"]).toDateString()
+              const newDay = day !== lastSeenDay
+              if (newDay){
+                lastSeenDay = day
+              }
+              return (
+                <div 
+                key={vItem.key}
+                ref={virtualizer.measureElement}
+                style={{
+                  transform:`translateY(${vItem.start}px)`,
+                  // height: `${vItem.size}px`,
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%"
+                }}
+                data-index={vItem.index}
+                >
+ 
+                    <div className={styles.groupContainer}>
+                      <section className={styles.groupLeft}>
+                        <span className={styles.timestamp}>
+                          {timestamp}
+                        </span>
+                        <img src={userStates[group["username"]]["avatar"]} alt="nth" />
+                      </section>
+                      <section className={styles.groupRight}>
+                        <div className={styles.username}>
+                          {group["username"]}
+                        </div>
+                        <div className={styles.messages}>
+                          {
+                            group["messages"].map((msgID)=>{
+                              const msg = mappedMessages[msgID]
+                              return (
+                                <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
+                                  {msg["files"].map(filePath => {
+                                    return <FileViewer key={filePath} url={filePath}/>
+                                  })}
+                                  {selectedID === msgID && isEditing
+                                    ?
+                                    <>
+                                      <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
+                                      <button onClick={changeMessage}>Edit</button>
+                                    </>
+                                    :
+                                    msg["text"]
+                                  }
+                                  {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}
+                                  {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
+                                  <div className={styles.toggleOptions}>
+                                    <img
+                                      className={selectedID === msgID ? styles.show : ""}
+                                      src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options"
+                                      onClick={()=>{
+                                        if (isEditing){
+                                          return
+                                        }
+                                        editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
+                                        setSelectedID(editRefs.current["selectedID"])
+                                      }}
+                                    />
+                                    {
+                                      selectedID === msgID && !isEditing &&
+                                      <ul className={styles.options}>
+                                          {msg["files"].length === 0 &&
+                                          <li onClick={()=>{
+                                            setIsEditing(true)
+                                            editRefs.current["isEditing"] = true
+                                            setEditMessage(msg["text"])
+                                          }
+                                          }>Edit
+                                          </li>}
+                                          <li onClick={()=>{
+                                            setSelectedID(null)
+                                            editRefs.current["selectedID"] = null
+                                            deleteMessage(msgID)
+                                          }}>Delete</li>
+                                        </ul>
+                                    }
+                                  </div>
+                                </div>
+                              )
+                            })
+                          }
+                        </div>
+                      </section>
                     </div>
-                  </section> 
                 </div>
-              </Fragment>
-            )
-          })
-        } 
-      </section>
+              )
+            })
+          }
+        </div>
+      </div>
       {roomID &&
-        <section className={styles.chatHub}>
+        <div className={styles.chatHub}>
             <Animation path={"/submit?4"} type="button" speed={5} onClick={handleMessage}/>
 
             <label className={styles.fileInput}>
@@ -633,7 +590,7 @@ function Chat(){
             </label>
  
             <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
-          </section>
+          </div>
         }
     </div>
   )
