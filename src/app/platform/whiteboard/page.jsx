@@ -1,12 +1,12 @@
 "use client"
-import { useRef, useEffect, useContext, useState } from "react"
+import { useRef, useEffect, useContext, useState, useLayoutEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import Animation from "src/components/Animation"
 import styles from "styles/platform/Whiteboard.module.css"
 
 import { draw, fill, clear } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
-
+import { HexColorPicker } from "react-colorful"
 function Whiteboard(){
   const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRef, darkMode} = useContext(ThemeContext)
 
@@ -18,7 +18,8 @@ function Whiteboard(){
   const canvasInfo = useRef({
     "type": "draw",
     "color": "black",
-    "lineWidth": 10,
+    "selectingColor": "black",
+    "lineWidth": 3,
     "scale": 1.0,
     "translateX": -500,
     "translateY": -500,
@@ -33,15 +34,32 @@ function Whiteboard(){
     "black","white","gray","red","green","orange","blue", "cyan",
     "yellow", "purple", "brown", "pink"
   ]
+  const [queuedColors, setQueuedColors] = useState([])
   const [selectedTool, setSelectedTool] = useState("draw")
-  const pixelInputsRef = useRef(canvasInfo.current["lineWidth"])
+  const [selectedColor, setSelectedColor] = useState("black")
+  const [isSelecting, setIsSelecting] = useState(false)
+  const pixelInputsRef = useRef(null)
+  const colorSelectorRef = useRef(null)
+
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
+
+    const exitPicker = (e) => {
+      if (colorSelectorRef.current && !colorSelectorRef.current.contains(e.target)){
+        setIsSelecting(false)
+        setSelectedColor(canvasInfo.current["selectingColor"])
+        changeColor(canvasInfo.current["selectingColor"])
+        return
+      }
+    }
+    document.addEventListener("mousedown", exitPicker)
   return ()=>{
     externalWhiteboardRef.current = (param1) => {}
+    document.removeEventListener("mousedown", exitPicker)
+
   }
   },[])
-
+  console.log(canvasInfo.current)
   useEffect(()=>{
     if (roomID){
       sendJsonMessage({
@@ -66,6 +84,10 @@ function Whiteboard(){
     }
   },[roomID])
 
+  useLayoutEffect(()=>{
+    canvasRef.current && zoom("out")
+
+  },[roomID])
   function externalWhiteboard(data){
     /* when data.type differentiates canvas actions
     from other things we want to do on the whiteboard 
@@ -110,7 +132,6 @@ function Whiteboard(){
         state["operations"].push(data)
 
         if (state["operations"].length > 10){
-          console.log("new snapshot", state["operations"])
           cxtRef.current.putImageData(state["snapshot"], 0, 0)
           for (let i = 0; i <= state["latestOp"]; i++){
             updateCanvas(state["operations"][i])
@@ -126,10 +147,6 @@ function Whiteboard(){
         
     }
   }
-  function seeSnapshot(){
-    cxtRef.current.putImageData(savedCanvasInfoRef.current["snapshot"],0,0)
-  }
-
   function updateCanvas(data){
     const mapActions = {
       "isErasing": "erase",
@@ -332,6 +349,10 @@ function Whiteboard(){
     handleCanvasAction(update)
   } 
   function changeLineWidth(e){
+    if (e.target.value < 1 || e.target.value > 30){
+      e.target.value = canvasInfo.current["lineWidth"]
+      return
+    }
     canvasInfo.current["lineWidth"] = e.target.value
     const elems = pixelInputsRef.current.querySelectorAll("*")
     if ([...elems].some((elem)=>!elem)){
@@ -342,7 +363,14 @@ function Whiteboard(){
     elems[2].style.width = `${e.target.value}px`
     elems[2].style.height = `${e.target.value}px`
   }
-
+  function changeColor(color){
+    if (canvasInfo.current["color"] === color){
+      return
+    }
+    canvasInfo.current["color"] = color;
+    setQueuedColors(prev=>[color,...prev].slice(0,8))
+    setSelectedColor(color)
+  }
   return (
     <div className={`${styles.whiteboardPage} ${darkMode ? styles.darkMode : ""}`}>
       <h1 className={styles.title}>
@@ -376,6 +404,17 @@ function Whiteboard(){
                   handleCanvasAction(update)
                 }}
                 />
+                <span style={{backgroundColor: selectedColor}} className={styles.selectedColor} onClick={(e)=>{
+                  setIsSelecting(true)
+                }}>
+                  {isSelecting &&
+                  <span ref={colorSelectorRef}>
+                    <HexColorPicker color={"#000000"} onChange={(c)=>{
+                      canvasInfo.current["selectingColor"] = c;
+                      }}/>
+                  </span>
+                  }
+                </span>
           </div>
           <section className={styles.quickToolbar}>
             <span className={styles.reverseButtons}>
@@ -394,10 +433,12 @@ function Whiteboard(){
               handleCanvasAction(update)
             }}>CLEAR
             </button>
+            
           </section>
         </div>
         <div className={styles.tools}>
           <section className={styles.modesContainer}>
+            <button onClick={()=>{console.log(canvasInfo.current["selectingColor"])}}>hey</button>
             <button className={selectedTool === "draw" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "draw";setSelectedTool("draw")}}><img src="/tool_icons/pencil.png" alt="draw" /></button>
             <button className={selectedTool === "erase" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "erase";setSelectedTool("erase")}}><img src="/tool_icons/eraser.png" alt="erase" /></button>
             <button className={selectedTool === "fill" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "fill";setSelectedTool("fill")}}><img src="/tool_icons/fill.png" alt="fill" /></button>
@@ -408,17 +449,35 @@ function Whiteboard(){
             <input type="number" min={1} max={30} defaultValue={canvasInfo.current["lineWidth"]} onChange={changeLineWidth} />
             <span className={styles.pixelSize}></span>
           </section>
+          <span className={styles.separator}></span>
           <section className={styles.colorsContainer}>
-            <section className={styles.colors}>
               {
                 colors.map(item=>{
                   return (
-                    <span key={item} className={styles.color} style={{backgroundColor:`${item}`}} onClick={() => {canvasInfo.current["color"] = item}}>
+                    <span 
+                    key={item} 
+                    className={styles.color} 
+                    style={{backgroundColor:`${item}`}} 
+                    onClick={()=>changeColor(item)}>
                     </span>
                   )
                 })
               }
-            </section>
+          </section>
+          <span className={styles.separator}></span>
+          <section className={styles.colorQueue}>
+              {
+                queuedColors.map((item,i)=>{
+                  return (
+                    <span 
+                    key={`${item}${i}`} 
+                    className={styles.color} 
+                    style={{backgroundColor:`${item}`}} 
+                    onClick={()=>changeColor(item)}>
+                    </span>
+                  )
+                })
+              }
           </section>
         </div>
       </div>
