@@ -12,15 +12,17 @@ function Chat(){
   const {externalChatRef, sendJsonMessage, roomID, roomIDRef, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef, darkMode} = useContext(ThemeContext)
 
   const mainScrollableRef = useRef(null)
+  const numMsgsAvailable = 30 // actually number of messages available - 1
   const lazyLoading = useRef({
     "allLoaded": false,
     "loading": false,
     "oldestID": null,
-    "displayListRangeRef": [0, 20],
+    "displayListRangeRef": [0, numMsgsAvailable],
     "numGroups": 0,
     "stickToBottom": true
   })
-  const [displayListRange, setDisplayListRange] = useState([0, 20])
+
+  const [displayListRange, setDisplayListRange] = useState([0, numMsgsAvailable])
 
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
@@ -35,7 +37,8 @@ function Chat(){
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
-
+  console.log(groupedMessages.length)
+ 
   /*
 
   Message Structure:
@@ -65,7 +68,10 @@ function Chat(){
     if (siteHistoryRef.current["chatHistoryReceived"]){
       const newGroups = getGroupedMessages(messagesRef.current)
 
-      const newRange = newGroups.length < 20 ? [0,20] : [(newGroups.length + 10) - 20, newGroups.length + 10]
+      const newRange = newGroups.length < numMsgsAvailable 
+      ? [0, numMsgsAvailable] 
+      : [(newGroups.length + Math.floor(numMsgsAvailable/2)) - numMsgsAvailable, newGroups.length + Math.floor(numMsgsAvailable/2)]
+        
       setGroupedMessages(newGroups)
       setDisplayListRange([...newRange])
       lazyLoading.current["displayListRangeRef"] = [...newRange]
@@ -116,17 +122,17 @@ function Chat(){
           return 
         }
         //we don't worry about display window unless we have enough groups
-        if (numGroups < 20){
+        if (numGroups < numMsgsAvailable){
           return
         }
 
         // debug()
         //load earlier ranges into display window/platform/chat
-        if (position < 10 && displayListRangeRef[0] > 0){
+        if (position < 5 && displayListRangeRef[0] > 0){
           renderEarlierValues()
         }
         //load later ranges into display window
-        if (position > 90 && displayListRangeRef[1] < numGroups + 10){
+        if (position > 95 && displayListRangeRef[1] < numGroups + Math.floor(numMsgsAvailable/2)){
           renderLaterValues()
         }
 
@@ -168,7 +174,7 @@ function Chat(){
   function renderEarlierValues(){
     const rangeRef = lazyLoading.current["displayListRangeRef"]
 
-    const decrement = Math.min(rangeRef[0], 10) 
+    const decrement = Math.min(rangeRef[0], Math.floor(numMsgsAvailable / 2)) 
     const newRange = [rangeRef[0]-decrement, rangeRef[1]-decrement]
     lazyLoading.current["displayListRangeRef"] = [...newRange]
 
@@ -179,7 +185,7 @@ function Chat(){
   function renderLaterValues(){
     const rangeRef = lazyLoading.current["displayListRangeRef"]
 
-    const increment = Math.min((lazyLoading.current["numGroups"] + 10) - rangeRef[1], 10) 
+    const increment = Math.min((lazyLoading.current["numGroups"] + Math.floor(numMsgsAvailable/2)) - rangeRef[1], Math.floor(numMsgsAvailable/2)) 
     const newRange = [rangeRef[0]+increment, rangeRef[1]+increment]
     lazyLoading.current["displayListRangeRef"] = [...newRange]
     setDisplayListRange([...newRange])
@@ -217,7 +223,7 @@ function Chat(){
         const newGroups = prependGroupedMessages(prev, olderMessages)
         const numGroupsAdded = newGroups.length-prev.length
         if (numGroupsAdded !== 0){
-          lazyLoading.current["displayListRangeRef"] = [numGroupsAdded, numGroupsAdded + 20]
+          lazyLoading.current["displayListRangeRef"] = [numGroupsAdded, numGroupsAdded + numMsgsAvailable]
           renderEarlierValues()
         }
         return newGroups
@@ -431,7 +437,10 @@ function Chat(){
       case "chatHistory":
         const newGroups = getGroupedMessages(messagesRef.current)
 
-        const newRange = newGroups.length < 20 ? [0,20] : [(newGroups.length + 10) - 20, newGroups.length + 10]
+        const newRange = newGroups.length < numMsgsAvailable 
+        ? [0, numMsgsAvailable] 
+        : [(newGroups.length + Math.floor(numMsgsAvailable/2)) - numMsgsAvailable, newGroups.length + Math.floor(numMsgsAvailable/2)]
+        
         setGroupedMessages(newGroups)
         setDisplayListRange([...newRange])
         lazyLoading.current["displayListRangeRef"] = [...newRange]
@@ -532,7 +541,7 @@ function Chat(){
       </h1>
       <div ref={mainScrollableRef} className={styles.chatDisplay}> 
           {
-            groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group)=>{
+            groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group,index)=>{
               const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
           
               const day = new Date(group["timestamp"]).toDateString()
@@ -550,6 +559,7 @@ function Chat(){
                     </div>
                     }
                     <div className={styles.groupContainer}>
+                      <span style={{fontSize: "3rem"}}>{displayListRange[0] + index}</span>
                       <section className={styles.groupLeft}>
                         <span className={styles.timestamp}>
                           {timestamp}

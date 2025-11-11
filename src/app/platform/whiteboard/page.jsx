@@ -1,5 +1,5 @@
 "use client"
-import { useRef, useEffect, useContext } from "react"
+import { useRef, useEffect, useContext, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import Animation from "src/components/Animation"
 import styles from "styles/platform/Whiteboard.module.css"
@@ -8,20 +8,20 @@ import { draw, fill, clear } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRe, darkMode} = useContext(ThemeContext)
+  const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRef, darkMode} = useContext(ThemeContext)
 
   const canvasRef = useRef(null)
   const cxtRef = useRef(null)
   const hiddenCanvasRef = useRef(null)
-  const hiddenCxt = useRef(null)
+  const hiddenCxt = useRef(null) 
 
   const canvasInfo = useRef({
-    "type": "idle",
+    "type": "draw",
     "color": "black",
     "lineWidth": 10,
     "scale": 1.0,
-    "translateX": 0,
-    "translateY": 0,
+    "translateX": -500,
+    "translateY": -500,
     "compositionType": "source-over"
   })
   const strokes = useRef({
@@ -33,7 +33,8 @@ function Whiteboard(){
     "black","white","gray","red","green","orange","blue", "cyan",
     "yellow", "purple", "brown", "pink"
   ]
-
+  const [selectedTool, setSelectedTool] = useState("draw")
+  const pixelInputsRef = useRef(canvasInfo.current["lineWidth"])
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
   return ()=>{
@@ -329,18 +330,28 @@ function Whiteboard(){
     }  
     sendJsonMessage(update)
     handleCanvasAction(update)
+  } 
+  function changeLineWidth(e){
+    canvasInfo.current["lineWidth"] = e.target.value
+    const elems = pixelInputsRef.current.querySelectorAll("*")
+    if ([...elems].some((elem)=>!elem)){
+      return
+    }
+    elems[0].value = e.target.value
+    elems[1].value = e.target.value
+    elems[2].style.width = `${e.target.value}px`
+    elems[2].style.height = `${e.target.value}px`
   }
 
   return (
-    <div className={styles.whiteboardPage}>
+    <div className={`${styles.whiteboardPage} ${darkMode ? styles.darkMode : ""}`}>
       <h1 className={styles.title}>
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/whiteboard?34" : "/light/whiteboard?34"} type="once" speed={10}/> 
       </h1>
       {roomID &&
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
-          <div className={styles.whiteboardScrollable}>
-            <section className={styles.canvasArea} onMouseDown={navigate}>
+          <div className={styles.whiteboardScrollable} onMouseDown={navigate}>
               <canvas 
                 ref={canvasRef} 
                 width={1000} 
@@ -365,36 +376,38 @@ function Whiteboard(){
                   handleCanvasAction(update)
                 }}
                 />
-            </section>
           </div>
-          <button className={styles.clearButton} onClick={()=>{
-            const update = {
-              "origin": "whiteboard",
-              "type": "clear",
-              "username": username,
-            }
-            sendJsonMessage(update)
-            handleCanvasAction(update)
-          }}>clear</button>
-          <span className={styles.reverseButtons}>
-            <button className={styles.undoButton} onClick={undo}>undo</button>
-            <button className={styles.redoButton} onClick={redo}>redo</button>
-          </span>
+          <section className={styles.quickToolbar}>
+            <span className={styles.reverseButtons}>
+              <button className={styles.undoButton} onClick={undo}><img src="/tool_icons/undo.png" alt="undo" /></button>
+              <button className={styles.redoButton} onClick={redo}><img src="/tool_icons/redo.png" alt="redo" /></button>
+              <button onClick={()=>zoom("in")}><img src="/tool_icons/zoomin.png" alt="zoom in" /></button>
+              <button onClick={()=>zoom("out")}><img src="/tool_icons/zoomout.png" alt="zoom out" /></button>
+            </span>
+            <button className={styles.clearButton} onClick={()=>{
+              const update = {
+                "origin": "whiteboard",
+                "type": "clear",
+                "username": username,
+              }
+              sendJsonMessage(update)
+              handleCanvasAction(update)
+            }}>CLEAR
+            </button>
+          </section>
         </div>
         <div className={styles.tools}>
-          <h3>Draw</h3>
-          <button onClick={seeSnapshot}>see snapshot</button>
           <section className={styles.modesContainer}>
-            <button onClick={()=>{canvasInfo.current["type"] = "draw"}}>Draw</button>
-            <button onClick={()=>{canvasInfo.current["type"] = "erase"}}>Erase</button>
-            <button onClick={()=>{canvasInfo.current["type"] = "fill"}}>Fill</button>
-            <button onClick={()=>{canvasInfo.current["type"] = "navigate"}}>Navigate</button>
-            <button onClick={()=>zoom("in")}>Zoom In</button>
-            <button onClick={()=>zoom("out")}>Zoom Out</button>
-
-            <input onChange={(e)=>{canvasInfo.current["lineWidth"] = e.target.value}} type="range" min="1" max="30"/>
+            <button className={selectedTool === "draw" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "draw";setSelectedTool("draw")}}><img src="/tool_icons/pencil.png" alt="draw" /></button>
+            <button className={selectedTool === "erase" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "erase";setSelectedTool("erase")}}><img src="/tool_icons/eraser.png" alt="erase" /></button>
+            <button className={selectedTool === "fill" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "fill";setSelectedTool("fill")}}><img src="/tool_icons/fill.png" alt="fill" /></button>
+            <button className={selectedTool === "navigate" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "navigate";setSelectedTool("navigate")}}><img src="/tool_icons/navigate.png" alt="draw" /></button>
           </section>
-          <h3>Colors</h3>
+          <section ref={pixelInputsRef} className={styles.pixelInput}>
+            <input type="range" min={1} max={30} defaultValue={canvasInfo.current["lineWidth"]} onChange={changeLineWidth} />
+            <input type="number" min={1} max={30} defaultValue={canvasInfo.current["lineWidth"]} onChange={changeLineWidth} />
+            <span className={styles.pixelSize}></span>
+          </section>
           <section className={styles.colorsContainer}>
             <section className={styles.colors}>
               {
