@@ -1,5 +1,10 @@
+.darkMode{
+  background-color: rgb(33, 36, 42);
+  color: rgb(255, 255, 255);
+}
 .videochatPage{
   height: 100vh;
+
 
   display: flex;
   flex-direction: column;
@@ -7,10 +12,45 @@
 }
 .title{
   padding: 5px;
-  border-bottom: 1px solid;
   margin: 0; 
   height: 100px;
   display: flex;
   justify-content: center;
   align-items: end;
+  box-shadow: 2px 5px 10px rgba(112, 112, 113, 0.395) ;
+  z-index: 100;
+} 
+
+.mainContent{
+  background-color: rgb(219, 184, 138);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 50px;
+}
+.darkMode .mainContent{
+  background-color: rgb(68, 57, 43);
+
+}
+.mainContent button{
+  font-family: "Exo 2", 'Courier New', Courier, monospace;
+  background-color: rgb(206, 154, 105);
+  color: rgb(44, 44, 44);
+  font-weight: 900;
+  border: none;
+  border-radius: 10px;
+  padding: 40px;
+  font-size: 2.1rem;
+  box-shadow: 10px 10px 10px black;
+}
+.mainContent button:hover{
+  color: rgb(206, 154, 105);
+  background-color: rgb(44, 44, 44);
+  opacity: .8;
+}
+.darkMode .mainContent button{
+  background-color: rgb(207, 176, 147);
+  color: rgb(44, 44, 44);
 }
