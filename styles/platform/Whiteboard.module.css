@@ -1,5 +1,5 @@
 .darkMode{
-  background-color: rgb(51, 56, 67);
+  background-color: rgb(66, 72, 88);
   color: rgb(255, 255, 255);
 }
 
@@ -117,12 +117,19 @@
   gap: 15px;
 }
 
+.tools span :first-child{
+  position: absolute;
+  top: 50%;
+  right: 270px;
+  transform: translate(0,-50%);
+  opacity: .7;
+}
+.tools span :first-child:hover{
+  opacity: 1;
+}
+
 .darkMode .tools{
   background-color: #3d2519;
-}
-.tools h3{
-  text-align: center;
-  font-size: 2rem;
 }
 .modesContainer{
   display: flex;
@@ -164,7 +171,6 @@
   width: 3px;
   height: 3px;
   background-color: black;
-  margin-inline: 15px;
   border-radius: 50%;
 }
 .colorsContainer, .colorQueue{

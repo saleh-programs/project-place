@@ -152,7 +152,6 @@ function Chat(){
 
     const unselectMessages = (e) => {
       const elem = document.getElementById(editRefs.current["selectedID"])
-      elem && console.log(!elem.contains(e.target))
       if (elem && !elem.contains(e.target)){
         setSelectedID(null)
         setIsEditing(false)

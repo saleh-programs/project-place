@@ -34,6 +34,7 @@ function Whiteboard(){
     "black","white","gray","red","green","orange","blue", "cyan",
     "yellow", "purple", "brown", "pink"
   ]
+  const toolsRef = useRef(null)
   const [queuedColors, setQueuedColors] = useState([])
   const [selectedTool, setSelectedTool] = useState("draw")
   const [selectedColor, setSelectedColor] = useState("black")
@@ -436,9 +437,25 @@ function Whiteboard(){
             
           </section>
         </div>
-        <div className={styles.tools}>
+        <div ref={toolsRef} className={styles.tools}>
+          <span 
+          onMouseEnter={(e)=>{
+            const imgElem = e.currentTarget.querySelectorAll("*")?.[0]
+            if (imgElem) imgElem.src = "/wb_handle/1.png"
+          }}
+          onMouseLeave={(e)=>{
+            const imgElem = e.currentTarget.querySelectorAll("*")?.[0]
+            if (imgElem) imgElem.src = "/wb_handle/0.png"
+          }}
+          onMouseDown={(e)=>{
+            const imgElem = e.currentTarget.querySelectorAll("*")?.[0]
+            if (!imgElem) return
+            toolsRef.current.style.transform = toolsRef.current.style.transform === "translate(285px, -50%)" ? "translate(0, -50%)" : "translate(285px, -50%)"
+          }}
+          > 
+            <img src="/wb_handle/0.png" alt="handle" />
+          </span>
           <section className={styles.modesContainer}>
-            <button onClick={()=>{console.log(canvasInfo.current["selectingColor"])}}>hey</button>
             <button className={selectedTool === "draw" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "draw";setSelectedTool("draw")}}><img src="/tool_icons/pencil.png" alt="draw" /></button>
             <button className={selectedTool === "erase" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "erase";setSelectedTool("erase")}}><img src="/tool_icons/eraser.png" alt="erase" /></button>
             <button className={selectedTool === "fill" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "fill";setSelectedTool("fill")}}><img src="/tool_icons/fill.png" alt="fill" /></button>
@@ -451,7 +468,7 @@ function Whiteboard(){
           </section>
           <span className={styles.separator}></span>
           <section className={styles.colorsContainer}>
-              {
+              { 
                 colors.map(item=>{
                   return (
                     <span 
