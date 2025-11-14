@@ -1,9 +1,11 @@
 "use client"
 import { useContext,useRef, useState, useEffect } from "react"
 import ThemeContext from "src/assets/ThemeContext"
+import styles from "styles/platform/GroupCall.module.css"
+import Animation from "src/components/Animation"
 
 function GroupCall(){
-    const { device, externalGroupcallRef, sendJsonMessage, username } = useContext(ThemeContext)
+    const { device, externalGroupcallRef, sendJsonMessage, username, darkMode } = useContext(ThemeContext)
 
     const [isJoined, setIsJoined] = useState(false)
     const connectionStateRef = useRef("disconnected")
@@ -18,7 +20,7 @@ function GroupCall(){
         "recvTransport": {
             "ref": null,
             "connectCallback": null 
-        },
+        }, 
         "consumers": {},
         "producers": [],
     })
@@ -165,7 +167,7 @@ function GroupCall(){
 
         console.log("get me")
         sendJsonMessage({
-            "username": username,
+            "username": username, 
             "origin": "groupcall",
             "type": "receivePeers"
         })
@@ -337,37 +339,61 @@ function GroupCall(){
     }
     
     return(
-        <div>
-            <video ref={localCam} playsInline autoPlay muted width={200}></video>
-            {
-                videoAdded
-                ?
-                    <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
-                :
-                    <button onClick={()=>requestMedia("video")}>Add Video</button>
-            }
-            {
-                audioAdded
-                ?
-                    <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
-                :
-                    <button onClick={()=>requestMedia("audio")}>Add Audio</button>
-            }
+        <div className={`${styles.groupcallPage} ${darkMode ? styles.darkMode : ""}`}>
+            <h1 className={styles.title}>
+                <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/videochat?18" : "/light/videochat?18"} type="once" speed={4}/> 
+            </h1>
+            <h2 className={styles.smallTitle}>
+                Group Call
+            </h2>
+            <div className={styles.mainContent}>
+                <div className={styles.streams}>
+                    <section className={styles.otherStreams}>
+                        {Object.entries(streams).sort(([a],[b])=>a.localeCompare(b)).map(([peerID, stream])=>{
+                            const assignStream = (elem) => {if (elem && elem.srcObject !== stream){
+                                elem.srcObject = stream 
+                            }}
+                            return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
+                        })}
+                        <video src=""></video>
+                        <video src=""></video>
+                        <video src=""></video>
+                        <video src=""></video>
+                        <video src=""></video>
+                        <video src=""></video>
 
-            {Object.entries(streams).sort(([a],[b])=>a.localeCompare(b)).map(([peerID, stream])=>{
-                const assignStream = (elem) => {if (elem && elem.srcObject !== stream){
-                    elem.srcObject = stream 
-                }}
-                return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
-            })}
-            {
-                isJoined 
-                ?
-                    <button onClick={disconnect}>Exit Group Call</button>
-                :
-                    <button onClick={joinGroupCall}>Join Group Call</button>
-                    
-            }
+
+
+                    </section>
+                    <section className={styles.myStream}>
+                        <video ref={localCam} playsInline autoPlay muted></video>
+                        {
+                            videoAdded
+                            ?
+                                <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
+                            :
+                                <button onClick={()=>requestMedia("video")}>Add Video</button>
+                        }
+                        {
+                            audioAdded
+                            ?
+                                <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
+                            :
+                                <button onClick={()=>requestMedia("audio")}>Add Audio</button>
+                        }
+                    </section>
+                    <section className={styles.joinOrExit}>
+                        {
+                            isJoined 
+                            ?
+                                <button className={`${styles.joinOrExit} ${styles.joined}`}  onClick={disconnect}>Exit Group Call</button>
+                            :
+                                <button className={`${styles.joinOrExit} ${styles.exited}`} onClick={joinGroupCall}>Join Group Call</button>
+                                
+                        }
+                    </section>
+                </div>
+            </div>
         </div>
     )
 }

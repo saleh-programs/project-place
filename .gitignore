@@ -37,3 +37,4 @@ backend/images/*
 
 backend/files/*
 dummy.js
+./s.sh

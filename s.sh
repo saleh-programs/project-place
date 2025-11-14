@@ -1,52 +1,55 @@
 #!/bin/bash
 
+
 site(){
-    gnome-terminal -- bash -c "npm run dev; exec bash" &
-    sitePID=$!
+    gnome-terminal --working-directory="/home/willow/JSProjects/ProjectPlace" -- bash -c 'echo $$ > /tmp/site.pid && npm run dev;exec bash;'
+    wmctrl -r :ACTIVE: -e 0,0,0,-1,-1
 }
 db(){
-    gnome-terminal -- bash -c "cd backend && source venv/bin/activate && python3 -u server.py; exec bash" &
-    dbPID=$!
+    gnome-terminal --working-directory="/home/willow/JSProjects/ProjectPlace/backend" -- bash -c 'echo $$ > /tmp/db.pid && source venv/bin/activate && python3 -u server.py; exec bash;'
+    wmctrl -r :ACTIVE: -e 0,680,0,-1,-1
 }
 ws(){
-    gnome-terminal -- bash -c "cd backend/wsServer && node wsServer.js; exec bash" &
-    wsPID=$!
+    gnome-terminal --working-directory="/home/willow/JSProjects/ProjectPlace/backend/wsServer" -- bash -c 'echo $$ > /tmp/ws.pid && node wsServer.js; exec bash;'
+    wmctrl -r :ACTIVE: -e 0,300,460,-1,-1
 }
+
 
 site
 db
 ws
-# while true; do
-#     read input
-#     case $input in 
-#         restart)
-#             kill $sitePID
-#             site
-#             kill $dbPID
-#             db
-#             kill $wsPID
-#             ws
-#             ;;
-#         site)
-#             kill $sitePID
-#             site
-#             ;;
-#         db)
-#             kill $dbPID
-#             db
-#             ;;
-#         ws)
-#             kill $wsPID
-#             ws
-#             ;;
-#         q)
-#             kill $sitePID
-#             kill $dbPID
-#             kill $wsPID
-#             break
-#             ;;
-#     esac
-# done
+
+while true; do
+read input
+ case $input in 
+     restart)
+         kill -1 "$(cat /tmp/site.pid)"
+         kill -1 "$(cat /tmp/db.pid)"
+         kill -1 "$(cat /tmp/ws.pid)"
+         site
+         db
+         ws
+         ;;
+     site)
+         kill -1 "$(cat /tmp/site.pid)"
+         site
+         ;;
+     db)
+         kill -1 "$(cat /tmp/db.pid)"
+         db
+         ;;
+     ws)
+         kill -1 "$(cat /tmp/ws.pid)"
+         ws
+         ;;
+     q)
+         kill -1 "$(cat /tmp/site.pid)"
+         kill -1 "$(cat /tmp/db.pid)"
+         kill -1 "$(cat /tmp/ws.pid)"
+         break
+         ;;
+ esac
+done
     
 
         

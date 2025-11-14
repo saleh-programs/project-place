@@ -502,30 +502,42 @@ function PeerCall(){
 
     return(
         <div>
-            hello to peer {searchParams.get("peer")}!\
-            <video ref={localCam} playsInline autoPlay muted width={200}></video>
-            {
-                videoAdded
-                ?
-                    <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
-                :
-                    <button onClick={()=>requestMedia("video")}>Add Video</button>
-            }
-            {
-                audioAdded
-                ?
-                    <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
-                :
-                    <button onClick={()=>requestMedia("audio")}>Add Audio</button>
-            }
-            <video ref={remoteCam} playsInline autoPlay width={200}></video>
+            <h1 className={styles.title}>
+                <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/videochat?18" : "/light/videochat?18"} type="once" speed={4}/> 
+            </h1>
+            <h2 className={styles.smallTitle}>
+                Group Call
+            </h2>
+            <div className={styles.mainContent}>
+                <div className={styles.streams}>
+                    <section className={styles.peerStream}>
+                        <video ref={remoteCam} playsInline autoPlay width={200}></video>
+                    </section>
+                    <section className={styles.myStrean}>
+                        <video ref={localCam} playsInline autoPlay muted width={200}></video>
+                        {
+                            videoAdded
+                            ?
+                                <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
+                            :
+                                <button onClick={()=>requestMedia("video")}>Add Video</button>
+                        }
+                        {
+                            audioAdded
+                            ?
+                                <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
+                            :
+                                <button onClick={()=>requestMedia("audio")}>Add Audio</button>
+                        }
+                    </section>
+                    <section className={styles.disconnect}>
+                        <button onClick={disconnect}>End Call</button>            
+                    </section>
+                </div>
+            </div>
             {Object.keys(userStates).map((name,i)=>{
                 return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
             })}
-            <button onClick={disconnect}>End Call</button>
-            <button onClick={debuggingLogs}>debug</button>
-            <button onClick={readTracks}> read tracks</button>
-            
         </div>
     )
 }

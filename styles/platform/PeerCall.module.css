@@ -1,0 +1,102 @@
+.darkMode{
+  background-color: rgb(33, 36, 42);
+  color: rgb(255, 255, 255);
+}
+.groupcallPage{
+  height: 100vh;
+
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+
+}
+.mainContent{
+  background-color: rgb(238, 232, 221);
+  height: 100%;
+  position: relative;  
+}
+.title{
+  padding: 5px;
+  margin: 0; 
+  height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: end;
+  box-shadow: 2px 5px 10px rgba(112, 112, 113, 0.395) ;
+  z-index: 100;
+} 
+
+.smallTitle{
+    margin: 0;
+    font-family: "Exo 2", "sans serif";
+    font-size: 2.5rem;
+    text-align: center;
+    box-shadow: 2px 5px 10px rgba(112, 112, 113, 0.395) ;
+} 
+
+.streams{
+    padding: 30px 20px;
+    border-radius: 10px;
+    border: 1px solid;
+    max-width: 900px;
+    margin-inline: auto;
+    margin-top: 80px;
+    position: relative;
+    background-color: rgb(56, 54, 53);
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 20px; 
+}
+.streams video{
+    border-radius: 10px;
+    border: 1px solid;
+    width: 200px;
+    box-shadow: 5px 5px 7px rgba(0, 0, 0, 0.562);
+    background-color: aliceblue;
+}
+
+.myStream{
+    position: relative;
+}
+.myStream video{
+    width: 200px;
+}
+.myStream button:nth-of-type(1){
+    position: absolute;
+    bottom: 0;
+    left: 0;
+}
+
+.myStream button:nth-of-type(2){
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
+.joinOrExit{
+    flex: 1;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 30px);
+}
+
+.joinOrExit button{
+    width: 150px;
+    border-radius: 6px;
+    padding: 10px;
+    
+    font-size: 1.2rem;
+    font-weight: 600;
+    font-family: "Exo 2", "sans serif";
+    opacity: .8;
+
+}
+.joinOrExit:hover{
+    transform: translate(-50%, 30px) scale(1.1);
+    transform-origin: center;
+    opacity: 1;
+}

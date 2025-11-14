@@ -160,9 +160,9 @@ function processWhiteboard(data, uuid){
   broadcastAll(uuid, data, false)
   handleCanvasAction(data, users[uuid]["roomID"])
 
-
-  const buffer = rooms[users[uuid]["roomID"]]["whiteboard"]["canvas"].toBuffer("image/png")
-  writeFileSync("test.png", buffer)
+  //debug whitboard
+  // const buffer = rooms[users[uuid]["roomID"]]["whiteboard"]["canvas"].toBuffer("image/png")
+  // writeFileSync("test.png", buffer)
 }
 
 async function processGroupcall(data, uuid){
