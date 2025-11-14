@@ -539,6 +539,11 @@ function Chat(){
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={8}/> 
       </h1>
       <div ref={mainScrollableRef} className={styles.chatDisplay}> 
+          {groupedMessages.length == 0 &&
+            <div style={{fontSize: "1.5rem"}}>
+              Start the conversation...
+            </div>
+          }
           {
             groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group,index)=>{
               const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
@@ -558,7 +563,6 @@ function Chat(){
                     </div>
                     }
                     <div className={styles.groupContainer}>
-                      <span style={{fontSize: "3rem"}}>{displayListRange[0] + index}</span>
                       <section className={styles.groupLeft}>
                         <span className={styles.timestamp}>
                           {timestamp}
