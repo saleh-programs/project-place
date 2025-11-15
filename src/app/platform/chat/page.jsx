@@ -37,7 +37,6 @@ function Chat(){
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
-  console.log(groupedMessages.length)
  
   /*
 
@@ -534,7 +533,7 @@ function Chat(){
   let lastSeenDay = null
   const today = new Date().toDateString()
   return(
-    <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`}>
+    <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={(e)=>e.key === "Enter" && handleMessage()} tabIndex={0}>
       <h1 className={styles.title}>
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={8}/> 
       </h1>
@@ -638,15 +637,16 @@ function Chat(){
       </div>
       {roomID &&
         <div className={styles.chatHub}>
-            <Animation path={"/submit?4"} type="button" speed={5} onClick={handleMessage}/>
-
             <label className={styles.fileInput}>
-              <img src={"de"} alt="upload" />
+              <img src={"/upload_icon.png"} alt="upload" />
               <input ref={filesRef} type="file" multiple hidden
             accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'/>
             </label>
- 
-            <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)}/>
+            <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
+            <button>    
+              <img src={"/submit_icon.png"} onClick={handleMessage}/>
+            </button>
+
           </div>
         }
     </div>
