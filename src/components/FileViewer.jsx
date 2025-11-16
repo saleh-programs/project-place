@@ -37,16 +37,22 @@ const extensionToMimeType = {
     
 }
 
-function FileViewer({url, dimensions}){
+function FileViewer({url, dimensions, manualMimeType = null}){
     function getFile(){
-        const extension = url.split(".").at(-1).toLowerCase()
         let mimeType = "application/octet-stream"
-        if (extension.length === url.length){
-            return
+        let extension;
+        if (!manualMimeType){
+            extension = url.split(".").at(-1).toLowerCase()
+            if (extension.length === url.length){
+                return
+            }
+            if (Object.hasOwn(extensionToMimeType, extension)){
+                mimeType = extensionToMimeType[extension]
+            }
+        }else{
+            mimeType = manualMimeType;
         }
-        if (Object.hasOwn(extensionToMimeType, extension)){
-            mimeType = extensionToMimeType[extension]
-        }
+
         const [fileCategory, fileKind] = mimeType.split("/")
 
         switch (fileCategory){

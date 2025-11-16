@@ -102,6 +102,25 @@
   display: flex;
   flex-direction: column;
 }
+
+.preview{
+  border: 1px solid rgba(119, 119, 118, 0.155);
+  padding: 20px;
+  background-color: rgba(162, 161, 161, 0.07);
+  border-radius: 10px;
+  position: relative;
+}
+.preview > span{
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 40%;
+  text-align: center;
+  border: 1px solid;
+  background-color: rgb(223, 115, 115);
+}
 .message{
   position: relative;
   padding-right: 35px;
@@ -193,6 +212,20 @@
 
 
 .chatHub{
+  display: flex;
+  flex-direction: column;
+}
+.miniFileView{
+  display: flex;
+  gap: 10px;
+
+  align-items: center;
+  overflow-x: auto;
+  margin: auto;
+  max-width: 800px;
+}
+
+.chatHubMain{
   height: 70px;
   display: flex;
   flex-direction: row;
@@ -236,11 +269,11 @@
     box-shadow: 0 0 2px 2px rgba(98, 155, 182, 0.575) ;
   }
 }
-.chatHub button{
+.chatHubMain button{
   background-color: transparent;
   border: none;
 } 
-.chatHub button img{
+.chatHubMain button img{
   transition: transform .05s;
   &:hover{
     filter: invert(.2);

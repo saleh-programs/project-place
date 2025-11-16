@@ -34,6 +34,7 @@ function Chat(){
     "selectedID": null
   })
   const filesRef = useRef(null)
+  const [filePreviews, setFilePreviews] = useState([])
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
@@ -313,7 +314,7 @@ function Chat(){
       canSendRef.current = true
     },100)
 
-    filesRef.current.files.length > 0 && await handleFileMessage()
+    filePreviews.length > 0 && await handleFileMessage()
 
     const currTime = Date.now()
     const messageID = getUniqueMessageID()
@@ -360,7 +361,7 @@ function Chat(){
   }
   async function handleFileMessage() {
     const currTime = Date.now()
-    const filePaths = await uploadFilesReq(filesRef.current.files)
+    const filePaths = await uploadFilesReq(filePreviews)
     if (!filePaths){
       return
     }
@@ -383,6 +384,7 @@ function Chat(){
       "data": msg
     })
     filesRef.current.value = ""
+    setFilePreviews([])
     msg["metadata"]["status"] = "pending"
     setMappedMessages(prev => {return {...prev, [messageID]: msg }})
     setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
@@ -532,6 +534,7 @@ function Chat(){
   
   let lastSeenDay = null
   const today = new Date().toDateString()
+  console.log(filePreviews)
   return(
     <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={(e)=>e.key === "Enter" && handleMessage()} tabIndex={0}>
       <h1 className={styles.title}>
@@ -637,16 +640,25 @@ function Chat(){
       </div>
       {roomID &&
         <div className={styles.chatHub}>
-            <label className={styles.fileInput}>
-              <img src={"/upload_icon.png"} alt="upload" />
-              <input ref={filesRef} type="file" multiple hidden
-            accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'/>
-            </label>
-            <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
-            <button>    
-              <img src={"/submit_icon.png"} onClick={handleMessage}/>
-            </button>
-
+          <section className={styles.miniFileView}>
+            {filePreviews.map(f => {
+              const url = URL.createObjectURL(f);
+              return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} manualMimeType={f.type}/> <span>X</span></span>
+            })}
+          </section>
+          <section className={styles.chatHubMain}>
+              <label className={styles.fileInput}>
+                <img src={"/upload_icon.png"} alt="upload" />
+                <input ref={filesRef} type="file" multiple hidden
+              accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'
+              onChange={(e)=>setFilePreviews(Array.from(e.target.files))}
+              />
+              </label>
+              <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
+              <button>    
+                <img src={"/submit_icon.png"} onClick={handleMessage}/>
+              </button>
+          </section>
           </div>
         }
     </div>
