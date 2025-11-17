@@ -21,3 +21,7 @@ button:hover{
 textarea{
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+img{
+  user-select: none;
+  -webkit-user-drag: none;
+}

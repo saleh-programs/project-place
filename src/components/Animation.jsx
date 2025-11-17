@@ -56,6 +56,9 @@ function Animation({path, type="loop", speed=1, onClick=null}){
     }, [dimensions])
 
     function replay(){
+        if (!onClick){
+            return
+        }
         cancelAnimationFrame(rafRef.current)
         onClick()
         frame.current = 1

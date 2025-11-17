@@ -110,7 +110,7 @@
   border-radius: 10px;
   position: relative;
 }
-.preview > span{
+.preview > button{
   position: absolute;
   top: 0;
   right: 0;
@@ -120,6 +120,11 @@
   text-align: center;
   border: 1px solid;
   background-color: rgb(223, 115, 115);
+  padding: 0;
+  font-weight: bolder;
+  &:hover{
+    opacity: .5;
+  }
 }
 .message{
   position: relative;
@@ -223,6 +228,7 @@
   overflow-x: auto;
   margin: auto;
   max-width: 800px;
+  scrollbar-width: none;
 }
 
 .chatHubMain{

@@ -534,7 +534,6 @@ function Chat(){
   
   let lastSeenDay = null
   const today = new Date().toDateString()
-  console.log(filePreviews)
   return(
     <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={(e)=>e.key === "Enter" && handleMessage()} tabIndex={0}>
       <h1 className={styles.title}>
@@ -643,7 +642,7 @@ function Chat(){
           <section className={styles.miniFileView}>
             {filePreviews.map(f => {
               const url = URL.createObjectURL(f);
-              return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} manualMimeType={f.type}/> <span>X</span></span>
+              return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} manualMimeType={f.type}/> <button onClick={()=>setFilePreviews(filePreviews.filter(file=>f!==file))}>X</button></span>
             })}
           </section>
           <section className={styles.chatHubMain}>
@@ -651,7 +650,28 @@ function Chat(){
                 <img src={"/upload_icon.png"} alt="upload" />
                 <input ref={filesRef} type="file" multiple hidden
               accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'
-              onChange={(e)=>setFilePreviews(Array.from(e.target.files))}
+              onChange={(e)=>{
+                const addedFiles = Array.from(e.target.files)
+                const newFilePreviews =[...filePreviews]
+
+                addedFiles.forEach((f, i)=>{
+                  const addedFileID = `${f["name"]} ${f["lastModified"]}`
+                  let j;
+                  for (j = 0; j < filePreviews.length; j++){
+                    const containingFileID = `${filePreviews[j]["name"]} ${filePreviews[j]["lastModified"]}`
+                    if (containingFileID === addedFileID){
+                      break
+                    }
+                  }
+                  if (j === filePreviews.length){
+                    console.log("added ", f)
+                    newFilePreviews.push(f);
+                  }
+                })
+
+                setFilePreviews(newFilePreviews)
+                filesRef.current.value=""
+              }}
               />
               </label>
               <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
