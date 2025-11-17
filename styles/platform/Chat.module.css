@@ -230,6 +230,16 @@
   max-width: 800px;
   scrollbar-width: none;
 }
+.overUploadMsg{
+  margin: auto;
+  color: red;
+  display: none;
+  padding: 0;
+}
+.show{
+  display: inline-block;
+}
+
 
 .chatHubMain{
   height: 70px;

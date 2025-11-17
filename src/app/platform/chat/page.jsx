@@ -35,6 +35,7 @@ function Chat(){
   })
   const filesRef = useRef(null)
   const [filePreviews, setFilePreviews] = useState([])
+  const [showOverUploadMsg, setShowOverUploadMsg] = useState(false)
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
@@ -639,6 +640,7 @@ function Chat(){
       </div>
       {roomID &&
         <div className={styles.chatHub}>
+          <span className={`${styles.overUploadMsg} ${showOverUploadMsg ? styles.show : ""}`}>Please select maximum of 10 files</span>
           <section className={styles.miniFileView}>
             {filePreviews.map(f => {
               const url = URL.createObjectURL(f);
@@ -652,7 +654,7 @@ function Chat(){
               accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'
               onChange={(e)=>{
                 const addedFiles = Array.from(e.target.files)
-                const newFilePreviews =[...filePreviews]
+                let newFilePreviews =[...filePreviews]
 
                 addedFiles.forEach((f, i)=>{
                   const addedFileID = `${f["name"]} ${f["lastModified"]}`
@@ -664,11 +666,14 @@ function Chat(){
                     }
                   }
                   if (j === filePreviews.length){
-                    console.log("added ", f)
                     newFilePreviews.push(f);
                   }
                 })
-
+                if (newFilePreviews.length > 10){
+                  setShowOverUploadMsg(true)
+                  setTimeout(()=>setShowOverUploadMsg(false), 3000)
+                  newFilePreviews = newFilePreviews.slice(0, 10)
+                }
                 setFilePreviews(newFilePreviews)
                 filesRef.current.value=""
               }}
