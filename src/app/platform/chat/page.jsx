@@ -36,6 +36,7 @@ function Chat(){
   const filesRef = useRef(null)
   const [filePreviews, setFilePreviews] = useState([])
   const [showOverUploadMsg, setShowOverUploadMsg] = useState(false)
+  const [isClicked, setIsClicked] = useState(false)
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
@@ -314,6 +315,8 @@ function Chat(){
     setTimeout(()=>{
       canSendRef.current = true
     },100)
+    setIsClicked(true)
+    setTimeout(()=>setIsClicked(false),50)
 
     filePreviews.length > 0 && await handleFileMessage()
 
@@ -537,6 +540,7 @@ function Chat(){
   const today = new Date().toDateString()
   return(
     <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={(e)=>e.key === "Enter" && handleMessage()} tabIndex={0}>
+
       <h1 className={styles.title}>
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={8}/> 
       </h1>
@@ -680,8 +684,8 @@ function Chat(){
               />
               </label>
               <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
-              <button>    
-                <img src={"/submit_icon.png"} onClick={handleMessage}/>
+              <button onClick={handleMessage} className={`${isClicked ? styles.clicked : ""}`}>    
+                <img src={"/submit_icon.png"} />
               </button>
           </section>
           </div>
