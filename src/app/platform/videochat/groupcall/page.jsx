@@ -43,9 +43,6 @@ function GroupCall(){
             disconnect()
         }
     },[])
-    useEffect(()=>{
-        console.log(streams)
-    },[streams])
 
     function disconnect(){
         if (connectionStateRef.current !== "connected"){
@@ -105,12 +102,15 @@ function GroupCall(){
             "type": "userJoined",
             "data": {rtpCapabilities: device.current.rtpCapabilities}
         })
+
         
         sendJsonMessage({
             "username": username,
             "origin": "groupcall",
             "type": "transportParams"
         })
+        console.log("requested server to make transport params")
+
     }
     async function startWebcam(){
         let stream = new MediaStream()
@@ -120,6 +120,7 @@ function GroupCall(){
             setVideoAdded(true)
         }catch(err){
             console.log("permission denied")
+            console.error(err)
         }
         localCam.current.srcObject = stream
     }
@@ -150,6 +151,7 @@ function GroupCall(){
             })
             callInfo.current["sendTransport"]["produceCallback"] = callback
         })
+        console.log("created send transport")
 
         //set up recv transport
         const recvTransport = device.current.createRecvTransport(recvParams)
@@ -164,16 +166,20 @@ function GroupCall(){
             })
             callInfo.current["recvTransport"]["connectCallback"] = callback
         })
+        console.log("created receive transport")
 
-        console.log("get me")
         sendJsonMessage({
             "username": username, 
             "origin": "groupcall",
             "type": "receivePeers"
         })
+        console.log("requested peers")
+
         //create producers
         localCam.current.srcObject.getTracks().forEach(track => {
             addProducer(track)
+            console.log("Added producer")
+
         })
         connectionStateRef.current = "connected"
     }  
@@ -207,10 +213,11 @@ function GroupCall(){
         callInfo.current["producers"].push(await callInfo.current["sendTransport"]["ref"].produce(produceOptions))
     }
 
-    async function addConsumer({id, producerId, kind, rtpParameters, uuid}){
-        if (!(uuid in callInfo.current["consumers"])){
+    async function addConsumer({id, producerId, kind, rtpParameters, peerName}){
+        if (!(peerName in callInfo.current["consumers"])){
             return
         }
+
         const consumer = await callInfo.current["recvTransport"]["ref"].consume({
             id,
             producerId,
@@ -218,14 +225,14 @@ function GroupCall(){
             rtpParameters
         })
 
-        callInfo.current["consumers"][uuid].push(consumer)
+        callInfo.current["consumers"][peerName].push(consumer)
         setStreams(prev => {
             const newStreams = {...prev}
-            const consumerExists = newStreams[uuid]?.getTracks().some(t => t === consumer.track)
+            const consumerExists = newStreams[peerName]?.getTracks().some(t => t === consumer.track)
             if (consumerExists) {
                 return prev
             }
-            newStreams[uuid].addTrack(consumer.track)
+            newStreams[peerName].addTrack(consumer.track)
             return newStreams
         })
 
@@ -286,6 +293,7 @@ function GroupCall(){
         const info = callInfo.current
         switch (data.type){
             case "getParticipants":
+                console.log("retrieved list of participating usernames", data.data)
                 const newStreams = {}
                 for (let i = 0; i < data.data.length; i++){
                     info["consumers"][data.data[i]] = []
@@ -295,12 +303,15 @@ function GroupCall(){
                 break
             case "transportParams":
                 createTransports(data.data)
+                console.log("retrieved server transport params")
                 break
             case "sendConnect":
                 info["sendTransport"]["connectCallback"]()
+                console.log("sendTransport connected")
                 break
             case "sendProduce":
                 info["sendTransport"]["produceCallback"]({id: data.data})
+                console.log("sendTransport producer callback")
                 // Now we can GIVE this media.
                 sendJsonMessage({
                     "origin": "groupcall",
@@ -308,30 +319,32 @@ function GroupCall(){
                     "type": "givePeers",
                     "data": data.data
                 })
+                console.log("Sent out producer")
                 break
             case "recvConnect":
                 info["recvTransport"]["connectCallback"]()
+                console.log("Receive transport connected")
                 break
             case "addConsumer":
-                console.log("here we add?")
                 addConsumer(data.data)
+                console.log("Added consumer")
                 break
             case "userJoined":
-                console.log("user adding")
-                info["consumers"][data.data["uuid"]] = []
+                console.log("User joined: ", data["username"])
+                info["consumers"][data["username"]] = []
                 setStreams(prev => {
-                    const newStreams = {...prev, [data.data["uuid"]]: new MediaStream()}
+                    const newStreams = {...prev, [data["username"]]: new MediaStream()}
                     return newStreams
                 })
                 break
             case "disconnect":
-                info["consumers"][data.data["uuid"]].forEach(consumer=>{
+                info["consumers"][data["username"]].forEach(consumer=>{
                     consumer.close()
                 })
-                delete info["consumers"][data.data["uuid"]]
+                delete info["consumers"][data["username"]]
                 setStreams(prev => {
                     const newStreams = {...prev}
-                    delete newStreams[data.data["uuid"]]
+                    delete newStreams[data["username"]]
                     return newStreams
                 })
                 break
@@ -353,11 +366,8 @@ function GroupCall(){
                             const assignStream = (elem) => {if (elem && elem.srcObject !== stream){
                                 elem.srcObject = stream 
                             }}
-                            return <section><h3>{peerID}</h3><video key={peerID} ref={assignStream} autoPlay playsInline></video></section>
+                            return <section key={peerID} ><h3>{peerID}</h3><video ref={assignStream} autoPlay playsInline></video></section>
                         })}
-
-
-
                     </section>
                     <section className={styles.myStream}>
                         <video ref={localCam} playsInline autoPlay muted></video>

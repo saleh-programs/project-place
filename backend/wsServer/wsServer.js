@@ -176,16 +176,12 @@ async function processGroupcall(data, uuid){
       roomCallInfo["callParticipants"].push(uuid)
       userCallInfo["rtpCapabilities"] = data.data["rtpCapabilities"]
 
-      broadcastAll(uuid,{
-        ...data,
-        "data": {uuid}
-      })
+      broadcastAll(uuid, data)
 
-      //user will have this on client side soon
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "getParticipants",
-        "data": roomCallInfo["callParticipants"].filter(id => id !== uuid)
+        "data": roomCallInfo["callParticipants"].filter(id => id !== uuid).map(id => users[id]["username"])
       }))
 
       break
@@ -228,7 +224,6 @@ async function processGroupcall(data, uuid){
       const producer = await userCallInfo["sendTransport"].produce({kind, rtpParameters})
       userCallInfo["producers"].push(producer)
       roomCallInfo["producers"][producer.id] = producer
-      console.log(userCallInfo)
 
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
@@ -276,18 +271,15 @@ async function processGroupcall(data, uuid){
             producerId: data.data,
             kind: consumer.kind,
             rtpParameters: consumer.rtpParameters,
-            uuid: uuid
+            peerName: users[uuid]["username"]
           }
         }))
       }
       break
     case "receivePeers":
-      console.log("time to reveive?", roomCallInfo["callParticipants"], userCallInfo)
       for (let i = 0; i < roomCallInfo["callParticipants"].length; i++){
         const userID = roomCallInfo["callParticipants"][i]
-        console.log("...")
         if (userID == uuid) {
-          console.log("skipped")
           continue
         }
         const peerCallInfo = users[userID]["groupcall"]
@@ -310,7 +302,6 @@ async function processGroupcall(data, uuid){
           userCallInfo["consumers"].push(consumer)
           roomCallInfo["consumers"][consumer.id] = consumer
           
-          console.log("get here?")
           connections[uuid].send(JSON.stringify({
             "origin": "groupcall",
             "type": "addConsumer",
@@ -319,7 +310,7 @@ async function processGroupcall(data, uuid){
               producerId: producer.id,
               kind: consumer.kind,
               rtpParameters: consumer.rtpParameters,
-              uuid: userID
+              peerName: users[userID]["username"]
             }
           }))
         }
@@ -329,11 +320,8 @@ async function processGroupcall(data, uuid){
       roomCallInfo["consumers"][data.data].resume()
       break
     case "disconnect": 
-      broadcastAll(uuid,{
-        ...data,
-          "data": {uuid}
-      })
-      roomCallInfo["callParticipants"].filter(userid => userid !== uuid)
+      broadcastAll(uuid, data)
+      roomCallInfo["callParticipants"] = roomCallInfo["callParticipants"].filter(userid => userid !== uuid)
       userCallInfo["producers"].forEach(p => delete roomCallInfo["producers"][p.id])
       userCallInfo["consumers"].forEach(c => delete roomCallInfo["consumers"][c.id])
 
@@ -495,7 +483,6 @@ async function getToken() {
       }
 
       const data = await response.json();
-      console.log("received token", data);
       return data["access_token"]
   } catch (error) {
       console.error('Error fetching token:', error);
