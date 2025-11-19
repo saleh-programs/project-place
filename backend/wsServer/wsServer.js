@@ -363,14 +363,26 @@ async function sendServerInfo(uuid) {
   const roomID = users[uuid]["roomID"]
   const connection = connections[uuid]
 
-  const roomHistories = [getRoomUsersReq(roomID, token), getMessagesReq(roomID, token)]
+  const roomHistories = [getMessagesReq(roomID, token)]
   let initializing = false
 
   if (roomID in rooms){
+    connection.send(JSON.stringify({
+      "origin": "user",
+      "type": "getUsers",
+      "data": rooms[roomID]["users"].map(id => users[id]["username"])
+    }))
+
     rooms[roomID]["users"].push(uuid)
     roomHistories.push(rooms[roomID]["whiteboard"]["canvas"])
     roomHistories.push(rooms[roomID]["whiteboard"]["operations"])
   }else{
+    connection.send(JSON.stringify({
+      "origin": "user",
+      "type": "getUsers",
+      "data": []
+    }))
+
     initializing = true
     const canvas = createCanvas(1000,1000)
     const cxt = canvas.getContext("2d")
@@ -387,7 +399,7 @@ async function sendServerInfo(uuid) {
       }))
     roomHistories.push(getCanvasInstructionsReq(roomID, token))
   }
-  const [roomUsers, chatHistory, canvasSnapshot, canvasInstructions] = await Promise.all(roomHistories)
+  const [chatHistory, canvasSnapshot, canvasInstructions] = await Promise.all(roomHistories)
 
   if (initializing){
     rooms[roomID] = {
@@ -407,11 +419,6 @@ async function sendServerInfo(uuid) {
     }
   }
 
-  connection.send(JSON.stringify({
-    "origin": "user",
-    "type": "getUsers",
-    "data": roomUsers
-  }))
   connection.send(JSON.stringify({
     "origin": "chat",
     "type": "chatHistory",

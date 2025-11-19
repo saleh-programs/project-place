@@ -140,13 +140,6 @@ with AccessDatabase() as cursor:
    
 
 
-# 
-'''
-DONT FORGET !!!!!!!!!! ------------------------------------------------------------------------------: 
-will load pfps from memory instead.
-Not tracking email anymore (until later)
-!!!!!!!!!!!!!!!!!!
- '''
 
 
 # ----------User Resources (include images)
@@ -220,9 +213,21 @@ def getPublicImage(imageID):
 @handleError("failed to get image")
 @authenticateClient
 def getImage(imageID):
-  if not os.path.exists(f"images/{imageID}"):
+  relativeURL = None
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT avatar FROM users WHERE username = %s)", (imageID,))
+    relativeURL = cursor.fetchone()
+    
+    #in case frontend makes imageID the username
+    if (relativeURL is not None):
+      relativeURL = relativeURL[0][relativeURL[0].find("images/"):]
+    else:
+      relativeURL = f"images/{imageID}"
+  
+  if not os.path.exists(relativeURL):
     return {"success": False}, 500
-  return send_file(f"images/{imageID}"), 200
+  
+  return send_file(relativeURL), 200
 
 
 
@@ -318,6 +323,8 @@ def getRoomUsers(roomID):
   with AccessDatabase() as cursor:    
     cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (roomID,))
     users = json.loads(cursor.fetchone()[0])
+
+
   return jsonify({"success":True,"data": {"users": users}}), 200
 
  
