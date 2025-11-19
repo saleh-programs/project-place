@@ -215,15 +215,16 @@ def getPublicImage(imageID):
 def getImage(imageID):
   relativeURL = None
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT avatar FROM users WHERE username = %s)", (imageID,))
+    cursor.execute("SELECT avatar FROM users WHERE username = %s", (imageID,))
     relativeURL = cursor.fetchone()
-    
+
     #in case frontend makes imageID the username
     if (relativeURL is not None):
       relativeURL = relativeURL[0][relativeURL[0].find("images/"):]
     else:
       relativeURL = f"images/{imageID}"
   
+  print(relativeURL)
   if not os.path.exists(relativeURL):
     return {"success": False}, 500
   

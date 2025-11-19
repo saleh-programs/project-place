@@ -1,6 +1,6 @@
 "use client"
 import * as mediasoupClient from "mediasoup-client"
-import { useEffect, useRef, useState } from "react"
+import { use, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -14,9 +14,8 @@ function MainDisplay({children, username, initialUserInfo}){
   const [userInfo, setUserInfo] = useState(initialUserInfo)
   const [roomID, setRoomID] = useState("")
   const roomIDRef = useRef("")
-  const [userStates, setUserStates] = useState({
-    [username]: {"avatar": initialUserInfo["avatar"]}
-  })
+  const [userStates, setUserStates] = useState({})
+  
   const [darkMode, setDarkMode] = useState(false)
 
   const messagesRef= useRef([])
@@ -57,8 +56,7 @@ function MainDisplay({children, username, initialUserInfo}){
       const data = JSON.parse(event.data)
       switch (data.origin){
         case "user":
-          console.log(data)
-          // updateUserStates(data)
+          updateUserStates(data)
           break
         case "chat":
           if (data.type === "chatHistory"){
@@ -122,7 +120,7 @@ function MainDisplay({children, username, initialUserInfo}){
       }
     }
   },roomID !== "")
-
+  
   const shared = {
     siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates, setDarkMode, darkMode,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
@@ -134,6 +132,9 @@ function MainDisplay({children, username, initialUserInfo}){
   useEffect(()=>{
     roomIDRef.current = roomID
   },[roomID])
+  useEffect(()=>{
+    console.log(userStates)
+  },[userStates])
 
   async function reconstructCanvas(data){
     const canvasBuffer = await data.arrayBuffer()
@@ -158,13 +159,14 @@ function MainDisplay({children, username, initialUserInfo}){
 
 
   function updateUserStates(data){
+    console.log(data)
     switch (data.type){
       case "newUser":
         setUserStates(prev => {
           return ({
             ...prev, 
             [data["username"]]: {
-                "avatar": data["imageURL"],
+                "avatar": `http://localhost:5000/users/images/${data["username"]}`,
                 "status": "idle",
                 "location": "chat"
             }})
@@ -172,6 +174,7 @@ function MainDisplay({children, username, initialUserInfo}){
         break
       case "userInfo":
         setUserStates(prev => {
+          console.log(prev)
           return ({
             ...prev, 
             [data["username"]]: {
@@ -181,11 +184,16 @@ function MainDisplay({children, username, initialUserInfo}){
         })
         break
       case "getUsers":
-        const users = {}
-        console.log(data)
+        const users = {
+          [username]: {
+            "avatar": initialUserInfo["avatar"],
+            "status": "idle",
+            "location": "chat"
+          }
+        }
         data["data"].forEach(user => {
-           users[user["username"]] = {
-            "avatar": user["avatar"],
+           users[user] = {
+            "avatar": `http://localhost:5000/users/images/${user}`,
             "status": "idle",
             "location": "chat"          
           }

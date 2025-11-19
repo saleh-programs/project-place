@@ -25,14 +25,14 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
         "avatar": imageURL
       }
     })
-    // sendJsonMessage({
-    //   "origin": "user",
-    //   "type": "userInfo",
-    //   "username": username, 
-    //   "data": {
-    //     "imageURL": imageURL
-    //   }
-    // })
+    sendJsonMessage({
+      "origin": "user",
+      "type": "userInfo",
+      "username": userInfo["username"], 
+      "data": {
+        "avatar": imageURL
+      }
+    })
 
     setIsChangingImage(false)
   }

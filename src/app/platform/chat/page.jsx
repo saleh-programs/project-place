@@ -233,7 +233,6 @@ function Chat(){
   }
   useEffect(()=> {
     lazyLoading.current["loading"] = false
-    console.log(displayListRange)
   }, [displayListRange])
 
   useLayoutEffect(()=>{

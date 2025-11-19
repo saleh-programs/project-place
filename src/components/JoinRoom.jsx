@@ -20,12 +20,6 @@ function JoinRoom({setIsLoadingRoom, setRoomID, username}){
     }
     setRoomID(joinRoomID);
     setIsLoadingRoom(false)
-      // sendJsonMessage({
-      //   "origin": "user",
-      //   "type": "newUser",
-      //   "username": username,
-      //   "imageURL": userInfo["profilePicURL"]
-      // })
   }
 
   return (

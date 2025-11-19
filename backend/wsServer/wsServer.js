@@ -354,7 +354,7 @@ async function processPeercall(data, uuid){
   broadcastOne(uuid, data, data.data["peer"])
 }
 function processUser(data, uuid){
-  broadcastAll(uuid, data)
+  broadcastAll(uuid, data, true)
 }
 
 
@@ -372,6 +372,11 @@ async function sendServerInfo(uuid) {
       "type": "getUsers",
       "data": rooms[roomID]["users"].map(id => users[id]["username"])
     }))
+    broadcastAll(uuid, {
+      "origin": "user",
+      "type": "newUser",
+      "username": users[uuid]["username"] 
+    })
 
     rooms[roomID]["users"].push(uuid)
     roomHistories.push(rooms[roomID]["whiteboard"]["canvas"])
