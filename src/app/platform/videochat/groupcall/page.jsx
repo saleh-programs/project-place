@@ -353,14 +353,8 @@ function GroupCall(){
                             const assignStream = (elem) => {if (elem && elem.srcObject !== stream){
                                 elem.srcObject = stream 
                             }}
-                            return <video key={peerID} ref={assignStream} autoPlay playsInline width={200}></video>
+                            return <section><h3>{peerID}</h3><video key={peerID} ref={assignStream} autoPlay playsInline></video></section>
                         })}
-                        <video src=""></video>
-                        <video src=""></video>
-                        <video src=""></video>
-                        <video src=""></video>
-                        <video src=""></video>
-                        <video src=""></video>
 
 
 
@@ -370,16 +364,16 @@ function GroupCall(){
                         {
                             videoAdded
                             ?
-                                <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
+                                <button onClick={()=>toggleMedia("video")}><img src={ showVideo ?  '/hidevideo_icon.png' : '/showvideo_icon.png'} alt="toggle video"></img></button>
                             :
-                                <button onClick={()=>requestMedia("video")}>Add Video</button>
+                                <button onClick={()=>requestMedia("video")}><img src='/showvideo_icon.png' alt="show video"></img></button>
                         }
                         {
                             audioAdded
                             ?
-                                <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
+                                <button onClick={()=>toggleMedia("audio")}><img src={ showAudio ?  '/muted_icon.png' : '/unmuted_icon.png'} alt="toggle audio"></img></button>
                             :
-                                <button onClick={()=>requestMedia("audio")}>Add Audio</button>
+                                <button onClick={()=>requestMedia("audio")}><img src='/unmuted_icon.png' alt="show audio"></img></button>
                         }
                     </section>
                     <section className={styles.joinOrExit}>

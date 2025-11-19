@@ -20,6 +20,9 @@
   box-shadow: 2px 5px 10px rgba(112, 112, 113, 0.395) ;
   z-index: 100;
 } 
+.darkMode .title{
+  background-color: rgb(66, 72, 88);
+}
 
 .mainContent{
   background-color: rgb(238, 223, 205);
@@ -31,8 +34,7 @@
   gap: 50px;
 }
 .darkMode .mainContent{
-  background-color: rgb(68, 57, 43);
-
+  background-color: rgb(29, 33, 40);
 }
 .mainContent button{
   font-family: "Exo 2", 'Courier New', Courier, monospace;

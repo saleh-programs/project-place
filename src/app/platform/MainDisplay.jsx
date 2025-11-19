@@ -47,7 +47,7 @@ function MainDisplay({children, username, initialUserInfo}){
     queryParams:{
       "username": username,
       "roomID": roomID
-    },
+    }, 
     onMessage:(event)=>{
       if (event.data instanceof Blob){
         reconstructCanvas(event.data)
@@ -57,8 +57,8 @@ function MainDisplay({children, username, initialUserInfo}){
       const data = JSON.parse(event.data)
       switch (data.origin){
         case "user":
+          console.log(data)
           // updateUserStates(data)
-
           break
         case "chat":
           if (data.type === "chatHistory"){

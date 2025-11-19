@@ -25,7 +25,9 @@
   align-items: end;
 }
 
-
+.darkMode .title{
+  background-color: rgb(66, 72, 88);
+}
 
 .chatDisplay{
   flex: 1;
@@ -33,7 +35,7 @@
   overflow-y: auto; 
   scrollbar-width: none;
   padding-top: 5px;
-
+ 
   display: flex;
   flex-direction: column;
   gap: 10px;
