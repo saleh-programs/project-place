@@ -360,12 +360,13 @@ function GroupCall(){
                 Group Call
             </h2>
             <div className={styles.mainContent}>
-                <div className={styles.streams}>
+                <section className={styles.streams}>
                     <section className={styles.otherStreams}>
                         {Object.entries(streams).sort(([a],[b])=>a.localeCompare(b)).map(([peerID, stream])=>{
                             const assignStream = (elem) => {if (elem && elem.srcObject !== stream){
                                 elem.srcObject = stream 
                             }}
+                            
                             return <section key={peerID} ><h3>{peerID}</h3><video ref={assignStream} autoPlay playsInline></video></section>
                         })}
                     </section>
@@ -396,7 +397,7 @@ function GroupCall(){
                                 
                         }
                     </section>
-                </div>
+                </section>
             </div>
         </div>
     )

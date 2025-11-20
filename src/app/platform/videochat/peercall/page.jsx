@@ -2,17 +2,18 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useContext, useEffect, useRef, useState } from "react"
+
 import ThemeContext from "src/assets/ThemeContext"
- 
+import Animation from "src/components/Animation"
+import styles from "styles/platform/PeerCall.module.css"
+
 function PeerCall(){
-    const { externalPeercallRef, userStates, username,sendJsonMessage, callOffers, setCallOffers, callOffersRef, stunCandidates  } = useContext(ThemeContext)
+    const { externalPeercallRef, userStates, username,sendJsonMessage, darkMode, setCallOffers, callOffersRef, stunCandidates  } = useContext(ThemeContext)
     const searchParams = useSearchParams()
     const router = useRouter()
 
     const servers = {
-        iceServers: [{
-        urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]
-        }],
+        iceServers: [{urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]}],
         iceCandidatePoolSize: 10,
     }
     const connectionInfo = useRef({ 
@@ -25,16 +26,20 @@ function PeerCall(){
     const localCam = useRef(null)
     const remoteCam = useRef(null)
 
+    const connectionStateRef = useRef("disconnected")
+    const callTimer = useRef(null)
+
+    const peerCallingRef = useRef(null)
+    const [peerCalling, setPeerCalling] = useState(null)
+
     const [videoAdded, setVideoAdded] = useState(false)
     const [audioAdded, setAudioAdded] = useState(false)
 
     const [showVideo, setShowVideo] = useState(true)
     const [showAudio, setShowAudio] = useState(true)
 
-    const connectionStateRef = useRef("disconnected")
-    const peerCalling = useRef(null)
-
-    const callTimer = useRef(null)
+    const [toggleActivePeers, setToggleActivePeers] = useState(true)
+    
 
 
     useEffect(()=>{
@@ -45,6 +50,7 @@ function PeerCall(){
             await startWebcam()
             disconnect()
 
+            //to renegotiate if a producer disconnects
             setInterval(()=>{
                 if (!connectionInfo.current["pc"] || connectionInfo.current["pc"].connectionState === "closed"){
                     return
@@ -56,14 +62,11 @@ function PeerCall(){
                     }
                 })
                 badTracks.forEach(s => {
-                    console.log("firing...?")
                     if (s.track.kind === "video"){
-                        console.log("fired video")
                         setVideoAdded(false)
                         localCam.current.srcObject.removeTrack(s.track)
                     }
                     if (s.track.kind === "audio"){
-                        console.log("fired audio")
                         setAudioAdded(false)
                         localCam.current.srcObject.removeTrack(s.track)
                     }
@@ -97,7 +100,7 @@ function PeerCall(){
         console.log(mssg)
         console.log("Connection Info: ", connectionInfo.current)
         console.log("Connection State: ", connectionStateRef.current )
-        console.log("Current Peer: ", peerCalling.current)
+        console.log("Current Peer: ", peerCallingRef.current)
     }
 
     async function startWebcam(){
@@ -123,7 +126,7 @@ function PeerCall(){
     }
 
     async function callPeer(name) {
-        if (peerCalling.current === name){
+        if (peerCallingRef.current === name){
             return
         }
         if (callOffersRef.current.hasOwnProperty(name)){
@@ -132,9 +135,11 @@ function PeerCall(){
         }
         disconnect()
         
+        peerCallingRef.current = name
+        setPeerCalling(name)
+
         connectionInfo.current["negotiating"] = true
         connectionStateRef.current = "waiting"
-        peerCalling.current = name
 
         const remoteStream = new MediaStream()
         connectionInfo.current["remoteStream"] = remoteStream
@@ -154,7 +159,6 @@ function PeerCall(){
                 }
             })
         }
-
         pc.onicecandidate = event => {
             if (!event.candidate){
                 return 
@@ -171,12 +175,10 @@ function PeerCall(){
             })
         }
         pc.onconnectionstatechange = () => {
-            console.log(pc.connectionState)
             if (pc.connectionState === "connected"){
                 connectionInfo.current["negotiating"] = false
                 connectionInfo.current["acceptingCandidates"] = false
                 connectionStateRef.current = "connected"
-                debuggingLogs("Connected to call (caller)")
             }
         }
 
@@ -184,7 +186,7 @@ function PeerCall(){
         await pc.setLocalDescription(offerDescription)
 
         callTimer.current = setTimeout(()=>{
-            if (connectionStateRef.current !== "connected" || peerCalling.current !== name ){
+            if (connectionStateRef.current !== "connected" || peerCallingRef.current !== name ){
                 disconnect()
             }
             callTimer.current = null
@@ -201,7 +203,6 @@ function PeerCall(){
                     type: offerDescription.type
                 }}
         })
-        debuggingLogs("Made call")
     }
 
     function clearConnection(){
@@ -210,7 +211,8 @@ function PeerCall(){
         connectionInfo.current["acceptingCandidates"] = false
 
         connectionStateRef.current = "disconnected"
-        peerCalling.current = null
+        peerCallingRef.current = null
+        setPeerCalling(null)
         if (remoteCam.current){
             remoteCam.current.srcObject = null
         }
@@ -218,26 +220,26 @@ function PeerCall(){
 
         callTimer.current && clearTimeout(callTimer.current)
 
-        router.push("/platform/videochat/peercall")
+        // router.push("/platform/videochat/peercall")
     }
 
     function disconnect(){
-        if (peerCalling.current){
+        if (peerCallingRef.current){
             sendJsonMessage({
                 "origin": "peercall",
                 "username": username,
                 "type": "disconnect",
-                "data": {peer: peerCalling.current}
+                "data": {"peer": peerCallingRef.current}
             })
-            if (stunCandidates.current.hasOwnProperty(peerCalling.current)){
-                delete stunCandidates.current[peerCalling.current]
+            if (stunCandidates.current.hasOwnProperty(peerCallingRef.current)){
+                delete stunCandidates.current[peerCallingRef.current]
             }
         }
         clearConnection()
     }
 
     async function acceptCall(name) {
-        if (peerCalling.current === name || !callOffersRef.current.hasOwnProperty(name)){
+        if (peerCallingRef.current === name || !callOffersRef.current.hasOwnProperty(name)){
             return
         }
         disconnect()
@@ -245,7 +247,8 @@ function PeerCall(){
         connectionInfo.current["negotiating"] = true
 
         connectionStateRef.current = "answering"
-        peerCalling.current = name
+        peerCallingRef.current = name
+        setPeerCalling(name)
 
         const offer = callOffersRef.current[name]
 
@@ -263,7 +266,6 @@ function PeerCall(){
             event.streams[0].getTracks().forEach(track=>{
                 connectionInfo.current["remoteStream"].addTrack(track)
                 track.onmute = (e) => {
-                    console.log("peer's muted")
                     remoteStream.removeTrack(track)
                 }
             })
@@ -283,12 +285,10 @@ function PeerCall(){
             })
         }
         pc.onconnectionstatechange = () => {
-            console.log(pc.connectionState)
             if (pc.connectionState === "connected"){
                 connectionInfo.current["negotiating"] = false
                 connectionInfo.current["acceptingCandidates"] = false
                 connectionStateRef.current = "connected"
-                debuggingLogs("Connected to call (answerer)")
             }
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer))
@@ -315,17 +315,16 @@ function PeerCall(){
             delete callOffersRef.current[name]
             setCallOffers({...callOffersRef.current})
         }
-        debuggingLogs("Answered call")
     }
 
     function recollectSTUN(){
-        if (!peerCalling.current.hasOwnProperty(peerCalling.current)){
+        if (!peerCallingRef.current.hasOwnProperty(peerCallingRef.current)){
             return
         }
-        stunCandidates.current[peerCalling.current].forEach(c => {
+        stunCandidates.current[peerCallingRef.current].forEach(c => {
             connectionInfo.current["pc"].addIceCandidate(new RTCIceCandidate(c))
         })
-        stunCandidates.current[peerCalling.current] = []
+        stunCandidates.current[peerCallingRef.current] = []
     }
 
     async function requestMedia(type){
@@ -333,7 +332,7 @@ function PeerCall(){
         try{
             if (type === "video"){
                 stream = await navigator.mediaDevices.getUserMedia({video: true})
-                setVideoAdded(true)
+                setVideoAdded(true) 
                 const videoTrack = stream.getVideoTracks()[0]
                 localCam.current.srcObject.addTrack(videoTrack)
 
@@ -388,13 +387,12 @@ function PeerCall(){
             "origin": "peercall",
             "type": "renegotiationRequest",
             "data": {
-                "peer": peerCalling.current,
+                "peer": peerCallingRef.current,
                 "offer": {
                     sdp: offerDescription.sdp,
                     type: offerDescription.type
                 }}
         })
-        debuggingLogs("new negotiation offer")
     }
 
     async function externalPeercall(data){
@@ -403,22 +401,20 @@ function PeerCall(){
         switch (data.type){
             case "callRequest":
                 //=== waiting is a pretty rare case (when users call at exact same time). I just compare usernames to settle it
-                const isRaceCollision = peerCalling.current === data["username"] && connectionStateRef.current === "waiting"
-                if (!isRaceCollision){
-                    break
+                const isRaceCollision = peerCallingRef.current === data["username"] && connectionStateRef.current === "waiting"
+                if (isRaceCollision){
+                    if (data["username"] <  username){
+                        clearConnection()
+                        acceptCall(data["username"])
+                    }else{
+                        delete callOffersRef.current[data["username"]]
+                        setCallOffers({...callOffersRef.current})
+                    }
                 }
-                if (data["username"] <  username){
-                    clearConnection()
-                    acceptCall(data["username"])
-                }else{
-                    delete callOffersRef.current[data["username"]]
-                    setCallOffers({...callOffersRef.current})
-                }
-
                 break
             case "callResponse":
-                const notCalling = !peerCalling.current || peerCalling.current !== data["username"]
-                const answered = peerCalling.current === data["username"] && connectionStateRef.current !== "waiting"
+                const notCalling = !peerCallingRef.current || peerCallingRef.current !== data["username"]
+                const answered = peerCallingRef.current === data["username"] && connectionStateRef.current !== "waiting"
                 if (notCalling || answered){
                     break
                 }
@@ -432,7 +428,7 @@ function PeerCall(){
                 }
                 break
             case "renegotiationRequest":
-                if (connectionStateRef.current !== "connected" || peerCalling.current !== data["username"]){
+                if (connectionStateRef.current !== "connected" || peerCallingRef.current !== data["username"]){
                     break
                 }
 
@@ -448,17 +444,16 @@ function PeerCall(){
                     "username": username,
                     "type": "renegotiationResponse",
                     "data": {
-                        "peer": peerCalling.current,
+                        "peer": peerCallingRef.current,
                         "answer": {
                             type: answerDescription.type,
                             sdp: answerDescription.sdp 
                         }
                     }
                 })
-                debuggingLogs("gave negotiation answer")
                 break
             case "renegotiationResponse":
-                if (connectionStateRef.current !== "connected" || peerCalling.current !== data["username"]){
+                if (connectionStateRef.current !== "connected" || peerCallingRef.current !== data["username"]){
                     break
                 }
                 connectionInfo.current["remoteStream"].getTracks().forEach(t => {
@@ -470,74 +465,78 @@ function PeerCall(){
                 connectionInfo.current["negotiating"] = false
                 recollectSTUN()
 
-                debuggingLogs("Completed negotiation!")
                 break
             case "stunCandidate":
-                console.log("got candidate")
-                if (peerCalling.current === data["username"] && connectionInfo.current["acceptingCandidates"]){
-                    debuggingLogs("new stun candidated")
+                if (peerCallingRef.current === data["username"] && connectionInfo.current["acceptingCandidates"]){
                     pc.addIceCandidate(new RTCIceCandidate(data.data["candidate"]))
                     delete stunCandidates.current[data["username"]]
                 }
                 break
             case "disconnect":
-                if (peerCalling.current === data["username"]){
-                    debuggingLogs("before disconnect")
+                if (peerCallingRef.current === data["username"]){
                     clearConnection()
                 }
                 break
-        }
-    }
-
-    function readTracks(){
-        console.log("local")
-        localCam.current.srcObject.getTracks().forEach(t => {
-            console.log(t)
-        })
-        console.log("remote")
-        remoteCam.current.srcObject.getTracks().forEach(t => {
-            console.log(t)
-        })
+        } 
     }
 
     return(
-        <div>
+        <div className={`${styles.peercallPage} ${darkMode ? styles.darkMode : ""}`}>
             <h1 className={styles.title}>
                 <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/videochat?18" : "/light/videochat?18"} type="once" speed={4}/> 
             </h1>
             <h2 className={styles.smallTitle}>
-                Group Call
+                Peer Call
             </h2>
             <div className={styles.mainContent}>
-                <div className={styles.streams}>
+                <section className={styles.streams}>
                     <section className={styles.peerStream}>
-                        <video ref={remoteCam} playsInline autoPlay width={200}></video>
+                        <section>
+                            {peerCalling && <h3>{peerCalling}</h3>} 
+                            <video ref={remoteCam} autoPlay playsInline></video>
+                        </section>
                     </section>
-                    <section className={styles.myStrean}>
-                        <video ref={localCam} playsInline autoPlay muted width={200}></video>
+                    <section className={styles.myStream}>
+                        <video ref={localCam} playsInline autoPlay muted></video>
                         {
                             videoAdded
                             ?
-                                <button onClick={()=>toggleMedia("video")}>Toggle Video</button>
+                                <button onClick={()=>toggleMedia("video")}><img src={ showVideo ?  '/hidevideo_icon.png' : '/showvideo_icon.png'} alt="toggle video"></img></button>
                             :
-                                <button onClick={()=>requestMedia("video")}>Add Video</button>
+                                <button onClick={()=>requestMedia("video")}><img src='/showvideo_icon.png' alt="show video"></img></button>
                         }
                         {
                             audioAdded
                             ?
-                                <button onClick={()=>toggleMedia("audio")}>Toggle Audio</button>
+                                <button onClick={()=>toggleMedia("audio")}><img src={ showAudio ?  '/muted_icon.png' : '/unmuted_icon.png'} alt="toggle audio"></img></button>
                             :
-                                <button onClick={()=>requestMedia("audio")}>Add Audio</button>
+                                <button onClick={()=>requestMedia("audio")}><img src='/unmuted_icon.png' alt="show audio"></img></button>
                         }
                     </section>
                     <section className={styles.disconnect}>
-                        <button onClick={disconnect}>End Call</button>            
+                        {
+                            peerCalling && <button onClick={disconnect}>End Call</button>            
+                        }
                     </section>
-                </div>
+                </section>
+                <section className={styles.activePeers} onClick={()=>setToggleActivePeers(prev=>!prev)}>
+                    <h2>Currently Active Members</h2>
+                    <hr />
+                    {
+                        toggleActivePeers &&
+                        <>
+                            {Object.keys(userStates).length <= 1 && <section>There are no active members</section>}
+                            <ul>
+                                {Object.keys(userStates).map((name)=>{
+                                    if (name === username){return null}
+                                    return <li key={name}><button onClick={(e)=>{e.stopPropagation();callPeer(name);}}>{name}</button></li>
+                                })}
+                            </ul>
+                        </>
+                    }
+                </section>
             </div>
-            {Object.keys(userStates).map((name,i)=>{
-                return <button key={i} onClick={()=>callPeer(name)}>{name}</button>
-            })}
+
         </div>
     )
 }
