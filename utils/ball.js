@@ -22,11 +22,12 @@ function add(p1, p2){
 }
 
 class Ball{
-    constructor(origin, circle_group, width, height){
+    constructor(origin, circle_group, width, height, image){
         this.circle_group = circle_group
 
         this.WIDTH = width
         this.HEIGHT = height
+        this.image = image
 
         this.random_number = -0.5 + Math.random()
         this.acceleration = [0, 0]
