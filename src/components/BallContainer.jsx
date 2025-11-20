@@ -3,9 +3,6 @@ import styles from "styles/components/BallContainer.module.css"
 
 import Ball from "utils/ball.js"
 
-// class Ball{
-//     constructor(origin, circle_group, width, height){
-
 
 function BallContainer({imgList}){
 
@@ -23,25 +20,40 @@ function BallContainer({imgList}){
 
         imgList.forEach(src =>{
             const origin = {x: Math.floor(Math.random() * rect.width),y: Math.floor(Math.random() * rect.height)}
-            ballGroup.current.push(new Ball(origin, ballGroup.current, rect.width, rect.height, src))
+            const img = new Image()
+            img.src = src
+            ballGroup.current.push(new Ball(origin, ballGroup.current, rect.width, rect.height, img))
         })
 
-
-        let last = null;
+        const cxt = cxtRef.current
+        const canvas = canvasRef.current
+        let last = null; 
+        let dt; 
         function updateBalls(step){
-            if (!last){
-                last = 0;
+            if (last === null){
+                last = step;
             }
-            
-            const cxt = cxtRef.current
-            const canvas = canvasRef.current
-            rafRef.current = requestAnimationFrame(()=>{
-                cxt.clearRect(0,0, canvas.width, canvas.height)
-                ballGroup.current.forEach(ball => {
-                    ball.update()
-                })
-            })
+            dt = step - last
+
+            cxt.clearRect(0,0, canvas.width, canvas.height)
+            for (let ball of ballGroup.current){
+                ball.update(dt)
+                // if (!ball.image.complete){
+                //     continue
+                // }
+                const scalar = ball.radius / ball.image.width
+                const scaledWidth = ball.radius
+                const scaledHeight = ball.image.height * scalar
+                
+                cxt.beginPath()
+                cxt.arc(ball.pos.x, ball.pos.y, ball.radius, 0, 2*Math.PI)
+                cxt.stroke()
+                cxt.clip()
+                // cxt.drawImage(ball.image, ball.pos.x - (scaledWidth/2), ball.pos.y - (scaledHeight/2), scaledWidth, scaledHeight)
+            }
+            rafRef.current = requestAnimationFrame(updateBalls)
         }
+
         if (ballGroup.current.length > 0){
             rafRef.current = requestAnimationFrame(updateBalls)
         }

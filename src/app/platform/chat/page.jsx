@@ -12,7 +12,7 @@ function Chat(){
   const {externalChatRef, sendJsonMessage, roomID, roomIDRef, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef, darkMode} = useContext(ThemeContext)
 
   const mainScrollableRef = useRef(null)
-  const numMsgsAvailable = 30 // actually number of messages available - 1
+  const numMsgsAvailable = 30 // actual number of messages available - 1
   const lazyLoading = useRef({
     "allLoaded": false,
     "loading": false,
