@@ -16,8 +16,7 @@ function Home(){
       position: "relative",
       margin: "10px"
       }}>
-        <BallContainer/>
-
+        <BallContainer imgList={["/showvideo_icon.png"]}/>
     </div>
   </div>
   )

@@ -22,25 +22,24 @@ function add(p1, p2){
 }
 
 class Ball{
-    constructor(origin, circle_group, width, height, image){
+    constructor(origin, circle_group, width, height, image=null){
         this.circle_group = circle_group
 
         this.WIDTH = width
         this.HEIGHT = height
         this.image = image
 
-        this.random_number = -0.5 + Math.random()
-        this.acceleration = [0, 0]
-        this.elasticity = 1
-        this.radius = 10
-        this.mass = this.radius / 50
-
+        this.acceleration = {x: 0, y: .0000005}
+        this.elasticity = .8
+        this.radius = 20
+        this.mass = 1  
+ 
         this.pos = {...origin} 
-        this.pastpos = {x: origin.x + this.random_number, y: origin.y + this.random_number}
+        this.pastpos = {x: origin.x + (-8 + Math.random()*16 ), y: origin.y + (-8 + Math.random()*16 )}
         this.currentpos = {...origin}
     }
     moveLinear(dt){
-        this.currentpos = [...this.pos]
+        this.currentpos = {...this.pos}
 
         this.pos.x += (this.pos.x - this.pastpos.x) + this.acceleration.x * dt*dt
         this.pos.y += (this.pos.y - this.pastpos.y) + this.acceleration.y * dt*dt
@@ -50,6 +49,7 @@ class Ball{
     }
     blockCollisions(){
         const diff = {x: this.pos.x - this.currentpos.x, y: this.pos.y - this.currentpos.y}
+
         if (this.pos.x > this.WIDTH - this.radius){
             this.pos.x = this.WIDTH - this.radius
             this.currentpos.x = this.pos.x + diff.x * this.elasticity
@@ -98,6 +98,7 @@ class Ball{
         }
     }
     update(dt){
+        dt /= 2
         this.circleCollisions()
         this.moveLinear(dt)
     }

@@ -10,19 +10,33 @@ function BallContainer({imgList}){
     const cxtRef = useRef(null)
     const ballGroup = useRef([])
 
-    const rafRef = useRef(null)
+    const rafRef = useRef(null) 
 
     useEffect(()=>{
-        const rect = containerRef.current.getBoundingClientRect()
+        const rect = canvasRef.current.getBoundingClientRect()
         canvasRef.current.width = rect.width
         canvasRef.current.height = rect.height
         cxtRef.current = canvasRef.current.getContext("2d")
 
         imgList.forEach(src =>{
             const origin = {x: Math.floor(Math.random() * rect.width),y: Math.floor(Math.random() * rect.height)}
+            const ball = new Ball(origin, ballGroup.current, rect.width, rect.height)
+
             const img = new Image()
             img.src = src
-            ballGroup.current.push(new Ball(origin, ballGroup.current, rect.width, rect.height, img))
+            img.onload = ()=>{
+                const scaledImg = document.createElement("canvas")
+
+                const scalar = (ball.radius * 2) / img.width
+                const scaledWidth = ball.radius * 2
+                const scaledHeight = img.height * scalar
+                
+                scaledImg.width = scaledWidth
+                scaledImg.height = scaledHeight
+                scaledImg.getContext("2d").drawImage(img, 0, 0, scaledWidth, scaledHeight)
+                ball.image = scaledImg
+            }
+            ballGroup.current.push(ball)
         })
 
         const cxt = cxtRef.current
@@ -38,18 +52,17 @@ function BallContainer({imgList}){
             cxt.clearRect(0,0, canvas.width, canvas.height)
             for (let ball of ballGroup.current){
                 ball.update(dt)
-                // if (!ball.image.complete){
-                //     continue
-                // }
-                const scalar = ball.radius / ball.image.width
-                const scaledWidth = ball.radius
-                const scaledHeight = ball.image.height * scalar
-                
+                if (ball.image === null){
+                    continue
+                }
+                  
+                cxt.save()
                 cxt.beginPath()
                 cxt.arc(ball.pos.x, ball.pos.y, ball.radius, 0, 2*Math.PI)
                 cxt.stroke()
                 cxt.clip()
-                // cxt.drawImage(ball.image, ball.pos.x - (scaledWidth/2), ball.pos.y - (scaledHeight/2), scaledWidth, scaledHeight)
+                cxt.drawImage(ball.image, ball.pos.x - (ball.image.width / 2), ball.pos.y - (ball.image.height / 2))
+                cxt.restore()
             }
             rafRef.current = requestAnimationFrame(updateBalls)
         }
