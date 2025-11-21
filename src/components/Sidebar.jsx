@@ -3,15 +3,16 @@ import styles from "styles/components/Sidebar.module.css"
 import { useRouter } from "next/navigation"
 
 import AccountHub from "src/components/AccountHub"
-import { useRef } from "react"
+import { useContext, useRef } from "react"
+import ThemeContext from "src/assets/ThemeContext"
+import BallContainer from "./BallContainer"
 
-function Sidebar(){
+function Sidebar({userStates, sendJsonMessage, username}){
   const router = useRouter()
   const sideBarRef = useRef(null)
 
   function startDrag(e){
     e.preventDefault()
-    console.log("here?")
     const imgOffset = e.clientX - e.currentTarget.getBoundingClientRect().left
 
     const collapseBoundary = 50
@@ -46,15 +47,60 @@ function Sidebar(){
     }
     document.addEventListener("mousemove",onMove)
     document.addEventListener("mouseup",onRelease)
-
   }
+
+  const peerLocations = {
+    "chat": [],
+    "whiteboard":[],
+    "videochat": []
+  }
+  Object.keys(userStates).forEach(user =>{
+    peerLocations[userStates[user]["location"]].push({"username":user, "avatar": userStates[user]["avatar"]})
+  })
   return(
     <div className={styles.sidePanel}>
       <section className={styles.sidePanelMain} ref={sideBarRef}>
         <section className={styles.features}>
-          <button onClick={()=>router.push("/platform/chat")}>Chat</button>
-          <button onClick={()=>router.push("/platform/whiteboard")}>Whiteboard</button>
-          <button onClick={()=>router.push("/platform/videochat")}>Video Chat</button>
+          <button onClick={()=>{
+            router.push("/platform/chat")
+              sendJsonMessage({
+                "origin": "user",
+                "username": username,
+                "type": "userInfo",
+                "data": {"location": "chat"}
+              })
+            }}>
+            Chat
+            {peerLocations["chat"].length !== 0 && 
+            <BallContainer userList={peerLocations["chat"]}/>}
+          </button>
+          <button onClick={()=>{
+            router.push("/platform/whiteboard")
+            sendJsonMessage({
+              "origin": "user",
+              "username": username,
+              "type": "userInfo",
+              "data": {"location": "whiteboard"}
+            })
+            }}>
+            Whiteboard
+            {peerLocations["whiteboard"].length !== 0 &&
+            <BallContainer userList={peerLocations["whiteboard"]}/>}
+          </button>
+          <button onClick={()=>{
+            router.push("/platform/videochat")
+            sendJsonMessage({
+              "origin": "user",
+              "username": username,
+              "type": "userInfo",
+              "data": {"location": "videochat"}
+            })
+            }}>
+            Video Chat
+            {peerLocations["videochat"].length !== 0 &&
+            <BallContainer userList={peerLocations["videochat"]}/>
+            }
+          </button>
         </section>
         <AccountHub/>
       </section>
