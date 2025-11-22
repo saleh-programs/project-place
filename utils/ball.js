@@ -3,7 +3,7 @@ function distanceBetween(p1, p2){
 }
 function normalize(p){
     const magnitude = Math.sqrt((p.x)**2 + (p.y)**2)
-    return {x: p.x / magnitude, y: p.y / magnitude}
+    return magnitude !== 0 ? {x: p.x / magnitude, y: p.y / magnitude} : {x: 0, y: 0}
 }
 function dot(p1, p2){
     return p1.x * p2.x + p1.y * p2.y
@@ -22,15 +22,17 @@ function add(p1, p2){
 }
 
 class Ball{
-    constructor(origin, circle_group, width, height, image=null){
-        this.circle_group = circle_group
+    constructor(origin, ballGroup, width, height, image=null, metadata=null){
+        this.ballGroup = ballGroup
 
         this.WIDTH = width
         this.HEIGHT = height
         this.image = image
 
-        this.acceleration = {x: 0, y: .0000005}
-        this.elasticity = .8
+        this.metadata=metadata
+
+        this.acceleration = {x: 0, y: .0005}
+        this.elasticity = 0.7
         this.radius = 20
         this.mass = 1  
  
@@ -40,9 +42,11 @@ class Ball{
     }
     moveLinear(dt){
         this.currentpos = {...this.pos}
+ 
 
         this.pos.x += (this.pos.x - this.pastpos.x) + this.acceleration.x * dt*dt
         this.pos.y += (this.pos.y - this.pastpos.y) + this.acceleration.y * dt*dt
+
         this.blockCollisions()
 
         this.pastpos = {...this.currentpos}
@@ -68,13 +72,13 @@ class Ball{
         }
     }
     circleCollisions(){
-        for (let circle of this.circle_group){
+        for (let circle of this.ballGroup.current){
             if (this != circle){
                 const collision = distanceBetween(circle.pos, this.pos) < (this.radius + circle.radius)
 
                 if (collision){
                     const collisionNormal = normalize(subtract(circle.pos, this.pos))
-                    const separation = (this.radius + circle.radius) - distanceBetween(this.pos, circle.pos)
+                    let separation = (this.radius + circle.radius) - distanceBetween(this.pos, circle.pos)
 
                     const Vrelative = subtract(
                         subtract(circle.pos, circle.pastpos),
@@ -82,7 +86,7 @@ class Ball{
                     )
 
                     const approaching = dot(Vrelative, collisionNormal)
-
+                    
                     this.pos = subtract(this.pos, multiply(collisionNormal, separation/2))
                     this.pastpos = subtract(this.pastpos, multiply(collisionNormal, separation/2))
 
@@ -97,10 +101,11 @@ class Ball{
             }
         }
     }
+    
     update(dt){
-        dt /= 2
-        this.circleCollisions()
         this.moveLinear(dt)
+        this.circleCollisions()
+
     }
 }
 

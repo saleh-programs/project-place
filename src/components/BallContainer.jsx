@@ -4,7 +4,7 @@ import styles from "styles/components/BallContainer.module.css"
 import Ball from "utils/ball.js"
 
 
-function BallContainer({imgList}){
+function BallContainer({userList}){
 
     const canvasRef = useRef(null)
     const cxtRef = useRef(null)
@@ -13,34 +13,24 @@ function BallContainer({imgList}){
     const rafRef = useRef(null) 
 
     useEffect(()=>{
+        if (userList.length === 0){
+            return
+        }
+        addBalls()
+    },[userList])
+
+    useEffect(()=>{
         const rect = canvasRef.current.getBoundingClientRect()
         canvasRef.current.width = rect.width
         canvasRef.current.height = rect.height
         cxtRef.current = canvasRef.current.getContext("2d")
 
-        imgList.forEach(src =>{
-            const origin = {x: Math.floor(Math.random() * rect.width),y: Math.floor(Math.random() * rect.height)}
-            const ball = new Ball(origin, ballGroup.current, rect.width, rect.height)
-
-            const img = new Image()
-            img.src = src
-            img.onload = ()=>{
-                const scaledImg = document.createElement("canvas")
-
-                const scalar = (ball.radius * 2) / img.width
-                const scaledWidth = ball.radius * 2
-                const scaledHeight = img.height * scalar
-                
-                scaledImg.width = scaledWidth
-                scaledImg.height = scaledHeight
-                scaledImg.getContext("2d").drawImage(img, 0, 0, scaledWidth, scaledHeight)
-                ball.image = scaledImg
-            }
-            ballGroup.current.push(ball)
-        })
-
         const cxt = cxtRef.current
         const canvas = canvasRef.current
+
+        addBalls()
+        
+        cxt.lineWidth = .25
         let last = null; 
         let dt; 
         function updateBalls(step){
@@ -48,7 +38,7 @@ function BallContainer({imgList}){
                 last = step;
             }
             dt = step - last
-
+            last = step
             cxt.clearRect(0,0, canvas.width, canvas.height)
             for (let ball of ballGroup.current){
                 ball.update(dt)
@@ -72,10 +62,50 @@ function BallContainer({imgList}){
         }
 
         return ()=>{
+            ballGroup.current = []
             cancelAnimationFrame(rafRef.current)
         }
     },[])
 
+    function addBalls(){
+        const rect = canvasRef.current.getBoundingClientRect()
+
+        const newBallGroup = []
+
+        for (let user of userList){
+            let exists = false
+            
+            for (let ball of ballGroup.current){
+                if (ball.metadata === user["username"]){
+                    exists = true
+                    newBallGroup.push(ball)
+                    break
+                }
+            }
+            if (exists){
+                continue
+            }
+            const origin = {x: Math.floor(Math.random() * rect.width),y: Math.floor(Math.random() * rect.height)}
+            const ball = new Ball(origin, ballGroup, rect.width, rect.height, null, user["username"])
+
+            const img = new Image()
+            img.src = user["avatar"]
+            img.onload = ()=>{
+                const scaledImg = document.createElement("canvas")
+
+                const scalar = (ball.radius * 2) / img.width
+                const scaledWidth = ball.radius * 2
+                const scaledHeight = img.height * scalar
+                
+                scaledImg.width = scaledWidth
+                scaledImg.height = scaledHeight
+                scaledImg.getContext("2d").drawImage(img, 0, 0, scaledWidth, scaledHeight)
+                ball.image = scaledImg
+            }
+            newBallGroup.push(ball)
+        }
+        ballGroup.current = newBallGroup
+    }
 
     return(
         <canvas className={styles.ballContainer} ref={canvasRef}>
