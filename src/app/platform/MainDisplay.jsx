@@ -217,7 +217,7 @@ function MainDisplay({children, username, initialUserInfo}){
   return(
     <ThemeContext.Provider value={shared}>
       <div className={styles.siteWrapper}>
-        <Sidebar/>
+        <Sidebar {...{userStates, sendJsonMessage, username}}/>
         <div className={styles.pageContainer}>
           {children}
           {Object.keys(callOffers).map((name) => {
