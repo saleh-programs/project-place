@@ -8,6 +8,8 @@ import ThemeContext from "src/assets/ThemeContext"
 import BallContainer from "./BallContainer"
 
 function Sidebar({userStates, sendJsonMessage, username}){
+  const {darkMode} = useContext(ThemeContext)
+
   const router = useRouter()
   const sidebarRef = useRef(null)
 
@@ -59,7 +61,7 @@ function Sidebar({userStates, sendJsonMessage, username}){
     peerLocations[userStates[user]["location"]].push({"username":user, "avatar": userStates[user]["avatar"]})
   })
   return(
-    <div className={styles.sidePanel}>
+    <div className={`${styles.sidePanel} ${darkMode ? styles.darkMode : ""}`}>
       <section className={styles.sidePanelMain} ref={sidebarRef}>
         <section className={styles.features}>
           <button onClick={()=>{
