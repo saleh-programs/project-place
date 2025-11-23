@@ -6,5 +6,7 @@
     left: 0;
 }
 .ballContainer canvas{
-    border: 1px solid;
+    position: absolute;
+    top: 0;
+    left: 0;
 }

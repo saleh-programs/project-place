@@ -40,6 +40,10 @@ class Ball{
         this.pastpos = {x: origin.x + (-8 + Math.random()*16 ), y: origin.y + (-8 + Math.random()*16 )}
         this.currentpos = {...origin}
     }
+    addEnergy(j){
+        this.pos.x += j.x
+        this.pos.y += j.y
+    }
     moveLinear(dt){
         this.currentpos = {...this.pos}
  
@@ -103,6 +107,11 @@ class Ball{
     }
     
     update(dt, width, height){
+        if (this.pos.x > width - this.radius && this.pos.x < this.width - this.radius ){
+            const diff = this.pos.x - (width - this.radius)
+            this.pastpos.x -= diff
+            this.pos.x -= diff
+        }
         this.width = width
         this.height = height
         this.moveLinear(dt)

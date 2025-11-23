@@ -4,7 +4,7 @@ import styles from "styles/components/BallContainer.module.css"
 import Ball from "utils/ball.js"
 
 
-function BallContainer({userList, sidebarRef}){
+function BallContainer({userList}){
 
     const containerRef = useRef(null)
     const canvasRef = useRef(null)
@@ -21,7 +21,7 @@ function BallContainer({userList, sidebarRef}){
     },[userList])
 
     useEffect(()=>{
-        const rect = containerRef.current.getBoundingClientRect()
+        let rect = containerRef.current.getBoundingClientRect()
         canvasRef.current.width = rect.width
         canvasRef.current.height = rect.height
         cxtRef.current = canvasRef.current.getContext("2d")
@@ -31,36 +31,46 @@ function BallContainer({userList, sidebarRef}){
 
         addBalls()
         
-        cxt.strokeStyle = "gray"
+        cxt.strokeStyle = "rgba(0, 0, 0, 0.3)"
         let last = null; 
         let dt; 
-        let sidebarRect;
+        let impulse = {x: 0, y: 0};
         function updateBalls(step){
             if (last === null){
                 last = step;
             }
             dt = Math.min(step - last, 150)
             last = step
-            sidebarRect = sidebarRef.current.getBoundingClientRect()
+            rect = containerRef.current.getBoundingClientRect()
             cxt.clearRect(0,0, canvas.width, canvas.height)
+            if (canvas.width !== Math.floor(rect.width)){
+                impulse.x = (rect.width - canvas.width) * dt * .001
+                impulse.y = -(dt* .001)
+                canvas.width = rect.width
+            }
+            if (canvas.height !== Math.floor(rect.height)){
+                impulse.y = (rect.height - canvas.height) * dt * .001
+                canvas.height = rect.height
+            }
             for (let ball of ballGroup.current){
-                if (canvas.width !== sidebarRect.width){
-                    canvas.width = sidebarRect.width
-                }
-
+                ball.addEnergy(impulse)
                 ball.update(dt, canvas.width, canvas.height)
                 if (ball.image === null){
                     continue
                 }
                   
                 cxt.save()
+
                 cxt.beginPath()
                 cxt.arc(ball.pos.x, ball.pos.y, ball.radius, 0, 2*Math.PI)
                 cxt.stroke()
                 cxt.clip()
                 cxt.drawImage(ball.image, ball.pos.x - (ball.image.width / 2), ball.pos.y - (ball.image.height / 2))
+                
                 cxt.restore()
             }
+            impulse.x = 0
+            impulse.y = 0
             rafRef.current = requestAnimationFrame(updateBalls)
         }
 
