@@ -313,11 +313,12 @@ function Chat(){
     canSendRef.current = false
     setTimeout(()=>{
       canSendRef.current = true
-    },100)
+    },300)
     setIsClicked(true)
-    setTimeout(()=>setIsClicked(false),50)
+    setTimeout(()=>setIsClicked(false), 50)
 
     filePreviews.length > 0 && await handleFileMessage()
+    if (newMessage === "") return
 
     const currTime = Date.now()
     const messageID = getUniqueMessageID()
@@ -466,16 +467,6 @@ function Chat(){
         const msg = data.data
         const messageID = msg["metadata"]["messageID"]
 
-        // temp awful solution for dev, when working on different tabs with same username
-        //would prefer at end of func. note. 
-        setMappedMessages(prev=>{
-            if (!(messageID in prev)){
-              setGroupedMessages(groups => appendGroupedMessages(groups, [msg]))
-            }
-            return prev
-        })
-        // msg["username"] !== username && setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
-
         setMappedMessages(prev => {
           return {
             ...prev, 
@@ -488,6 +479,8 @@ function Chat(){
             }
           }
         })
+        msg["username"] !== username && setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
+
         break
       case "edit":
         setMappedMessages(prev => {
