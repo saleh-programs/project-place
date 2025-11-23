@@ -44,7 +44,7 @@ function AccountHub(){
         Create Room
       </button>
       {isCreatingRoom && 
-      <CreateRoom {...{setIsCreatingRoom,setRoomID, username}}/>
+      <CreateRoom {...{setIsCreatingRoom,setRoomID, setUserInfo}}/>
       }
       
       <button className={styles.joinRoom}
@@ -52,7 +52,7 @@ function AccountHub(){
         Join Room
       </button>
       {isLoadingRoom && 
-        <JoinRoom {...{setIsLoadingRoom,setRoomID, username}}/>
+        <JoinRoom {...{setIsLoadingRoom,setRoomID, setUserInfo, userInfo}}/>
       }
     </div>
   )

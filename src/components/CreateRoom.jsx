@@ -3,7 +3,8 @@ import styles from "styles/components/CreateRoom.module.css"
 
 import { createRoomReq, updateCanvasReq } from "backend/requests"
 
-function CreateRoom({setIsCreatingRoom, setRoomID, username}){
+function CreateRoom({setIsCreatingRoom, setRoomID, setUserInfo}){
+
   const [newRoomName, setNewRoomName] = useState("")
 
   async function handleRoomCreation(){
@@ -12,6 +13,12 @@ function CreateRoom({setIsCreatingRoom, setRoomID, username}){
       setNewRoomName("")
       setIsCreatingRoom(false)
       setRoomID(res)
+      setUserInfo(prev =>{
+        return {
+          ...prev,
+          "rooms": [...prev["rooms"], res]
+        }
+      })
     }
   }
 

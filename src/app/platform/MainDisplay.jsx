@@ -135,7 +135,9 @@ function MainDisplay({children, username, initialUserInfo}){
   useEffect(()=>{
     console.log(userStates)
   },[userStates])
-
+  useEffect(()=>{
+    console.log(userInfo)
+  },[])
   async function reconstructCanvas(data){
     const canvasBuffer = await data.arrayBuffer()
 
@@ -218,6 +220,14 @@ function MainDisplay({children, username, initialUserInfo}){
     <ThemeContext.Provider value={shared}>
       <div className={styles.siteWrapper}>
         <Sidebar {...{userStates, sendJsonMessage, username}}/>
+        <div>
+          Here are your rooms:
+          <ul>
+              {userInfo["rooms"].map(room=>{
+                return <li key={room}>{room}</li>
+              })}
+          </ul>
+        </div>
         <div className={styles.pageContainer}>
           {children}
           {Object.keys(callOffers).map((name) => {

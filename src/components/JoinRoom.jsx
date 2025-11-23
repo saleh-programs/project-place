@@ -4,20 +4,33 @@ import styles from "styles/components/JoinRoom.module.css"
 import { checkRoomExistsReq, addRoomUserReq } from "backend/requests";
 import ThemeContext from "src/assets/ThemeContext";
 
-function JoinRoom({setIsLoadingRoom, setRoomID, username}){
+function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
   const [joinRoomID, setJoinRoomID]= useState("")
 
   async function handleRoomLoad(){
+
     const res = await checkRoomExistsReq(joinRoomID)
     if (!res){
       setJoinRoomID("")
       return
     }
-    const joinRes = await addRoomUserReq(joinRoomID)
-    if(!joinRes){
-      setJoinRoomID("")
-      return
+
+    if (!userInfo["rooms"].includes(joinRoomID)){
+      const joinRes = await addRoomUserReq(joinRoomID)
+      if(!joinRes){
+        setJoinRoomID("")
+        return
+      }
+      setUserInfo(prev =>{
+        return {
+          ...prev,
+          "rooms": [...prev["rooms"], res]
+        }
+      })
     }
+
+
+
     setRoomID(joinRoomID);
     setIsLoadingRoom(false)
   }
