@@ -9,14 +9,14 @@ import BallContainer from "./BallContainer"
 
 function Sidebar({userStates, sendJsonMessage, username}){
   const router = useRouter()
-  const sideBarRef = useRef(null)
+  const sidebarRef = useRef(null)
 
   function startDrag(e){
     e.preventDefault()
     const imgOffset = e.clientX - e.currentTarget.getBoundingClientRect().left
 
     const collapseBoundary = 50
-    const leftBoundary = 100
+    const leftBoundary = 200
     const rightBoundary = 800
     let done;
 
@@ -27,16 +27,17 @@ function Sidebar({userStates, sendJsonMessage, username}){
       }
       done = true
       requestAnimationFrame(()=>{
-        sideBarRef.current.style.width = `${e.clientX - imgOffset}px`
-        sideBarRef.current.style.display = ""
+        sidebarRef.current.style.width = `${e.clientX - imgOffset}px`
+        sidebarRef.current.style.display = ""
         
         if (e.clientX < collapseBoundary){
-          sideBarRef.current.style.display = "none"
+          sidebarRef.current.style.display = "none"
         }else if (e.clientX < leftBoundary){
-          sideBarRef.current.style.width = `${leftBoundary}px`
+          sidebarRef.current.style.width = `${leftBoundary}px`
         }else if (e.clientX > rightBoundary){
-          sideBarRef.current.style.width = `${rightBoundary}px`
+          sidebarRef.current.style.width = `${rightBoundary}px`
         }
+
         done = false
       })
     }
@@ -59,7 +60,7 @@ function Sidebar({userStates, sendJsonMessage, username}){
   })
   return(
     <div className={styles.sidePanel}>
-      <section className={styles.sidePanelMain} ref={sideBarRef}>
+      <section className={styles.sidePanelMain} ref={sidebarRef}>
         <section className={styles.features}>
           <button onClick={()=>{
             router.push("/platform/chat")
@@ -72,7 +73,7 @@ function Sidebar({userStates, sendJsonMessage, username}){
             }}>
             Chat
             {peerLocations["chat"].length !== 0 && 
-            <BallContainer userList={peerLocations["chat"]}/>}
+            <BallContainer userList={peerLocations["chat"]} sidebarRef={sidebarRef}/>}
           </button>
           <button onClick={()=>{
             router.push("/platform/whiteboard")
@@ -85,7 +86,7 @@ function Sidebar({userStates, sendJsonMessage, username}){
             }}>
             Whiteboard
             {peerLocations["whiteboard"].length !== 0 &&
-            <BallContainer userList={peerLocations["whiteboard"]}/>}
+            <BallContainer userList={peerLocations["whiteboard"]} sidebarRef={sidebarRef}/>}
           </button>
           <button onClick={()=>{
             router.push("/platform/videochat")
@@ -98,7 +99,7 @@ function Sidebar({userStates, sendJsonMessage, username}){
             }}>
             Video Chat
             {peerLocations["videochat"].length !== 0 &&
-            <BallContainer userList={peerLocations["videochat"]}/>
+            <BallContainer userList={peerLocations["videochat"]} sidebarRef={sidebarRef}/>
             }
           </button>
         </section>

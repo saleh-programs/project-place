@@ -25,15 +25,15 @@ class Ball{
     constructor(origin, ballGroup, width, height, image=null, metadata=null){
         this.ballGroup = ballGroup
 
-        this.WIDTH = width
-        this.HEIGHT = height
+        this.width = width
+        this.height = height
         this.image = image
 
         this.metadata=metadata
 
         this.acceleration = {x: 0, y: .0005}
         this.elasticity = 0.7
-        this.radius = 20
+        this.radius = 15
         this.mass = 1  
  
         this.pos = {...origin} 
@@ -54,16 +54,16 @@ class Ball{
     blockCollisions(){
         const diff = {x: this.pos.x - this.currentpos.x, y: this.pos.y - this.currentpos.y}
 
-        if (this.pos.x > this.WIDTH - this.radius){
-            this.pos.x = this.WIDTH - this.radius
+        if (this.pos.x > this.width - this.radius){
+            this.pos.x = this.width- this.radius
             this.currentpos.x = this.pos.x + diff.x * this.elasticity
         }
         if (this.pos.x < this.radius){
             this.pos.x = this.radius
             this.currentpos.x = this.pos.x + diff.x * this.elasticity
         }
-        if (this.pos.y > this.HEIGHT - this.radius){
-            this.pos.y = this.HEIGHT  - this.radius
+        if (this.pos.y > this.height - this.radius){
+            this.pos.y = this.height  - this.radius
             this.currentpos.y = this.pos.y + diff.y * this.elasticity
         }
         if (this.pos.y < this.radius){
@@ -102,7 +102,9 @@ class Ball{
         }
     }
     
-    update(dt){
+    update(dt, width, height){
+        this.width = width
+        this.height = height
         this.moveLinear(dt)
         this.circleCollisions()
 

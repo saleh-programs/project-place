@@ -4,8 +4,9 @@ import styles from "styles/components/BallContainer.module.css"
 import Ball from "utils/ball.js"
 
 
-function BallContainer({userList}){
+function BallContainer({userList, sidebarRef}){
 
+    const containerRef = useRef(null)
     const canvasRef = useRef(null)
     const cxtRef = useRef(null)
     const ballGroup = useRef([])
@@ -20,7 +21,7 @@ function BallContainer({userList}){
     },[userList])
 
     useEffect(()=>{
-        const rect = canvasRef.current.getBoundingClientRect()
+        const rect = containerRef.current.getBoundingClientRect()
         canvasRef.current.width = rect.width
         canvasRef.current.height = rect.height
         cxtRef.current = canvasRef.current.getContext("2d")
@@ -30,18 +31,24 @@ function BallContainer({userList}){
 
         addBalls()
         
-        cxt.lineWidth = .25
+        cxt.strokeStyle = "gray"
         let last = null; 
         let dt; 
+        let sidebarRect;
         function updateBalls(step){
             if (last === null){
                 last = step;
             }
-            dt = step - last
+            dt = Math.min(step - last, 150)
             last = step
+            sidebarRect = sidebarRef.current.getBoundingClientRect()
             cxt.clearRect(0,0, canvas.width, canvas.height)
             for (let ball of ballGroup.current){
-                ball.update(dt)
+                if (canvas.width !== sidebarRect.width){
+                    canvas.width = sidebarRect.width
+                }
+
+                ball.update(dt, canvas.width, canvas.height)
                 if (ball.image === null){
                     continue
                 }
@@ -68,8 +75,6 @@ function BallContainer({userList}){
     },[])
 
     function addBalls(){
-        const rect = canvasRef.current.getBoundingClientRect()
-
         const newBallGroup = []
 
         for (let user of userList){
@@ -85,8 +90,8 @@ function BallContainer({userList}){
             if (exists){
                 continue
             }
-            const origin = {x: Math.floor(Math.random() * rect.width),y: Math.floor(Math.random() * rect.height)}
-            const ball = new Ball(origin, ballGroup, rect.width, rect.height, null, user["username"])
+            const origin = {x: Math.floor(Math.random() * canvasRef.current.width),y: Math.floor(Math.random() * canvasRef.current.height)}
+            const ball = new Ball(origin, ballGroup, canvasRef.current.width, canvasRef.current.height, null, user["username"])
 
             const img = new Image()
             img.src = user["avatar"]
@@ -108,8 +113,10 @@ function BallContainer({userList}){
     }
 
     return(
-        <canvas className={styles.ballContainer} ref={canvasRef}>
-        </canvas>
+        <div ref={containerRef} className={styles.ballContainer} >
+            <canvas ref={canvasRef}>
+            </canvas>
+        </div>
     )
 }
 
