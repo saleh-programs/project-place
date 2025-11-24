@@ -17,43 +17,45 @@ function AccountHub(){
   const [isChangingImage, setIsChangingImage] = useState(false)
 
   return(
-    <div className={styles.accountHub}>
-      {roomID}
-        <label className={styles.toggleAppearance}>
-          dark mode
-          <input 
-          type="checkbox"
-          onClick={(e)=>setDarkMode(e.target.checked)
-
-          }
-          /> 
-          <span></span>
-        </label>
+    <div className={styles.accountHub}>    
       <section className={styles.header}>
-        <span className={`profilePic ${styles.changeImage}`} onClick={()=>setIsChangingImage(!isChangingImage)}>
-          <img src={userInfo["avatar"]} alt="nth" />
+        <span className={`${styles.profilePicture}`} onClick={()=>setIsChangingImage(!isChangingImage)}>
+          <img src={userInfo["avatar"]} alt="profile picture" />
         </span>
         {
           isChangingImage &&
           <ChooseImage {...{setIsChangingImage, username, userInfo,setUserInfo, sendJsonMessage}}/>
         }
         <span className={styles.username}>{username}</span>
+      </section>  
+
+      <label className={styles.toggleAppearance}>
+        Dark Mode?
+        <input 
+        type="checkbox"
+        onClick={(e)=>setDarkMode(e.target.checked)
+
+        }
+        /> 
+        <span></span>
+      </label>
+      <section className={styles.roomButtons}>
+        <button className={styles.createRoom}
+        onClick={()=>{setIsCreatingRoom(true);setIsLoadingRoom(false)}}>
+          Create Room
+        </button>
+        {isCreatingRoom && 
+        <CreateRoom {...{setIsCreatingRoom,setRoomID, setUserInfo}}/>
+        }
+        
+        <button className={styles.joinRoom}
+        onClick={()=>{setIsLoadingRoom(true); setIsCreatingRoom(false)}}>
+          Join Room
+        </button>
+        {isLoadingRoom && 
+          <JoinRoom {...{setIsLoadingRoom,setRoomID, setUserInfo, userInfo}}/>
+        }
       </section>
-      <button className={styles.createRoom}
-      onClick={()=>{setIsCreatingRoom(true);setIsLoadingRoom(false)}}>
-        Create Room
-      </button>
-      {isCreatingRoom && 
-      <CreateRoom {...{setIsCreatingRoom,setRoomID, setUserInfo}}/>
-      }
-      
-      <button className={styles.joinRoom}
-      onClick={()=>{setIsLoadingRoom(true); setIsCreatingRoom(false)}}>
-        Join Room
-      </button>
-      {isLoadingRoom && 
-        <JoinRoom {...{setIsLoadingRoom,setRoomID, setUserInfo, userInfo}}/>
-      }
     </div>
   )
 }

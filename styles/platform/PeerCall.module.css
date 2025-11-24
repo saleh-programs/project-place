@@ -141,6 +141,8 @@
     transition: height .1s;
     &:hover{
         cursor: default;
+        background-color: rgba(125, 135, 143, 0.39);
+
     }
 }
 .activePeers h2{

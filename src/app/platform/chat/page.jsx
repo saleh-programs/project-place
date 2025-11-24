@@ -93,6 +93,9 @@ function Chat(){
       lazyLoading.current["oldestID"] = messagesRef.current.length === 0 ?  null : messagesRef.current[0]["metadata"]["messageID"]
     }
 
+    const textInputElem = document.querySelector("textarea")
+    textInputElem && textInputElem.focus()
+
     let called = false
     let stickTimer
     function onScroll(){
@@ -172,6 +175,18 @@ function Chat(){
       cancelAnimationFrame(watchHeight)
     }
   },[])
+  useEffect(()=> {
+    lazyLoading.current["loading"] = false
+  }, [displayListRange])
+
+  useLayoutEffect(()=>{
+    lazyLoading.current["numGroups"] = groupedMessages.length
+    if (lazyLoading.current["stickToBottom"]){
+      if (groupedMessages.length >= displayListRange[1]){
+        renderLaterValues()
+      }
+    }
+  },[groupedMessages])
   function renderEarlierValues(){
     const rangeRef = lazyLoading.current["displayListRangeRef"]
 
@@ -231,18 +246,6 @@ function Chat(){
       })
     }
   }
-  useEffect(()=> {
-    lazyLoading.current["loading"] = false
-  }, [displayListRange])
-
-  useLayoutEffect(()=>{
-    lazyLoading.current["numGroups"] = groupedMessages.length
-    if (lazyLoading.current["stickToBottom"]){
-      if (groupedMessages.length >= displayListRange[1]){
-        renderLaterValues()
-      }
-    }
-  },[groupedMessages])
 
 
   // Groups all messages from chat history 

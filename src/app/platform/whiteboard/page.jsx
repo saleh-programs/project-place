@@ -464,7 +464,7 @@ function Whiteboard(){
           <section ref={pixelInputsRef} className={styles.pixelInput}>
             <input type="range" min={1} max={30} defaultValue={canvasInfo.current["lineWidth"]} onChange={changeLineWidth} />
             <input type="number" min={1} max={30} defaultValue={canvasInfo.current["lineWidth"]} onChange={changeLineWidth} />
-            <span className={styles.pixelSize}></span>
+            <span className={styles.pixelSize} style={{backgroundColor: selectedColor}}></span>
           </section>
           <span className={styles.separator}></span>
           <section className={styles.colorsContainer}>
