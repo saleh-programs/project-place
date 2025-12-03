@@ -13,6 +13,8 @@ function BallContainer({userList}){
 
     const rafRef = useRef(null) 
 
+    const BALL_RADIUS = 15
+
     useEffect(()=>{
         if (userList.length === 0){
             return
@@ -43,15 +45,19 @@ function BallContainer({userList}){
             last = step
             rect = containerRef.current.getBoundingClientRect()
             cxt.clearRect(0,0, canvas.width, canvas.height)
-            if (canvas.width !== Math.floor(rect.width)){
+
+            if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)){
+                if (ballGroup.current.length * BALL_RADIUS * BALL_RADIUS * 4> rect.width * rect.height * .85){
+                    rafRef.current = requestAnimationFrame(updateBalls)
+                    return
+                }
+
                 impulse.x = (rect.width - canvas.width) * dt * .001
-                impulse.y = -(dt* .001)
-                canvas.width = rect.width
-            }
-            if (canvas.height !== Math.floor(rect.height)){
                 impulse.y = (rect.height - canvas.height) * dt * .001
-                canvas.height = rect.height
+                canvas.width = rect.width
+                canvas.height = rect.height   
             }
+
             for (let ball of ballGroup.current){
                 ball.addEnergy(impulse)
                 ball.update(dt, canvas.width, canvas.height)
@@ -62,7 +68,7 @@ function BallContainer({userList}){
                 cxt.save()
 
                 cxt.beginPath()
-                cxt.arc(ball.pos.x, ball.pos.y, ball.radius, 0, 2*Math.PI)
+                cxt.arc(ball.pos.x, ball.pos.y, BALL_RADIUS, 0, 2*Math.PI)
                 cxt.stroke()
                 cxt.clip()
                 cxt.drawImage(ball.image, ball.pos.x - (ball.image.width / 2), ball.pos.y - (ball.image.height / 2))
@@ -99,17 +105,17 @@ function BallContainer({userList}){
             }
             if (exists){
                 continue
-            }
+            } 
             const origin = {x: Math.floor(Math.random() * canvasRef.current.width),y: Math.floor(Math.random() * canvasRef.current.height)}
-            const ball = new Ball(origin, ballGroup, canvasRef.current.width, canvasRef.current.height, null, user["username"])
+            const ball = new Ball(origin, ballGroup, canvasRef.current.width, canvasRef.current.height, null, user["username"], BALL_RADIUS)
 
             const img = new Image()
             img.src = user["avatar"]
             img.onload = ()=>{
                 const scaledImg = document.createElement("canvas")
 
-                const scalar = (ball.radius * 2) / img.width
-                const scaledWidth = ball.radius * 2
+                const scalar = (BALL_RADIUS * 2) / img.width
+                const scaledWidth = BALL_RADIUS * 2
                 const scaledHeight = img.height * scalar
                 
                 scaledImg.width = scaledWidth

@@ -22,7 +22,7 @@ function add(p1, p2){
 }
 
 class Ball{
-    constructor(origin, ballGroup, width, height, image=null, metadata=null){
+    constructor(origin, ballGroup, width, height, image=null, metadata=null, radius=15){
         this.ballGroup = ballGroup
 
         this.width = width
@@ -33,7 +33,7 @@ class Ball{
 
         this.acceleration = {x: 0, y: .0005}
         this.elasticity = 0.7
-        this.radius = 15
+        this.radius = radius
         this.mass = 1  
  
         this.pos = {...origin} 
