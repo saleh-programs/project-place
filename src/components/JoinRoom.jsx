@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import styles from "styles/components/JoinRoom.module.css"
 
 import { checkRoomExistsReq, addRoomUserReq, getUserRoomsReq } from "backend/requests";
@@ -8,9 +8,13 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
   const [joinRoomID, setJoinRoomID]= useState("")
   const [rooms, setRooms] = useState([])
 
+  const customInputRef = useRef(null)
+
   useEffect(()=>{
     getUserRoomsReq()
     .then(roomList=>setRooms(roomList))
+
+    customInputRef.current.focus()
   },[])
 
   async function handleRoomLoad(){
@@ -36,6 +40,9 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
     if (letter === "BACKSPACE"){
       setJoinRoomID(prev => prev.slice(0,-1))
       return
+    }
+    if (letter === "ENTER"){
+      handleRoomLoad()
     }
     if (!(ascii >= 48 && ascii <= 57) && !(ascii >= 65 && ascii<= 90) || letter.length > 1){
       return
@@ -68,7 +75,7 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
 
       <section className={styles.joinInput}>
         <h2>Enter Room Code</h2>
-        <section onKeyDown={handleKeyPress} tabIndex={0}>
+        <section ref={customInputRef} onKeyDown={handleKeyPress} tabIndex={0}>
           {customRoomInput()}
         </section>
       </section>
@@ -79,7 +86,7 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
           <ul>
               {rooms.map(room => {
                 return (
-                <li key={room["roomID"]}>
+                <li key={room["roomID"]} onClick={()=>{setJoinRoomID(room["roomID"]); handleRoomLoad();}}>
                   <span>{room["roomName"]}</span>
                   <span>{room["roomID"]}</span>
                 </li>)
