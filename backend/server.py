@@ -151,12 +151,10 @@ def getUserInfo():
     cursor.execute("SELECT username, avatar, images, rooms FROM users WHERE userID = %s", (session["userID"],))
 
     values = cursor.fetchone()
-    print(values)
     userInfo = {
       "username": values[0],
       "avatar": values[1],
-      "images": json.loads(values[2]),
-      "rooms": json.loads(values[3])
+      "images": json.loads(values[2])
     }
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
@@ -181,6 +179,25 @@ def updateUserInfo():
     cursor.execute(f"UPDATE users SET {modifiedFields} WHERE userID = %s", newValues)
 
   return jsonify({"success":True}), 200
+
+@app.route("/users/rooms", methods=["GET"])
+@handleError("Failed to get user's rooms")
+@authenticateClient
+def getUserRooms():
+  rooms = []
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT rooms FROM users WHERE userID = %s", (session["userID"],))
+    values = cursor.fetchone()
+
+    for room in values:
+      cursor.execute("SELECT roomID, roomName FROM users WHERE userID = %s", (session["userID"],))
+      roomInfo = cursor.fetchone()
+      room.append({
+        "roomID": roomInfo[0],
+        "roomName": roomInfo[1]
+      })
+  return jsonify({"success": True, "data": {"rooms": rooms}}), 200
+
 
 @app.route("/users/images", methods=["POST"])
 @handleError("failed to upload image")

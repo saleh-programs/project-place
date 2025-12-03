@@ -26,6 +26,18 @@ async function getUserInfoReq(session) {
   }
   return data["data"]["userInfo"]
 }
+async function getUserRoomsReq() {
+  const response = await fetch(baseurl + `users/rooms`,{
+    "method": "GET",
+    "credentials": "include"
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new error(data.message || "req failed")
+  }
+  return data.data["rooms"]
+}
+
 async function updateUserInfoReq(modifiedFields) {
   console.log(modifiedFields)
   const response = await fetch(baseurl + "users", {
@@ -338,17 +350,21 @@ async function getCanvasInstructionsReq(roomID, token=null){
 
 getUserInfoReq = handleError(getUserInfoReq)
 updateUserInfoReq = handleError(updateUserInfoReq)
+getUserInfoReq = handleError(getUserInfoReq)
 uploadNewImageReq = handleError(uploadNewImageReq)
+
 createRoomReq = handleError(createRoomReq)
 checkRoomExistsReq = handleError(checkRoomExistsReq)
 getRoomUsersReq = handleError(getRoomUsersReq)
 addRoomUserReq = handleError(addRoomUserReq)
+
 uploadFilesReq = handleError(uploadFilesReq)
 storeMessageReq = handleError(storeMessageReq)
 editMessageReq = handleError(editMessageReq)
 deleteMessageReq = handleError(deleteMessageReq)
 getMessagesReq = handleError(getMessagesReq)
 getOlderMessagesReq = handleError(getOlderMessagesReq)
+
 updateCanvasSnapshotReq = handleError(updateCanvasSnapshotReq)
 getCanvasSnapshotReq = handleError(getCanvasSnapshotReq)
 updateCanvasInstructionsReq = handleError(updateCanvasInstructionsReq)
