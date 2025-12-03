@@ -1,27 +1,3 @@
-    /* <div className={styles.joinRoom}>
-
-      <section className={styles.joinInput}>
-        <h2>Existing Room Code?</h2>
-        <section onKeyDown={handleKeyPress} tabIndex={0}>
-          d
-          {customRoomInput()}
-        </section>
-      </section>
-
-      <section className={styles.existingRooms}>
-        <h2>Joined Rooms</h2>
-        <section>
-          <ul>
-              {rooms.map(room => {
-                return (
-                <li key={room["roomID"]}>
-                  <span>{room["roomID"]}</span>
-                  <span>{room["roomName"]}</span>
-                </li>)
-              })}
-          </ul>
-        </section>
-      </section> */
 
 
 .joinRoom{
@@ -93,10 +69,48 @@
 
 }
 
-.existingRooms{
-  height: 300px;
-  overflow-y: auto;
-}
+
 .existingRooms ul{
-  padding: 10px;
+  padding: 4px;
+  border-radius: 10px;
+  overflow-y: auto;
+  max-height: 150px;
+
+  scrollbar-width: thin;
+  scrollbar-color: white transparent;
+
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.existingRooms ul li{
+  background-color: rgb(243, 236, 223);
+  padding: 5px;
+  border-radius: 2px;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-family: "Exo 2";
+
+
+
+  &:hover{
+    cursor: pointer;
+    filter: invert();
+  }
+
+  & :nth-child(1){
+    font-weight: 800;
+    font-size: 1.4rem;
+    text-overflow: ellipsis;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  & :nth-child(2){
+    opacity: .8;
+  }
 }

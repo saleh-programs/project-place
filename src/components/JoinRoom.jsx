@@ -80,8 +80,8 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
               {rooms.map(room => {
                 return (
                 <li key={room["roomID"]}>
-                  <span>{room["roomID"]}</span>
                   <span>{room["roomName"]}</span>
+                  <span>{room["roomID"]}</span>
                 </li>)
               })}
           </ul>
