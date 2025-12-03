@@ -60,34 +60,34 @@ function Whiteboard(){
 
   }
   },[])
-  console.log(canvasInfo.current)
-  useEffect(()=>{
-    if (roomID){
-      sendJsonMessage({
-        "username": username,
-        "origin": "whiteboard",
-        "type": "getCanvas"
-      })
-      cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
-      hiddenCanvasRef.current = Object.assign(document.createElement("canvas"), {
-        "width":canvasRef.current.width, 
-        "height": canvasRef.current.width
-      })
-      hiddenCxt.current = hiddenCanvasRef.current.getContext("2d", {willReadFrequently: true})
 
-      const customizations = {
-        "lineCap": "round",
-        "lineJoin": "round"
-      }
-      Object.assign(cxtRef.current, customizations)
-      Object.assign(hiddenCxt.current, customizations)
-      savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
+  useEffect(()=>{
+    if (!roomID) return
+
+    sendJsonMessage({
+      "username": username,
+      "origin": "whiteboard",
+      "type": "getCanvas"
+    })
+    cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
+    hiddenCanvasRef.current = Object.assign(document.createElement("canvas"), {
+      "width":canvasRef.current.width, 
+      "height": canvasRef.current.width
+    })
+    hiddenCxt.current = hiddenCanvasRef.current.getContext("2d", {willReadFrequently: true})
+
+    const customizations = {
+      "lineCap": "round",
+      "lineJoin": "round"
     }
+    Object.assign(cxtRef.current, customizations)
+    Object.assign(hiddenCxt.current, customizations)
+    savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
+    
   },[roomID])
 
   useLayoutEffect(()=>{
     canvasRef.current && zoom("out")
-
   },[roomID])
   function externalWhiteboard(data){
     /* when data.type differentiates canvas actions

@@ -64,6 +64,7 @@ function Chat(){
   }
   */
   useEffect(()=>{
+    if (!mainScrollableRef.current) return
     const mainScrollableElem = mainScrollableRef.current
     externalChatRef.current = externalChat
 
@@ -174,7 +175,8 @@ function Chat(){
       mainScrollableElem.removeEventListener("scroll", onScroll)
       cancelAnimationFrame(watchHeight)
     }
-  },[])
+  },[roomID])
+  
   useEffect(()=> {
     lazyLoading.current["loading"] = false
   }, [displayListRange])
@@ -539,152 +541,154 @@ function Chat(){
       <h1 className={styles.title}>
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/chat?20" : "/light/chat?20"} type="once" speed={8}/> 
       </h1>
-      <div ref={mainScrollableRef} className={styles.chatDisplay}> 
-          {groupedMessages.length == 0 &&
-            <div style={{fontSize: "1.5rem"}}>
-              Start the conversation...
-            </div>
-          }
-          {
-            groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group,index)=>{
-              const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
-          
-              const day = new Date(group["timestamp"]).toDateString()
-              const newDay = day !== lastSeenDay
-              if (newDay){
-                lastSeenDay = day
-              }
-              return (
-                  <Fragment key={group["messages"][0]}>
-                    {newDay && 
-                    <div className={styles.dateHeader}>
-                      <span></span>
-                      {day === today ? "Today" : day}
-                      <span></span>
-                    </div>
-                    }
-                    <div className={styles.groupContainer}>
-                      <section className={styles.groupLeft}>
-                        <span className={styles.timestamp}>
-                          {timestamp}
-                        </span>
-                        <img src={userStates[group["username"]]["avatar"]} alt="nth" />
-                      </section>
-                      <section className={styles.groupRight}>
-                        <div className={styles.username}>
-                          {group["username"]}
-                        </div>
-                        <div className={styles.messages}>
-                          {
-                            group["messages"].map((msgID)=>{
-                              const msg = mappedMessages[msgID]
-                              return (
-                                <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
-                                  {msg["files"].map((filePath, i) => {
-                                    return <FileViewer key={filePath} url={filePath} dimensions={msg["metadata"]["dimensions"][i]}/>
-                                  })}
-                                  {selectedID === msgID && isEditing
-                                    ?
-                                    <>
-                                      <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
-                                      <button onClick={changeMessage}>Edit</button>
-                                    </>
-                                    :
-                                    msg["text"]
-                                  }
-                                  {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}
-                                  {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
-                                  <div className={styles.toggleOptions}>
-                                    <img
-                                      className={selectedID === msgID ? styles.show : ""}
-                                      src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options"
-                                      onClick={()=>{
-                                        if (isEditing){
-                                          return
-                                        }
-                                        editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
-                                        setSelectedID(editRefs.current["selectedID"])
-                                      }}
-                                    />
-                                    {
-                                      selectedID === msgID && !isEditing &&
-                                      <ul className={styles.options}>
-                                          {msg["files"].length === 0 &&
-                                          <li onClick={()=>{
-                                            setIsEditing(true)
-                                            editRefs.current["isEditing"] = true
-                                            setEditMessage(msg["text"])
-                                          }
-                                          }>Edit
-                                          </li>}
-                                          <li onClick={()=>{
-                                            setSelectedID(null)
-                                            editRefs.current["selectedID"] = null
-                                            deleteMessage(msgID)
-                                          }}>Delete</li>
-                                        </ul>
-                                    }
-                                  </div>
-                                </div>
-                              )
-                            })
-                          }
-                        </div>
-                      </section>
-                    </div>
-                </Fragment>
-              )
-            })
-          }
-      </div>
       {roomID &&
-        <div className={styles.chatHub}>
-          <span className={`${styles.overUploadMsg} ${showOverUploadMsg ? styles.show : ""}`}>Please select maximum of 10 files</span>
-          <section className={styles.miniFileView}>
-            {filePreviews.map(f => {
-              const url = URL.createObjectURL(f);
-              return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} manualMimeType={f.type}/> <button onClick={()=>setFilePreviews(filePreviews.filter(file=>f!==file))}>X</button></span>
-            })}
-          </section>
-          <section className={styles.chatHubMain}>
-              <label className={styles.fileInput}>
-                <img src={"/upload_icon.png"} alt="upload" />
-                <input ref={filesRef} type="file" multiple hidden
-              accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'
-              onChange={(e)=>{
-                const addedFiles = Array.from(e.target.files)
-                let newFilePreviews =[...filePreviews]
-
-                addedFiles.forEach((f, i)=>{
-                  const addedFileID = `${f["name"]} ${f["lastModified"]}`
-                  let j;
-                  for (j = 0; j < filePreviews.length; j++){
-                    const containingFileID = `${filePreviews[j]["name"]} ${filePreviews[j]["lastModified"]}`
-                    if (containingFileID === addedFileID){
-                      break
-                    }
+        <>
+          <div ref={mainScrollableRef} className={styles.chatDisplay}> 
+              {groupedMessages.length == 0 &&
+                <div style={{fontSize: "1.5rem"}}>
+                  Start the conversation...
+                </div>
+              }
+              {
+                groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map((group,index)=>{
+                  const timestamp = new Date(group["timestamp"]).toLocaleTimeString("en-us",{hour:"numeric",minute:"2-digit"})
+              
+                  const day = new Date(group["timestamp"]).toDateString()
+                  const newDay = day !== lastSeenDay
+                  if (newDay){
+                    lastSeenDay = day
                   }
-                  if (j === filePreviews.length){
-                    newFilePreviews.push(f);
-                  }
+                  return (
+                      <Fragment key={group["messages"][0]}>
+                        {newDay && 
+                        <div className={styles.dateHeader}>
+                          <span></span>
+                          {day === today ? "Today" : day}
+                          <span></span>
+                        </div>
+                        }
+                        <div className={styles.groupContainer}>
+                          <section className={styles.groupLeft}>
+                            <span className={styles.timestamp}>
+                              {timestamp}
+                            </span>
+                            <img src={userStates[group["username"]]["avatar"]} alt="nth" />
+                          </section>
+                          <section className={styles.groupRight}>
+                            <div className={styles.username}>
+                              {group["username"]}
+                            </div>
+                            <div className={styles.messages}>
+                              {
+                                group["messages"].map((msgID)=>{
+                                  const msg = mappedMessages[msgID]
+                                  return (
+                                    <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
+                                      {msg["files"].map((filePath, i) => {
+                                        return <FileViewer key={filePath} url={filePath} dimensions={msg["metadata"]["dimensions"][i]}/>
+                                      })}
+                                      {selectedID === msgID && isEditing
+                                        ?
+                                        <>
+                                          <input type="text" value={editMessage} onChange={(e)=>setEditMessage(e.target.value)}/>
+                                          <button onClick={changeMessage}>Edit</button>
+                                        </>
+                                        :
+                                        msg["text"]
+                                      }
+                                      {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}
+                                      {msg["status"] === "failed" && <span style={{color:"red"}}> FAIL</span> }
+                                      <div className={styles.toggleOptions}>
+                                        <img
+                                          className={selectedID === msgID ? styles.show : ""}
+                                          src={darkMode ? "/dark_options.png" : "/light_options.png"} alt="options"
+                                          onClick={()=>{
+                                            if (isEditing){
+                                              return
+                                            }
+                                            editRefs.current["selectedID"] = editRefs.current["selectedID"] === msgID ? null : msgID
+                                            setSelectedID(editRefs.current["selectedID"])
+                                          }}
+                                        />
+                                        {
+                                          selectedID === msgID && !isEditing &&
+                                          <ul className={styles.options}>
+                                              {msg["files"].length === 0 &&
+                                              <li onClick={()=>{
+                                                setIsEditing(true)
+                                                editRefs.current["isEditing"] = true
+                                                setEditMessage(msg["text"])
+                                              }
+                                              }>Edit
+                                              </li>}
+                                              <li onClick={()=>{
+                                                setSelectedID(null)
+                                                editRefs.current["selectedID"] = null
+                                                deleteMessage(msgID)
+                                              }}>Delete</li>
+                                            </ul>
+                                        }
+                                      </div>
+                                    </div>
+                                  )
+                                })
+                              }
+                            </div>
+                          </section>
+                        </div>
+                    </Fragment>
+                  )
                 })
-                if (newFilePreviews.length > 10){
-                  setShowOverUploadMsg(true)
-                  setTimeout(()=>setShowOverUploadMsg(false), 3000)
-                  newFilePreviews = newFilePreviews.slice(0, 10)
-                }
-                setFilePreviews(newFilePreviews)
-                filesRef.current.value=""
-              }}
-              />
-              </label>
-              <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
-              <button onClick={handleMessage} className={`${isClicked ? styles.clicked : ""}`}>    
-                <img src={"/submit_icon.png"} />
-              </button>
-          </section>
+              }
           </div>
-        }
+          <div className={styles.chatHub}>
+            <span className={`${styles.overUploadMsg} ${showOverUploadMsg ? styles.show : ""}`}>Please select maximum of 10 files</span>
+            <section className={styles.miniFileView}>
+              {filePreviews.map(f => {
+                const url = URL.createObjectURL(f);
+                return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} manualMimeType={f.type}/> <button onClick={()=>setFilePreviews(filePreviews.filter(file=>f!==file))}>X</button></span>
+              })}
+            </section>
+            <section className={styles.chatHubMain}>
+                <label className={styles.fileInput}>
+                  <img src={"/upload_icon.png"} alt="upload" />
+                  <input ref={filesRef} type="file" multiple hidden
+                accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'
+                onChange={(e)=>{
+                  const addedFiles = Array.from(e.target.files)
+                  let newFilePreviews =[...filePreviews]
+
+                  addedFiles.forEach((f, i)=>{
+                    const addedFileID = `${f["name"]} ${f["lastModified"]}`
+                    let j;
+                    for (j = 0; j < filePreviews.length; j++){
+                      const containingFileID = `${filePreviews[j]["name"]} ${filePreviews[j]["lastModified"]}`
+                      if (containingFileID === addedFileID){
+                        break
+                      }
+                    }
+                    if (j === filePreviews.length){
+                      newFilePreviews.push(f);
+                    }
+                  })
+                  if (newFilePreviews.length > 10){
+                    setShowOverUploadMsg(true)
+                    setTimeout(()=>setShowOverUploadMsg(false), 3000)
+                    newFilePreviews = newFilePreviews.slice(0, 10)
+                  }
+                  setFilePreviews(newFilePreviews)
+                  filesRef.current.value=""
+                }}
+                />
+                </label>
+                <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
+                <button onClick={handleMessage} className={`${isClicked ? styles.clicked : ""}`}>    
+                  <img src={"/submit_icon.png"} />
+                </button>
+            </section>
+          </div>
+        </>
+      }
     </div>
   )
 }

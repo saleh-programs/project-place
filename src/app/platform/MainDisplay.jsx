@@ -126,19 +126,14 @@ function MainDisplay({children, username, initialUserInfo}){
     siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates, setDarkMode, darkMode,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
-    roomID, setRoomID,roomIDRef, setRoomName,
+    roomID, setRoomID, roomIDRef, setRoomName,
     messagesRef
   }
 
   useEffect(()=>{
     roomIDRef.current = roomID
   },[roomID])
-  useEffect(()=>{
-    console.log(userStates)
-  },[userStates])
-  useEffect(()=>{
-    console.log(userInfo)
-  },[])
+
   async function reconstructCanvas(data){
     const canvasBuffer = await data.arrayBuffer()
 
@@ -162,7 +157,6 @@ function MainDisplay({children, username, initialUserInfo}){
 
 
   function updateUserStates(data){
-    console.log(data)
     switch (data.type){
       case "newUser":
         setUserStates(prev => {
@@ -224,13 +218,13 @@ function MainDisplay({children, username, initialUserInfo}){
           <h1 className={darkMode ? styles.darkMode : ""}>
             <span>{roomID}</span>
             <span>"{roomName}"</span>
-            <button onClick={()=>{setRoomID("");setRoomName("")}}>Leave Room</button>
+            <button onClick={()=>{setRoomID("");setRoomName("");setUserStates({});}}>Leave Room</button>
 
           </h1>
         }
         <div className={styles.siteWrapper}>
           <Sidebar {...{userStates, sendJsonMessage, username}}/>
-          <div className={styles.pageContainer}>
+          <div className={styles.pageContainer} style={roomID === "" ? {opacity: ".5", backgroundColor: "rgba(0,0,0,.3)"} : {}}>
             {children}
             {Object.keys(callOffers).map((name) => {
               return (
