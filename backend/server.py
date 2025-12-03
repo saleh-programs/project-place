@@ -187,14 +187,16 @@ def getUserRooms():
   rooms = []
   with AccessDatabase() as cursor:
     cursor.execute("SELECT rooms FROM users WHERE userID = %s", (session["userID"],))
-    values = cursor.fetchone()
-
-    for room in values:
-      cursor.execute("SELECT roomID, roomName FROM users WHERE userID = %s", (session["userID"],))
-      roomInfo = cursor.fetchone()
-      room.append({
-        "roomID": roomInfo[0],
-        "roomName": roomInfo[1]
+    values = json.loads(cursor.fetchone()[0])
+    print(values)
+    for roomID in values:
+      cursor.execute("SELECT roomName FROM rooms WHERE roomID = %s", (roomID,))
+      roomName = cursor.fetchone()
+      if roomName is None:
+        continue
+      rooms.append({
+        "roomID": roomID,
+        "roomName": roomName[0]
       })
   return jsonify({"success": True, "data": {"rooms": rooms}}), 200
 

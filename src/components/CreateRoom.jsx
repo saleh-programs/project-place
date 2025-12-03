@@ -9,17 +9,12 @@ function CreateRoom({setIsCreatingRoom, setRoomID, setUserInfo}){
 
   async function handleRoomCreation(){
     const res = await createRoomReq(newRoomName)
-    if (res){
-      setNewRoomName("")
-      setIsCreatingRoom(false)
-      setRoomID(res)
-      setUserInfo(prev =>{
-        return {
-          ...prev,
-          "rooms": [...prev["rooms"], res]
-        }
-      })
+    if (!res){
+      return
     }
+    setNewRoomName("")
+    setIsCreatingRoom(false)
+    setRoomID(res)
   }
 
 

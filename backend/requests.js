@@ -382,5 +382,6 @@ function getUniqueMessageID(){
 }
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
-  createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq, getUserInfoReq, updateUserInfoReq, 
+  createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
+  getUserInfoReq, updateUserInfoReq, getUserRoomsReq,
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}

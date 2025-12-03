@@ -24,3 +24,12 @@
   justify-content: center;
   align-items: center;
 }
+.existingRooms{
+  height: 300px;
+  overflow-y: auto;
+  border: 1px solid;
+}
+.existingRooms ul{
+  padding: 10px;
+
+}
