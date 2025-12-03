@@ -13,6 +13,7 @@ function MainDisplay({children, username, initialUserInfo}){
   
   const [userInfo, setUserInfo] = useState(initialUserInfo)
   const [roomID, setRoomID] = useState("")
+  const [roomName, setRoomName] = useState("")
   const roomIDRef = useRef("")
   const [userStates, setUserStates] = useState({})
   
@@ -125,7 +126,7 @@ function MainDisplay({children, username, initialUserInfo}){
     siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates, setDarkMode, darkMode,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
-    roomID, setRoomID,roomIDRef,
+    roomID, setRoomID,roomIDRef, setRoomName,
     messagesRef
   }
 
@@ -218,22 +219,24 @@ function MainDisplay({children, username, initialUserInfo}){
   }
   return(
     <ThemeContext.Provider value={shared}>
-      <div className={styles.siteWrapper}>
-        <Sidebar {...{userStates, sendJsonMessage, username}}/>
-        <div className={styles.pageContainer}>
-          {children}
-          {Object.keys(callOffers).map((name) => {
-            return (
-            <div key={name} className={styles.callNotification}>
-              New call offer from <strong>{name}</strong>!
-              <button onClick={()=>router.push(`/platform/videochat/peercall?peer=${encodeURI(name)}`)}>Accept</button>
-              <button onClick={()=>rejectCall(name)}>Reject</button>
-            </div>
-            )
-          })}
+      <div className={styles.columnWrapper}>
+        {roomID && <h1 className={darkMode ? styles.darkMode : ""}>"{roomName}"</h1>}
+        <div className={styles.siteWrapper}>
+          <Sidebar {...{userStates, sendJsonMessage, username}}/>
+          <div className={styles.pageContainer}>
+            {children}
+            {Object.keys(callOffers).map((name) => {
+              return (
+              <div key={name} className={styles.callNotification}>
+                New call offer from <strong>{name}</strong>!
+                <button onClick={()=>router.push(`/platform/videochat/peercall?peer=${encodeURI(name)}`)}>Accept</button>
+                <button onClick={()=>rejectCall(name)}>Reject</button>
+              </div>
+              )
+            })}
+          </div>
         </div>
       </div>
-        
     </ThemeContext.Provider>
   ) 
 }
