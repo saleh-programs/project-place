@@ -318,9 +318,12 @@ def getFile(fileID):
 @authenticateClient
 def checkRoomExists(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM rooms where roomID=%s",(roomID,))
-    exists = cursor.fetchone() is not None
-  return jsonify({"success":True,"data": {"exists": exists}}), 200
+    cursor.execute("SELECT roomName FROM rooms where roomID=%s",(roomID,))
+    result = cursor.fetchone()
+    if result is None:
+        return jsonify({"success": False}), 400
+
+  return jsonify({"success":True,"data": {"roomName": result[0]}}), 200
 
 @app.route("/rooms/<roomID>/users", methods=["PUT"])
 @handleError("failed to add room user")

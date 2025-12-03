@@ -92,7 +92,7 @@ async function checkRoomExistsReq(roomID) {
   if (!data.success){
     throw new error(data.message || "req failed")
   }
-  return data.data["exists"]
+  return data.data["roomName"]
 }
 async function addRoomUserReq(roomID) {
   const response = await fetch(baseurl + `rooms/${roomID}/users`,{

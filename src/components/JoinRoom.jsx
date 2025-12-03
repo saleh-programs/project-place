@@ -4,8 +4,9 @@ import styles from "styles/components/JoinRoom.module.css"
 import { checkRoomExistsReq, addRoomUserReq, getUserRoomsReq } from "backend/requests";
 import ThemeContext from "src/assets/ThemeContext";
 
-function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
+function JoinRoom({setIsLoadingRoom, setRoomID, setRoomName}){
   const [joinRoomID, setJoinRoomID]= useState("")
+  const joinRoomIDRef = useRef("")
   const [rooms, setRooms] = useState([])
 
   const customInputRef = useRef(null)
@@ -18,19 +19,22 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
   },[])
 
   async function handleRoomLoad(){
-    const res = await checkRoomExistsReq(joinRoomID)
-    if (!res){
+    const roomNameRes = await checkRoomExistsReq(joinRoomIDRef.current)
+    if (!roomNameRes){
       setJoinRoomID("")
+      joinRoomIDRef.current = ""
       return
     }
 
-    const joinRes = await addRoomUserReq(joinRoomID)
+    const joinRes = await addRoomUserReq(joinRoomIDRef.current)
     if(!joinRes){
       setJoinRoomID("")
+      joinRoomIDRef.current = ""
       return
     }
     
-    setRoomID(joinRoomID);
+    setRoomID(joinRoomIDRef.current);
+    setRoomName(roomNameRes)
     setIsLoadingRoom(false)
   }
 
@@ -38,7 +42,8 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
     const letter = e.key.toUpperCase()
     const ascii = letter.charCodeAt(0)
     if (letter === "BACKSPACE"){
-      setJoinRoomID(prev => prev.slice(0,-1))
+      joinRoomIDRef.current = joinRoomIDRef.current.slice(0, -1)
+      setJoinRoomID(joinRoomIDRef.current)
       return
     }
     if (letter === "ENTER"){
@@ -47,7 +52,8 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
     if (!(ascii >= 48 && ascii <= 57) && !(ascii >= 65 && ascii<= 90) || letter.length > 1){
       return
     }
-    setJoinRoomID(prev => prev.length >= 6 ? prev : prev + letter)
+    joinRoomIDRef.current = joinRoomIDRef.current.length >= 6 ? joinRoomIDRef.current : joinRoomIDRef.current + letter
+    setJoinRoomID(joinRoomIDRef.current)
   }
 
   function customRoomInput(){
@@ -66,7 +72,6 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
         )
       }
     }
-    console.log(result, joinRoomID)
     return result
   }
 
@@ -86,7 +91,10 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
           <ul>
               {rooms.map(room => {
                 return (
-                <li key={room["roomID"]} onClick={()=>{setJoinRoomID(room["roomID"]); handleRoomLoad();}}>
+                <li key={room["roomID"]} onClick={()=>{
+                  setJoinRoomID(room["roomID"]);
+                  joinRoomIDRef.current = room["roomID"]; 
+                  handleRoomLoad();}}>
                   <span>{room["roomName"]}</span>
                   <span>{room["roomID"]}</span>
                 </li>)
