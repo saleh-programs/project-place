@@ -30,38 +30,73 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setUserInfo, userInfo}){
     setIsLoadingRoom(false)
   }
 
+  function handleKeyPress(e){
+    const letter = e.key.toUpperCase()
+    const ascii = letter.charCodeAt(0)
+    if (letter === "BACKSPACE"){
+      setJoinRoomID(prev => prev.slice(0,-1))
+      return
+    }
+    if (!(ascii >= 48 && ascii <= 57) && !(ascii >= 65 && ascii<= 90) || letter.length > 1){
+      return
+    }
+    setJoinRoomID(prev => prev.length >= 6 ? prev : prev + letter)
+  }
+
+  function customRoomInput(){
+    const result = []
+    for (let i = 0; i < 6; i++){
+      if (joinRoomID.length - 1 >= i){
+        result.push(
+          <span key={i} className={styles.fullSquare}>
+            {joinRoomID[i]}
+          </span>
+        )
+      }else{
+        result.push(
+          <span key={i}>
+          </span>
+        )
+      }
+    }
+    console.log(result, joinRoomID)
+    return result
+  }
 
   return (
     <div className={styles.joinRoom}>
-      Enter existing room name!<br/>
-      <input type="text"
-       value={joinRoomID}
-      onChange={(e)=>setJoinRoomID(e.target.value)}/>
 
-      <button onClick={handleRoomLoad}>
-        Submit
-      </button>  
+      <section className={styles.joinInput}>
+        <h2>Enter Room Code</h2>
+        <section onKeyDown={handleKeyPress} tabIndex={0}>
+          {customRoomInput()}
+        </section>
+      </section>
+
+      <section className={styles.existingRooms}>
+        <h2>Joined Rooms</h2>
+        <section>
+          <ul>
+              {rooms.map(room => {
+                return (
+                <li key={room["roomID"]}>
+                  <span>{room["roomID"]}</span>
+                  <span>{room["roomName"]}</span>
+                </li>)
+              })}
+          </ul>
+        </section>
+      </section>
+
+
 
       <button 
       className={styles.escape}
       onClick={()=>{setIsLoadingRoom(false)}} >
         X
       </button>
-
-      <div className={styles.existingRooms}>
-        Join existing rooms
-        <ul>
-            {rooms.map(room => {
-              return (
-              <section>
-                <span>{room["roomID"]}</span>
-                <span>{room["roomName"]}</span>
-              </section>)
-            })}
-        </ul>
-      </div>
     </div>
   )
 } 
 
-export default JoinRoom
+export default JoinRoom 

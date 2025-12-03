@@ -4,6 +4,12 @@
   font-weight: 100 900;
   font-style: normal;
 }
+@font-face {
+  font-family: "Daruma";
+  src: url("/fonts/DarumadropOne-Regular.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+}
 
 html, body, #root{
   height: 100vh;

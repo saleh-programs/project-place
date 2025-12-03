@@ -1,15 +1,44 @@
+    /* <div className={styles.joinRoom}>
+
+      <section className={styles.joinInput}>
+        <h2>Existing Room Code?</h2>
+        <section onKeyDown={handleKeyPress} tabIndex={0}>
+          d
+          {customRoomInput()}
+        </section>
+      </section>
+
+      <section className={styles.existingRooms}>
+        <h2>Joined Rooms</h2>
+        <section>
+          <ul>
+              {rooms.map(room => {
+                return (
+                <li key={room["roomID"]}>
+                  <span>{room["roomID"]}</span>
+                  <span>{room["roomName"]}</span>
+                </li>)
+              })}
+          </ul>
+        </section>
+      </section> */
+
+
 .joinRoom{
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%,-50%);
   
-  background-color: rgb(50, 110, 207);
-  padding: 30px;
+  background-color: rgb(145, 182, 242);
+  padding: 10px;
   border-radius: 10px;
-  z-index: 100;
 
+  z-index: 100;
 } 
+.joinRoom h2{
+  text-align: center;
+}
 .escape{
   position: absolute;
   top: -17px;
@@ -24,12 +53,50 @@
   justify-content: center;
   align-items: center;
 }
+
+.joinInput section{
+  padding: 5px 10px;
+  height: 50px;
+  display: flex;
+  gap: 5px;
+
+  background-color: rgba(230, 234, 237, 0.213);
+  border-radius: 10px;
+
+  &:hover{
+    cursor: pointer;
+    background-color: rgba(230, 234, 237, 0.513);
+  }
+  &:focus{
+    background-color: rgba(230, 234, 237, 0.513);
+    border: 1px solid rgba(0, 0, 0, 0.593);
+    outline: none;
+  }
+
+}
+.joinInput section span{
+  flex: 1;
+  width: 35px;
+  padding: 5px;
+  border-bottom: 1px solid;
+}
+.fullSquare{
+  background-color: white;
+  border-radius: 5px;
+
+  font-size: 2rem;
+  font-family: "Daruma";
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 1px 1px rgba(0, 0, 0, 0.409);
+
+}
+
 .existingRooms{
   height: 300px;
   overflow-y: auto;
-  border: 1px solid;
 }
 .existingRooms ul{
   padding: 10px;
-
 }
