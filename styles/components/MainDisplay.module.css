@@ -11,6 +11,7 @@
 
 .columnWrapper > h1{
   margin: 0;
+  padding-inline: 5px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -19,7 +20,30 @@
   border-bottom: 1px solid gray;
 
   font-family: "Daruma";
+  position: relative;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  & :nth-child(1){
+    opacity: .6;
+    font-size: 1.5rem;
+  }
+  & :nth-child(3){
+    background-color: rgb(251, 175, 166);
+    font-family: "Exo 2";
+    font-weight: 600;
+    padding: 5px;
+    border-radius: 5px;
+    border-color: rgba(0, 0, 0, 0.861);
+    &:hover{
+      background-color: rgb(233, 214, 214);
+      color: black;
+    }
+  }
 }
+
+
 h1.darkMode{
   background-color: rgb(49, 49, 49);
   color: white;

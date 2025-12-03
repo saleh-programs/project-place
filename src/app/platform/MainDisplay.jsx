@@ -220,7 +220,14 @@ function MainDisplay({children, username, initialUserInfo}){
   return(
     <ThemeContext.Provider value={shared}>
       <div className={styles.columnWrapper}>
-        {roomID && <h1 className={darkMode ? styles.darkMode : ""}>"{roomName}"</h1>}
+        {roomID && 
+          <h1 className={darkMode ? styles.darkMode : ""}>
+            <span>{roomID}</span>
+            <span>"{roomName}"</span>
+            <button onClick={()=>{setRoomID("");setRoomName("")}}>Leave Room</button>
+
+          </h1>
+        }
         <div className={styles.siteWrapper}>
           <Sidebar {...{userStates, sendJsonMessage, username}}/>
           <div className={styles.pageContainer}>
