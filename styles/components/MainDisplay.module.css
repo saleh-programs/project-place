@@ -5,6 +5,8 @@
 .columnWrapper{
   display: flex;
   flex-direction: column;
+  height: 100vh;
+
 }
 
 .columnWrapper > h1{
@@ -23,6 +25,7 @@ h1.darkMode{
   color: white;
 }
 .siteWrapper{
+  flex: 1;
   display: flex;
 }
 .pageContainer{
