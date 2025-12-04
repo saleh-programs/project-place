@@ -10,7 +10,7 @@
   padding: 10px;
   border-radius: 10px;
 
-  z-index: 100;
+  z-index: 1000;
 } 
 .joinRoom h2{
   text-align: center;
@@ -103,7 +103,7 @@
 
   & :nth-child(1){
     font-weight: 800;
-    font-size: 1.4rem;
+    font-size: 1.4rem; 
     text-overflow: ellipsis;
     max-width: 300px;
     white-space: nowrap;
