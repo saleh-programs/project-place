@@ -1,0 +1,66 @@
+.accountSetupPage{
+    height: 100vh;
+    background-color: rgb(133, 134, 136);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.interactable{
+    background-color: rgb(130, 199, 248);
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 10px 10px 10px black;
+    border: 2px solid;
+
+    display: flex;
+    flex-direction: column;
+}
+.usernameInput{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.usernameInput h2{
+    text-align: center;
+    font-size: 1.7rem;
+}
+.usernameInput input{
+    background-color:  rgb(152, 208, 247);
+    border: none;
+    border-radius: 10px;
+    min-height: 30px;
+
+    font-family: "Daruma";
+    font-size: 2.5rem;
+    font-weight: 100;
+    text-align: center;
+    
+    &:focus{
+        outline: none;
+        border: 1px solid gray;
+        background-color:  rgb(165, 213, 247);
+
+    }
+}
+.usernameInput span{
+    color: red;
+    font-size: .8rem;
+}
+.usernameInput button{
+    padding: 5px;
+    width: fit-content;
+    margin-top: 10px;
+
+    font-family: "Exo 2";
+    font-weight: 700;
+    background-color: rgb(218, 244, 231);
+    border: 1px solid;
+    border-radius: 4px;
+
+    &:hover{
+        opacity: .8;
+    }
+
+}
