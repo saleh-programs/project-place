@@ -17,16 +17,16 @@ function AccountSetup(){
   const inputRef = useRef(null)
 
   async function handleSubmit(){
-    // const response = await updateUserInfoReq({"username": inputRef.current.value})
-    // if (response){
-    //   router.push("/platform")
-    // }
+    const response = await updateUserInfoReq({"username": inputRef.current.value})
+    if (response){
+      router.push("/platform")
+    }
 
     //ill verify username don't exist
-    setUsernameSelected(true)
+    // setUsernameSelected(true)
 
     //if it doesn't, show error
-    setErrMessage("That username already exists");
+    // setErrMessage("That username already exists");
 
   }
 

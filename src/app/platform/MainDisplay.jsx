@@ -1,6 +1,6 @@
 "use client"
 import * as mediasoupClient from "mediasoup-client"
-import { use, useEffect, useRef, useState } from "react"
+import {useLayoutEffect, useEffect, useRef, useState } from "react"
 import ThemeContext from "src/assets/ThemeContext"
 import useWebSocket from "react-use-websocket"
 
@@ -12,8 +12,8 @@ function MainDisplay({children, username, initialUserInfo}){
   const router = useRouter()
   
   const [userInfo, setUserInfo] = useState(initialUserInfo)
-  const [roomID, setRoomID] = useState("")
-  const [roomName, setRoomName] = useState("")
+  const [roomID, setRoomID] = useState(()=>initialUserInfo["storedRoomID"] ? initialUserInfo["storedRoomID"] : "")
+  const [roomName, setRoomName] = useState(()=>initialUserInfo["storedRoomName"] ? initialUserInfo["storedRoomName"] : "")
   const roomIDRef = useRef("")
   const [userStates, setUserStates] = useState({})
   
@@ -132,7 +132,9 @@ function MainDisplay({children, username, initialUserInfo}){
 
   useEffect(()=>{
     roomIDRef.current = roomID
-  },[roomID])
+    document.cookie = `roomID=${roomID}; path=/`
+    document.cookie = `roomName=${roomName}; path=/`
+  },[roomID, roomName])
 
   async function reconstructCanvas(data){
     const canvasBuffer = await data.arrayBuffer()

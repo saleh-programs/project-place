@@ -28,7 +28,7 @@ function CreateRoom({setIsCreatingRoom, setRoomID, setRoomName}){
   }
 
   function handleChange(e){
-    if (/^[a-zA-Z0-9_+!]*$/.test(e.target.value)){
+    if (/^[a-zA-Z0-9_+!\s]*$/.test(e.target.value)){
       setNewRoomName(e.target.value)
       newRoomNameRef.current = e.target.value
     } 
