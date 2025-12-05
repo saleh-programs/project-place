@@ -537,6 +537,18 @@ function Chat(){
 
   function getMessageElem(msgID){
     const msg = mappedMessages[msgID]
+
+    if (msg["username"] !== username){
+      return (
+        <div key={msgID} id={msgID} className={styles.message}>
+          {msg["files"].map((filePath, i) => {
+            return <FileViewer key={filePath} url={filePath} dimensions={msg["metadata"]["dimensions"][i]}/>
+          })}
+          {msg["text"]}
+          {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}
+        </div>
+      )
+    }
     return (
       <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
         {msg["files"].map((filePath, i) => {
