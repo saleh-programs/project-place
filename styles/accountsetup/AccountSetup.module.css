@@ -64,3 +64,19 @@
     }
 
 }
+
+.logout{
+    all: unset;
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    padding: 6px 3px;
+    background-color: rgb(210, 227, 214);
+    border: 2px solid;
+    border-radius: 3px; 
+    font-size: 1.2rem;
+    font-weight: 600;
+    &:hover{
+        opacity: .85;
+    }
+}

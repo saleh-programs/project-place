@@ -57,6 +57,9 @@ function AccountSetup(){
         }
 
       </div>
+      <button className={styles.logout} onClick={()=>{window.location.href="http://localhost:5000/logout"}}>
+        Log Out
+      </button>
     </div>
   )
 }

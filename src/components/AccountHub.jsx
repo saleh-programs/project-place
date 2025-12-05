@@ -30,16 +30,7 @@ function AccountHub(){
         <span className={styles.username}>{username}</span>
       </section>  
 
-      <label className={styles.toggleAppearance}>
-        Dark Mode?
-        <input  
-        type="checkbox"
-        onClick={(e)=>setDarkMode(e.target.checked)
 
-        }
-        /> 
-        <span></span>
-      </label>
       <section className={styles.roomButtons}>
           <button className={styles.createRoom}
           onClick={()=>{setIsCreatingRoom(true);setIsLoadingRoom(false)}}>
@@ -56,10 +47,22 @@ function AccountHub(){
           {isLoadingRoom && 
             <JoinRoom {...{setIsLoadingRoom,setRoomID, setUserInfo, userInfo, setRoomName}}/>
           }
+          <button onClick={()=>{window.location.href="http://localhost:5000/logout"}}>
+            Log Out
+          </button>
       </section>
-      
+      <label className={styles.toggleAppearance}>
+        Dark Mode?
+        <input  
+        type="checkbox"
+        onClick={(e)=>setDarkMode(e.target.checked)
+
+        }
+        /> 
+        <span></span>
+      </label>
     </div>
   )
 }
 
-export default AccountHub
+export default AccountHub 

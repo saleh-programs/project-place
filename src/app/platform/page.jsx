@@ -5,7 +5,7 @@ function PlatformHome(){
 
   return(
     <div>
-      This is essentially a loading screen
+      This is not needed
     </div>
   )
 }
