@@ -6,6 +6,7 @@ from random import randint, choice
 from PIL import Image
 import io
 from functools import wraps
+import bcrypt
 
 from authlib.integrations.flask_client import OAuth
 from authlib.jose import JsonWebToken, JsonWebKey
@@ -89,7 +90,7 @@ with AccessDatabase() as cursor:
     '''
     CREATE TABLE IF NOT EXISTS users (
       userID VARCHAR(100) PRIMARY KEY,
-      username VARCHAR(70),
+      username VARCHAR(70) UNIQUE,
       avatar VARCHAR(300),
       images JSON,
       rooms JSON
@@ -116,7 +117,8 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS rooms (
       roomID VARCHAR(10) PRIMARY KEY,
       roomName VARCHAR(70),
-      users JSON
+      users JSON,
+      password VARCHAR(30) NULL
     )
     '''
   )
@@ -188,7 +190,7 @@ def getUserRooms():
   with AccessDatabase() as cursor:
     cursor.execute("SELECT rooms FROM users WHERE userID = %s", (session["userID"],))
     values = json.loads(cursor.fetchone()[0])
-    print(values)
+
     for roomID in values:
       cursor.execute("SELECT roomName FROM rooms WHERE roomID = %s", (roomID,))
       roomName = cursor.fetchone()
@@ -258,7 +260,13 @@ def getImage(imageID):
 def createRoom():
   data = request.get_json()
   roomName = data["roomName"]
-  
+  password = data["password"]
+  if password:
+    salt = bcrypt.gensalt()
+    passBytes = password.encode("utf-8")
+    password = bcrypt.hashpw(passBytes, salt)
+
+  roomID = None
   with AccessDatabase() as cursor:
     exists = True
     while (exists):
@@ -266,8 +274,9 @@ def createRoom():
       cursor.execute("SELECT 1 from rooms WHERE roomID=%s",(roomID,))
       exists = cursor.fetchone() is not None
 
-    cursor.execute("INSERT INTO rooms (roomID, roomName, users) VALUES (%s, %s, %s)",(roomID, roomName, json.dumps([session["userID"]])))
+    cursor.execute("INSERT INTO rooms (roomID, roomName, users, password) VALUES (%s, %s, %s, %s)",(roomID, roomName, json.dumps([session["userID"]]), password))
     cursor.execute("UPDATE users SET rooms = JSON_ARRAY_APPEND(rooms,'$',%s) WHERE userID = %s", (roomID, session["userID"]))
+
     # store empty canvas 
     canvasImg = Image.new(mode = "RGBA", size=(1000,1000), color=(0,0,0,0))
     buffer = io.BytesIO()
@@ -329,7 +338,16 @@ def checkRoomExists(roomID):
 @handleError("failed to add room user")
 @authenticateClient
 def addRoomUser(roomID):
+  data = request.get_json()
+  userPassword = data["password"] 
   with AccessDatabase() as cursor:
+    cursor.execute("SELECT password FROM rooms WHERE roomID = %s", (roomID,))
+    passwordHash = cursor.fetchone()
+    if passwordHash is not None:
+      passwordsMatch = bcrypt.checkpw(userPassword.encode("utf-8"), passwordHash)
+      if not passwordsMatch:
+        return jsonify({"success": False, "message": "Wrong password entered"}), 400
+
     cursor.execute('''
     UPDATE rooms SET users = JSON_ARRAY_APPEND(users, '$', %s)
     WHERE roomID = %s AND NOT JSON_CONTAINS(users, %s, '$')''',(session["userID"], roomID, json.dumps(session["userID"])))
@@ -349,6 +367,18 @@ def getRoomUsers(roomID):
 
 
   return jsonify({"success":True,"data": {"users": users}}), 200
+
+# this uses users table but I liked it in rooms area
+@app.route("/rooms/<roomID>/users/<username>", methods=["GET"])
+@handleError("failed to validate room user")
+@authenticateServer
+def validateRoomUser(roomID, username):
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE username = %s AND JSON_CONTAINS(rooms, %s)", (username, roomID))
+    if (cursor.fetchone() is not None):
+      return jsonify({"success": True}), 200
+
+  return jsonify({"success": True, "data": {"username": username}}), 200
 
  
 @app.route("/rooms/<roomID>/messages", methods=["POST"])

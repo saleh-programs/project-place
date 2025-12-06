@@ -5,7 +5,7 @@ import url from "url"
 import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
-import { storeMessageReq, getMessagesReq,getRoomUsersReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
+import { storeMessageReq, getMessagesReq,getRoomUsersReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
 import { draw, fill, clear } from "../../utils/canvasArt.js"
 import { writeFileSync } from "fs"
 import { buffer } from "stream/consumers"
@@ -58,12 +58,16 @@ getToken()
 }
  */
 
-wsServer.on("connection", (connection, request)=>{
-  console.log("made connection")
+wsServer.on("connection", async (connection, request)=>{
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
-  const uuid = uuidv4()
+  const isMember = await validateRoomUserReq(roomID, username, token)
+  if (!isMember){
+    connection.close()
+    return
+  }
 
+  const uuid = uuidv4()
   connections[uuid] = connection
   users[uuid] = {
     "username": username,
@@ -79,7 +83,7 @@ wsServer.on("connection", (connection, request)=>{
   }
 
   sendServerInfo(uuid);
-  
+
   connection.on("message",(data)=>handleMessage(data, uuid));
   connection.on("close",()=>handleClose(uuid));
 })
@@ -88,9 +92,10 @@ wsServer.on("connection", (connection, request)=>{
 function handleClose(uuid){
   const roomID = users[uuid]["roomID"]
 
-  delete rooms[roomID]["users"][uuid]
   delete connections[uuid]
   delete users[uuid]
+  rooms[roomID]["users"] = rooms[roomID]["users"].filter(id => id !== uuid)
+
 
   if (rooms[roomID]["users"].length === 0){
     rooms[roomID]["whiteboard"]["canvas"].getContext("2d").putImageData(rooms[roomID]["whiteboard"]["snapshot"],0,0)

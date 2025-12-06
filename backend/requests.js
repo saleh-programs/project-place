@@ -70,12 +70,12 @@ async function uploadNewImageReq(imageFile) {
 
 
 
-async function createRoomReq(roomName) {
+async function createRoomReq(roomName, password=null) {
   const response = await fetch(baseurl + "rooms",{
     "method": "POST",
     "credentials": "include",
     "headers" : {"Content-Type": "application/json"},
-    "body": JSON.stringify({"roomName": roomName})
+    "body": JSON.stringify({"roomName": roomName, "password": password})
   })
   const data = await response.json()
   if (!data.success){
@@ -94,10 +94,12 @@ async function checkRoomExistsReq(roomID) {
   }
   return data.data["roomName"]
 }
-async function addRoomUserReq(roomID) {
+async function addRoomUserReq(roomID, password=null) {
   const response = await fetch(baseurl + `rooms/${roomID}/users`,{
     "method": "PUT",
     "credentials": "include",
+    "headers": {"Content-Type": "application/json"},
+    "body": JSON.stringify({"password": password})
   })
   const data = await response.json()
   if (!data.success){
@@ -125,6 +127,28 @@ async function getRoomUsersReq(roomID, token=null) {
     throw new Error(data.message ||"req failed")
   }
   return data["data"]["users"]
+}
+async function validateRoomUserReq(roomID, username, token=null) {
+  let options;
+  if (token){
+    options = {
+      "method": "GET",
+      "headers": {"authorization": `Bearer ${token}`}
+    }
+  }else{
+    options = {
+      "method": "GET",
+      "credentials": "include"
+    }
+  }
+
+  const response = await fetch(baseurl + `rooms/${roomID}/users/${username}`, options)
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message ||"req failed")
+  }
+
+  return data["data"]?.["username"]
 }
 
 async function uploadFilesReq(files) {
@@ -357,6 +381,7 @@ createRoomReq = handleError(createRoomReq)
 checkRoomExistsReq = handleError(checkRoomExistsReq)
 getRoomUsersReq = handleError(getRoomUsersReq)
 addRoomUserReq = handleError(addRoomUserReq)
+validateRoomUserReq = handleError(validateRoomUserReq)
 
 uploadFilesReq = handleError(uploadFilesReq)
 storeMessageReq = handleError(storeMessageReq)
@@ -364,6 +389,7 @@ editMessageReq = handleError(editMessageReq)
 deleteMessageReq = handleError(deleteMessageReq)
 getMessagesReq = handleError(getMessagesReq)
 getOlderMessagesReq = handleError(getOlderMessagesReq)
+
 
 updateCanvasSnapshotReq = handleError(updateCanvasSnapshotReq)
 getCanvasSnapshotReq = handleError(getCanvasSnapshotReq)
@@ -381,7 +407,7 @@ function getUniqueMessageID(){
   return messageID.join("")
 }
 
-export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
+export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, validateRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
   createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
   getUserInfoReq, updateUserInfoReq, getUserRoomsReq,
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}
