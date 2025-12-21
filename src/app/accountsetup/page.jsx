@@ -16,6 +16,10 @@ function AccountSetup(){
 
   const inputRef = useRef(null)
 
+  useEffect(()=>{
+    document.cookie = "roomID=; Max-Age=0; path=/"
+    document.cookie = "roomName=; Max-Age=0; path=/"
+  },[])
   async function handleSubmit(){
     const response = await updateUserInfoReq({"username": inputRef.current.value})
     if (response){
