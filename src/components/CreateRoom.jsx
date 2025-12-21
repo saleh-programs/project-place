@@ -10,6 +10,7 @@ function CreateRoom({setIsCreatingRoom, setRoomID, setRoomName}){
 
   const [isPasswordProtected, setIsPasswordProtected] = useState(false)
   const [password, setPassword] = useState("")
+  const [hideVisibility, setHideVisibility] = useState(false)
 
   const nameInputRef = useRef(null)
   const passwordInputRef = useRef(null)
@@ -20,7 +21,7 @@ function CreateRoom({setIsCreatingRoom, setRoomID, setRoomName}){
 
   async function handleRoomCreation(){
     if (newRoomNameRef.current === "") return
-    const res = await createRoomReq(newRoomNameRef.current, isPasswordProtected ? passwordInputRef.current : null)
+    const res = await createRoomReq(newRoomNameRef.current, passwordInputRef.current ? passwordInputRef.current.value : null)
 
     if (!res){
       return
@@ -49,17 +50,22 @@ function CreateRoom({setIsCreatingRoom, setRoomID, setRoomName}){
         onChange={handleChange}
         />
       </section>
-      <button onClick={()=>{setIsPasswordProtected(prev=>!prev);setPassword("")}}>{isPasswordProtected ? "No Password" : "Using Password"}</button>Password
-      <section>
-        <h2>Create Room Password</h2>
-        <input ref={passwordInputRef} type="text" spellCheck="false"
-        value={password} 
-        onChange={e=>setPassword(e.target.value)}
-        />
-      </section>
-      <button onClick={handleRoomCreation}>Create Room</button>
+      <button className={styles.enterPasswordBtn} onClick={()=>{setIsPasswordProtected(prev=>!prev);setPassword("")}}>{!isPasswordProtected ? "Use Password" : "Don't use Password"}</button>
+      {isPasswordProtected &&       
+        <section className={styles.createPassword}>
+          <h2>Create Room Password</h2>
+          <section>
+            <input ref={passwordInputRef} type={hideVisibility ? "password" : "text"} spellCheck="false" 
+            value={password} 
+            onChange={e=>setPassword(e.target.value)}/>
+            <button onClick={()=>setHideVisibility(prev=>!prev)}>{hideVisibility ? "show" : "hide"}</button>
+          </section>
+        </section>
+      }
+
+      <button className={styles.createRoomBtn} onClick={handleRoomCreation}>Create Room</button>
       <button 
-      className={styles.escape}
+      className={styles.escape} 
       onClick={()=>setIsCreatingRoom(false)} >
         X
       </button>

@@ -36,8 +36,7 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setRoomName}){
       setTimeout(()=>setErrorJoiningMsg(""), 2000)
       return
     }
-
-    if (roomInfo["needsPassword"] && rooms.some(r=>r["roomID"] !== joinRoomIDRef.current)){
+    if (roomInfo["needsPassword"] && !rooms.some(r=>r["roomID"] === joinRoomIDRef.current)){
       setIsPasswordProtected(true)
       setPassword("")
       return
@@ -49,7 +48,7 @@ function JoinRoom({setIsLoadingRoom, setRoomID, setRoomName}){
     justSubmittedRef.current = true
     setTimeout(()=>{justSubmittedRef.current = false}, 300)
 
-    const roomName = await addRoomUserReq(joinRoomIDRef.current, isPasswordProtected ? passwordInputRef.current?.value : null) 
+    const roomName = await addRoomUserReq(joinRoomIDRef.current,  passwordInputRef.current ? passwordInputRef.current.value : null) 
     if(!roomName){
       setErrorJoiningMsg("The password is incorrect")
       setTimeout(()=>setErrorJoiningMsg(""), 2000)

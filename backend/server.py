@@ -118,7 +118,7 @@ with AccessDatabase() as cursor:
       roomID VARCHAR(10) PRIMARY KEY,
       roomName VARCHAR(70),
       users JSON,
-      password VARCHAR(30) NULL
+      password VARBINARY(100) NULL
     )
     '''
   )
@@ -150,7 +150,7 @@ with AccessDatabase() as cursor:
 @authenticateClient
 def getUserInfo():
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, avatar, images, rooms FROM users WHERE userID = %s", (session["userID"],))
+    cursor.execute("SELECT username, avatar, images FROM users WHERE userID = %s", (session["userID"],))
 
     values = cursor.fetchone()
     userInfo = {
@@ -223,7 +223,7 @@ def uploadImage():
   return {"success": True, "data": {"path": exposedPath}}, 200
 
 @app.route("/users/images/public/<imageID>", methods=["GET"])
-@handleError("failed to get image")
+@handleError("failed to get public image")
 @authenticateClient
 def getPublicImage(imageID):
   if not os.path.exists(f"images/public/{imageID}"):
@@ -273,7 +273,6 @@ def createRoom():
       roomID = generateRoomCode()
       cursor.execute("SELECT 1 from rooms WHERE roomID=%s",(roomID,))
       exists = cursor.fetchone() is not None
-
     cursor.execute("INSERT INTO rooms (roomID, roomName, users, password) VALUES (%s, %s, %s, %s)",(roomID, roomName, json.dumps([session["userID"]]), password))
     cursor.execute("UPDATE users SET rooms = JSON_ARRAY_APPEND(rooms,'$',%s) WHERE userID = %s", (roomID, session["userID"]))
 
@@ -343,6 +342,7 @@ def checkRoomExists(roomID):
 def addRoomUser(roomID):
   data = request.get_json()
   userPassword = data["password"] 
+
   with AccessDatabase() as cursor:
     cursor.execute("SELECT roomName, password, users FROM rooms WHERE roomID = %s", (roomID,))
     result = cursor.fetchone()
