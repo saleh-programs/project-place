@@ -327,12 +327,15 @@ def getFile(fileID):
 @authenticateClient
 def checkRoomExists(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT roomName FROM rooms where roomID=%s",(roomID,))
+    cursor.execute("SELECT roomName, password FROM rooms where roomID=%s",(roomID,))
     result = cursor.fetchone()
     if result is None:
-        return jsonify({"success": False}), 400
-
-  return jsonify({"success":True,"data": {"roomName": result[0]}}), 200
+        return jsonify({"success": True}), 200
+  roomInfo = {
+    "roomName": result[0],
+    "needsPassword": result[1] is not None
+  }
+  return jsonify({"success":True,"data": {"roomInfo": roomInfo}}), 200
 
 @app.route("/rooms/<roomID>/users", methods=["PUT"])
 @handleError("failed to add room user")
@@ -341,21 +344,24 @@ def addRoomUser(roomID):
   data = request.get_json()
   userPassword = data["password"] 
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT password FROM rooms WHERE roomID = %s", (roomID,))
-    passwordHash = cursor.fetchone()
+    cursor.execute("SELECT roomName, password, users FROM rooms WHERE roomID = %s", (roomID,))
+    result = cursor.fetchone()
+    roomName = result[0]
+    passwordHash = result[1] if session["userID"] not in json.loads(result[2]) else None
+    
     if passwordHash is not None:
       passwordsMatch = bcrypt.checkpw(userPassword.encode("utf-8"), passwordHash)
       if not passwordsMatch:
-        return jsonify({"success": False, "message": "Wrong password entered"}), 400
+        return jsonify({"success": True}), 200
 
     cursor.execute('''
     UPDATE rooms SET users = JSON_ARRAY_APPEND(users, '$', %s)
-    WHERE roomID = %s AND NOT JSON_CONTAINS(users, %s, '$')''',(session["userID"], roomID, json.dumps(session["userID"])))
+    WHERE roomID = %s AND NOT JSON_CONTAINS(users, %s)''',(session["userID"], roomID, json.dumps(session["userID"])))
     cursor.execute('''
     UPDATE users SET rooms = JSON_ARRAY_APPEND(rooms,'$',%s)
-    WHERE userID = %s AND NOT JSON_CONTAINS(rooms, %s, '$')''', (roomID, session["userID"], json.dumps(roomID)))
+    WHERE userID = %s AND NOT JSON_CONTAINS(rooms, %s)''', (roomID, session["userID"], json.dumps(roomID)))
 
-  return jsonify({"success": True}), 200
+  return jsonify({"success": True, "data": {"roomName": roomName}}), 200
 
 @app.route("/rooms/<roomID>/users", methods=["GET"])
 @handleError("Failed to get room users")
@@ -374,7 +380,7 @@ def getRoomUsers(roomID):
 @authenticateServer
 def validateRoomUser(roomID, username):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE username = %s AND JSON_CONTAINS(rooms, %s)", (username, roomID))
+    cursor.execute("SELECT 1 FROM users WHERE username = %s AND JSON_CONTAINS(rooms, %s)", (username, json.dumps(roomID)))
     if (cursor.fetchone() is not None):
       return jsonify({"success": True}), 200
 
