@@ -2,16 +2,29 @@
 
 .joinRoom{
   position: fixed;
-  top: 50%;
+  top: 30%;
   left: 50%;
-  transform: translate(-50%,-50%);
-  
+  transform: translateX(-50%);
   background-color: rgb(145, 182, 242);
   padding: 10px;
   border-radius: 10px;
 
   z-index: 1000;
 } 
+.joinRoom input{
+  border: none;
+  border-radius: 5px;
+  height: 30px;
+  background-color: rgb(217, 232, 255);
+  padding: 20px 5px;
+
+  font-family: "Daruma";
+  font-size: 1.8rem;
+  text-align: center;
+  &:focus{ 
+    outline: none;
+  }
+}
 .joinRoom h2{
   text-align: center;
 }
@@ -58,7 +71,7 @@
 }
 .fullSquare{
   background-color: white;
-  border-radius: 5px;
+  border-radius: 5px; 
 
   font-size: 2rem;
   font-family: "Daruma";
@@ -112,5 +125,64 @@
 
   & :nth-child(2){
     opacity: .8;
+  }
+}
+
+
+
+.enterPassword{
+  padding: 10px;
+  border-radius: 5px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.enterPassword h2{
+  font-size: 1.2rem;
+  margin: 1px 0px;
+}
+
+.enterPassword section{
+  position: relative;
+}
+.enterPassword section button{
+  font-weight: bold;
+  background-color: transparent;
+  border: none;
+  position: absolute;
+  height: 100%;
+  right: 0;
+
+  background-color: rgb(205, 205, 205);
+  opacity: .7;
+  &:hover{
+    opacity: .9;
+  }
+}
+
+.errorJoiningMsg{
+  display: block;
+
+  color: rgb(169, 12, 12);
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+.joinRoomBtn{
+  padding: 4px;
+  font-weight: 600;
+  font-size: 1.3rem;
+  background-color: rgb(220, 240, 255);
+  border: none;
+  border-radius: 3px;
+  padding: 5px;
+
+  display: block;
+  margin: 5px auto;
+
+  &:hover{
+    opacity: .7;
   }
 }
