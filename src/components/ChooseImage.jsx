@@ -1,9 +1,13 @@
 import styles from "styles/components/ChooseImage.module.css"
 import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage}){
   const [availableImages, setAvailableImages] = useState([])
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const isUploadingImageRef = useRef(false)
+  
   const publicImages = [
       "http://localhost:5000/users/images/public/willow.png",
       "http://localhost:5000/users/images/public/man.png",
@@ -60,7 +64,7 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
 
   return(
     <div className={styles.chooseImage}>
-      <h1>Choose your new Image</h1>
+      <h1>Choose Your Avatar</h1>
       <section className={styles.scrollableImages}>
         {
           availableImages.map((imageURL)=>{
@@ -73,10 +77,25 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
         }
       </section>
 
-      <label className={styles.uploadImage}>
+      <label className={styles.uploadImageBtn}>
         Upload a new Image
-        <input type="file" hidden onChange={uploadNewImage}/>
+        <input type="file" hidden onChange={()=>setIsUploadingImage(true)}/>
       </label>
+      {
+        isUploadingImage &&
+        <section className={styles.selectImageArea}>
+          <h2>Customize Visible Region</h2>
+          <section className={styles.viewport}>
+
+          </section>
+          <button>
+            Finish and Upload
+          </button>
+          <button className={styles.exit} onClick={()=>setIsUploadingImage(false)}>
+            X
+          </button>  
+        </section>
+      }
 
       <button className={styles.exit} onClick={()=>setIsChangingImage(false)}>
         X
