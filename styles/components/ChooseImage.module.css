@@ -81,12 +81,20 @@
   flex-direction: column;
   align-items: center;
 }
-.selectImageArea section{
-  border: 2px solid;
+.viewport{
   width: 150px;
   height: 150px;
   border-radius: 50%;
+  outline: 3px solid;
+
+  position: relative;
+  overflow: hidden;
 }
+.viewport canvas{
+  position: absolute;
+  top: 0;
+  left: 0;
+  }
 .selectImageArea button:nth-of-type(1){
   margin: 40px;
   padding: 5px;
