@@ -37,9 +37,7 @@ async function getUserRoomsReq() {
   }
   return data.data["rooms"]
 }
-
 async function updateUserInfoReq(modifiedFields) {
-  console.log(modifiedFields)
   const response = await fetch(baseurl + "users", {
     "method": "PUT",
     "credentials": "include",
@@ -52,6 +50,17 @@ async function updateUserInfoReq(modifiedFields) {
   }
 
   return data
+}
+async function validateUsernameReq(username) {
+  const response = await fetch(baseurl + `users/${username}`, {
+    "method": "GET",
+    "credentials": "include"
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
+  }
+  return data?.["username"]
 }
 async function uploadNewImageReq(imageFile) {
   const fileInfo = new FormData()
@@ -374,6 +383,7 @@ async function getCanvasInstructionsReq(roomID, token=null){
 
 getUserInfoReq = handleError(getUserInfoReq)
 updateUserInfoReq = handleError(updateUserInfoReq)
+validateUsernameReq = handleError(validateUsernameReq)
 getUserInfoReq = handleError(getUserInfoReq)
 uploadNewImageReq = handleError(uploadNewImageReq)
 
@@ -409,5 +419,5 @@ function getUniqueMessageID(){
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, validateRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
   createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
-  getUserInfoReq, updateUserInfoReq, getUserRoomsReq,
+  getUserInfoReq, updateUserInfoReq, getUserRoomsReq, validateUsernameReq,
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}

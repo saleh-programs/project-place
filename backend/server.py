@@ -182,6 +182,18 @@ def updateUserInfo():
 
   return jsonify({"success":True}), 200
 
+@app.route("/users/<username>", methods=["GET"])
+@handleError("Failed to validate username")
+@authenticateClient
+def validateUsername(username):
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
+    if cursor.fetchone() is not None:
+      return jsonify({"success":True}), 200
+
+  return jsonify({"success":True, "data": {"username": username}}), 200
+
+
 @app.route("/users/rooms", methods=["GET"])
 @handleError("Failed to get user's rooms")
 @authenticateClient

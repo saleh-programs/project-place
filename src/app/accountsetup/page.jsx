@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react";
-import {updateUserInfoReq } from "backend/requests";
+import {updateUserInfoReq, validateUsernameReq } from "backend/requests";
 import { useRouter } from "next/navigation";
+import ChooseImage from "src/components/ChooseImage";
 
 import styles from "styles/accountsetup/AccountSetup.module.css"
 
@@ -19,8 +20,14 @@ function AccountSetup(){
   useEffect(()=>{
     document.cookie = "roomID=; Max-Age=0; path=/"
     document.cookie = "roomName=; Max-Age=0; path=/"
+    inputRef.current.focus()
   },[])
   async function handleSubmit(){
+    const userExists = await validateUsernameReq(inputRef.current.value)
+    if (!userExists){
+      setErrMessage("")
+      return
+    }
     const response = await updateUserInfoReq({"username": inputRef.current.value})
     if (response){
       router.push("/platform")
