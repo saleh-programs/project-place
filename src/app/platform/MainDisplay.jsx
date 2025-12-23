@@ -226,7 +226,7 @@ function MainDisplay({children, username, initialUserInfo}){
         }
         <div className={styles.siteWrapper}>
           <Sidebar {...{userStates, sendJsonMessage, username}}/>
-          <div className={styles.pageContainer} style={roomID === "" ? {opacity: ".5", backgroundColor: "rgba(0,0,0,.3)"} : {}}>
+          <div className={styles.pageContainer} style={roomID === "" ? {boxShadow: "10px 10px 90px black inset",opacity: ".5"} : {}}>
             {children}
             {Object.keys(callOffers).map((name) => {
               return (

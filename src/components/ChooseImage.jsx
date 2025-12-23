@@ -79,21 +79,23 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
     }
   } 
 
-  // async function convertCanvasToFile(canvas) {
-  //   // canvas.toBlob(()=>)
-  //   return file
-  // }
+  async function convertCanvasToFile(canvas) {
+    const blob = await new Promise(resolve => {
+      canvas.toBlob(b=>resolve(b))
+    })
+    return new File([blob], "temp.png", {"type": "image/png"})
+  }
   async function uploadNewImage(e){ 
     const croppedUpload = document.createElement("canvas")
     croppedUpload.width = VIEWPORT_DIAMETER
     croppedUpload.height = VIEWPORT_DIAMETER
     croppedUpload.getContext("2d").drawImage(pannableImageRef.current, -1 * panImageInfo.current["translateX"], -1 * panImageInfo.current["translateY"], VIEWPORT_DIAMETER, VIEWPORT_DIAMETER, 0, 0, VIEWPORT_DIAMETER, VIEWPORT_DIAMETER)
     const file = await convertCanvasToFile(croppedUpload)
-
     const newPath = await uploadNewImageReq(file)
     if (!newPath){
       return
     }
+    setIsUploadingImage(false)
 
     let newImagesList = [...userInfo["images"], newPath]
     const result = await updateUserInfoReq({"images": JSON.stringify(newImagesList)})
