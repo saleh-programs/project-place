@@ -62,6 +62,7 @@ wsServer.on("connection", async (connection, request)=>{
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
   const isMember = await validateRoomUserReq(roomID, username, token)
+  console.log(isMember)
   if (!isMember){
     connection.close()
     return

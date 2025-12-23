@@ -381,7 +381,7 @@ def getRoomUsers(roomID):
 def validateRoomUser(roomID, username):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT 1 FROM users WHERE username = %s AND JSON_CONTAINS(rooms, %s)", (username, json.dumps(roomID)))
-    if (cursor.fetchone() is not None):
+    if (cursor.fetchone() is None):
       return jsonify({"success": True}), 200
 
   return jsonify({"success": True, "data": {"username": username}}), 200

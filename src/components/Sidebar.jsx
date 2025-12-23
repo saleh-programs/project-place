@@ -60,6 +60,7 @@ function Sidebar({userStates, sendJsonMessage, username}){
   Object.keys(userStates).forEach(user =>{
     peerLocations[userStates[user]["location"]].push({"username":user, "avatar": userStates[user]["avatar"]})
   })
+  console.log(peerLocations)
   return(
     <div className={`${styles.sidePanel} ${darkMode ? styles.darkMode : ""}`}>
       <section className={styles.sidePanelMain} ref={sidebarRef}>
