@@ -10,7 +10,7 @@ import JoinRoom from "./JoinRoom"
 import ChooseImage from "./ChooseImage"
 
 function AccountHub(){
-  const {roomID, setRoomID, setRoomName, username, userInfo, setUserInfo, sendJsonMessage, setDarkMode} = useContext(ThemeContext)
+  const {roomID, setRoomID, setRoomName, username, userInfo, setUserInfo, sendJsonMessage, darkMode, setDarkMode} = useContext(ThemeContext)
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)
 
@@ -51,18 +51,13 @@ function AccountHub(){
             Log Out
           </button>
       </section>
-      <label className={styles.toggleAppearance}>
-        Dark Mode?
-        <input  
-        type="checkbox"
-        onClick={(e)=>setDarkMode(e.target.checked)
-
-        }
-        /> 
-        <span></span>
-      </label>
+      <button className={`${styles.toggleAppearance} ${darkMode ? styles.darkMode : ""}`} onClick={()=>setDarkMode(prev=>!prev)}>
+        <span>{darkMode ? "Try Light Mode" : "Try Dark Mode"}</span>
+        <span><img src="/lightbulb_icon.png" alt="lightbulb" /></span>
+        <span><img src="/moon_icon.png" alt="moon" /></span>
+      </button>
     </div>
-  )
+  ) 
 }
 
 export default AccountHub 
