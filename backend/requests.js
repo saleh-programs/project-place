@@ -60,7 +60,7 @@ async function validateUsernameReq(username) {
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
-  return data?.["username"]
+  return data.data?.["username"]
 }
 async function uploadNewImageReq(imageFile) {
   const fileInfo = new FormData()
