@@ -1,10 +1,15 @@
-import styles from "styles/components/ChooseImage.module.css"
+"use client"
+
+import styles from "styles/accountsetup/profile/ChooseAvatar.module.css"
 import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 
-function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage}){
+function ChooseAvatar({initialUserInfo}){
+  const router = useRouter()
   const [availableImages, setAvailableImages] = useState([])
   const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [selectedAvatar, setSelectedAvatar] = useState(null)
 
   const fileinputRef = useRef(null)
   const pannableImageRef = useRef(null)
@@ -14,9 +19,9 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
     "translateX": 0,
     "translateY": 0,
   })
+  const userInfoRef = useRef({...initialUserInfo})
 
   const VIEWPORT_DIAMETER = 150
-  
   const publicImages = [
       "http://localhost:5000/users/images/public/willow.png",
       "http://localhost:5000/users/images/public/man.png",
@@ -24,12 +29,11 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
     ]
 
   useEffect(()=>{
-    setAvailableImages([...publicImages, ...userInfo["images"]]) 
+    setAvailableImages([...publicImages, ...userInfoRef.current["images"]]) 
   },[])
   
   useEffect(()=>{
     if (!isUploadingImage || !pannableImageRef.current) return
-
     const img = storedImageRef.current
 
     const smallestDimension = Math.min(img.width, img.height)
@@ -42,27 +46,13 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
     panImageInfo.current["translateY"] = 0
   },[isUploadingImage])
 
-  async function setNewUserImage(imageURL){
-    const result = await updateUserInfoReq({"avatar": imageURL})
+  async function setNewUserImage(){
+    if (!selectedAvatar) return
+    const result = await updateUserInfoReq({"avatar": selectedAvatar})
     if (!result){
       return
     }
-    setUserInfo(prev => {
-      return {
-        ...prev,
-        "avatar": imageURL
-      }
-    })
-    sendJsonMessage({
-      "origin": "user",
-      "type": "userInfo",
-      "username": userInfo["username"], 
-      "data": {
-        "avatar": imageURL
-      }
-    })
-
-    setIsChangingImage(false)
+    router.push("/platform")
   }
 
   async function handleImageSetup(e) {
@@ -98,17 +88,12 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
     }
     setIsUploadingImage(false)
 
-    let newImagesList = [...userInfo["images"], newPath]
+    let newImagesList = [...userInfoRef.current["images"], newPath]
     const result = await updateUserInfoReq({"images": JSON.stringify(newImagesList)})
     if (!result){
       return
     }
-    setUserInfo((prev) => {
-      return {
-        ...prev,
-        "images": newImagesList
-      }
-    })
+    userInfoRef.current["images"] = newImagesList
     setAvailableImages([...publicImages, ...newImagesList])
     e.target.value = ""
   }
@@ -129,7 +114,6 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
       let newShiftX = panImageInfo.current["translateX"]
       let newShiftY = panImageInfo.current["translateY"]
 
-      console.log(viewportRect.width, viewportRect.right - viewportRect.left)
       const withinHorizontalBounds = 
       (canvasRect.left + offset[0] <= viewportRect.left) && 
       (canvasRect.right + offset[0] >= viewportRect.right)
@@ -162,47 +146,52 @@ function ChooseImage({setIsChangingImage, userInfo, setUserInfo, sendJsonMessage
   }
 
   return(
-    <div className={styles.chooseImage}>
-      <h1>Choose Your Avatar</h1>
-      <section className={styles.scrollableImages}>
-        {
-          availableImages.map((imageURL)=>{
-            return (
-              <div key={imageURL} onClick={()=>setNewUserImage(imageURL)} className={styles.imgContainer}>
-                <img src={imageURL} alt="nth" /> 
-              </div>
-            )
-          })
-        }
-      </section>
-
-      <label className={styles.uploadImageBtn}>
-        Upload a new Image
-        <input ref={fileinputRef} type="file" hidden onChange={handleImageSetup}/>
-      </label>
-      {
-        isUploadingImage &&
-        <section className={styles.selectImageArea}>
-          <h2>Customize Visible Region</h2>
-          <section ref={viewportRef} className={styles.viewport}>
-            <canvas 
-            ref={pannableImageRef}
-            onMouseDown={startDrag}
-            ></canvas>
-          </section>
-          <button onClick={uploadNewImage}> 
-            Upload
-          </button>
-          <button className={styles.exit} onClick={()=>{setIsUploadingImage(false);fileinputRef.current.value=""}}>
-            X
-          </button>  
+    <div className={styles.chooseAvatarPage}>
+      <div className={styles.chooseImage}>
+        <h1>Choose Your Avatar</h1>
+        <section className={styles.scrollableImages}>
+          {
+            availableImages.map((imageURL)=>{
+              return (
+                <div key={imageURL} onClick={()=> imageURL !== selectedAvatar ? setSelectedAvatar(imageURL) : setSelectedAvatar(null)} className={`${styles.imgContainer} ${selectedAvatar === imageURL ? styles.selected : ""}`}>
+                  <img src={imageURL} alt="nth" /> 
+                </div>
+              )
+            })
+          }
         </section>
-      }
 
-      <button className={styles.exit} onClick={()=>setIsChangingImage(false)}>
-        X
-      </button>    
+        <label className={styles.uploadImageBtn}>
+          Upload New Image
+          <input ref={fileinputRef} type="file" hidden onChange={handleImageSetup}/>
+        </label>
+        {
+          isUploadingImage &&
+          <section className={styles.selectImageArea}>
+            <h2>Customize Visible Region</h2>
+            <section ref={viewportRef} className={styles.viewport}>
+              <canvas 
+              ref={pannableImageRef}
+              onMouseDown={startDrag}
+              ></canvas>
+            </section>
+            <button onClick={uploadNewImage}> 
+              Upload
+            </button>
+            <button className={styles.exit} onClick={()=>{setIsUploadingImage(false);fileinputRef.current.value="";}}>
+              X
+            </button>  
+          </section>
+        }
+
+        {selectedAvatar &&
+        <button className={styles.selectImageBtn} onClick={setNewUserImage}>
+          Set Avatar
+        </button> 
+        }
+      </div>
     </div>
+
   )
 }
-export default ChooseImage
+export default ChooseAvatar
