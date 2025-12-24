@@ -28,6 +28,7 @@
   & :nth-child(1){
     opacity: .6;
     font-size: 1.5rem;
+    font-family: "Exo 2";
   }
   & :nth-child(3){
     background-color: rgb(251, 175, 166);

@@ -46,7 +46,8 @@
 }
 .usernameInput span{
     color: red;
-    font-size: .8rem;
+    font-size: 1.2rem;
+
 }
 .usernameInput button{
     padding: 5px;
@@ -74,7 +75,7 @@
     background-color: rgb(210, 227, 214);
     border: 2px solid;
     border-radius: 3px; 
-    font-size: 1.2rem;
+    font-size: 1.2rem; 
     font-weight: 600;
     &:hover{
         opacity: .85;
