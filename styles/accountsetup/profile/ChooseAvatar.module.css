@@ -1,0 +1,148 @@
+
+.chooseAvatarPage{
+    background: linear-gradient(rgba(0, 20, 3, 0.833), rgb(176, 172, 181));
+    width: 100%;
+    height: 100%;
+
+}
+
+.chooseImage{
+  max-width: 500px;
+  border-radius: 15px;
+
+  border: 5px solid rgba(0, 0, 0, 0.583);
+  background-color: rgb(78, 83, 92);
+  padding: 20px;
+  box-shadow: 0 0 200px 50px rgba(36, 87, 38, 0.363);
+
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 500;
+  
+} 
+
+.chooseImage h1:first-of-type{
+  font-family: "Exo 2";
+  font-size: 1.4rem;
+  color: white;
+  text-align: center;
+  margin: 5px;
+}
+
+.scrollableImages{
+  flex: 1;
+  height: 100%;
+  border: 1px solid rgba(224, 218, 208,.5);
+  border-radius: 15px;
+  padding: 10px;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.imgContainer{
+  width: 80px;
+  height: 80px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 2px dotted rgba(255, 255, 255, 0.3);
+  &:hover{
+    cursor: pointer;
+    opacity: .8;
+    border: 2px solid;
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+}
+.imgContainer img{
+  width: 100%;
+  object-fit: cover;
+}
+.selected{
+    border: 3px double green;
+    box-shadow: 0 0 9px 5px rgb(39, 23, 130,.6);
+    &:hover{
+        border: 3px double rgb(21, 181, 21);
+    }
+}
+
+.uploadImageBtn{
+  margin: auto;
+  text-align: center;
+  border-radius: 5px;
+  background-color: rgba(227, 251, 220, 0.742);
+  padding: 6px;
+  font-size: 1.2rem;
+  font-family: "Exo 2";
+  font-weight: bold;
+  &:hover{
+    cursor: pointer;
+    opacity: .85;
+  }
+}
+
+.selectImageArea{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%,-50%);
+  background-color: rgb(228, 223, 216);
+  width: 400px;
+  z-index: 2000;
+  border-radius: 10px;
+  border: 3px solid;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.viewport{
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  outline: 3px solid;
+
+  position: relative;
+  overflow: hidden;
+}
+.viewport canvas{
+  position: absolute;
+  top: 0;
+  left: 0;
+  }
+.selectImageArea button:nth-of-type(1){
+  margin: 40px;
+  padding: 5px;
+  background-color: aliceblue;
+  font-weight: bold;
+  font-size: 1.2rem;
+
+  &:hover{
+    opacity: .85;
+  }
+}
+
+.selectImageBtn{
+    width: fit-content;
+    margin: auto;
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    background-color: rgb(242, 242, 242);
+
+    &:hover{
+        transform: scale(1.05);
+        opacity: .8;
+    }
+}
+.exit{
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(50%,-50%);
+}
