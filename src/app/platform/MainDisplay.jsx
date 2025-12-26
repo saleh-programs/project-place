@@ -126,7 +126,7 @@ function MainDisplay({children, username, initialUserInfo}){
     siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates, setDarkMode, darkMode,
     sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
     externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
-    roomID, setRoomID, roomIDRef, setRoomName,
+    roomID, setRoomID, roomIDRef, roomName, setRoomName,
     messagesRef
   }
 

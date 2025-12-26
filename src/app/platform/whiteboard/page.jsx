@@ -8,7 +8,7 @@ import { draw, fill, clear } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 import { HexColorPicker } from "react-colorful"
 function Whiteboard(){
-  const {sendJsonMessage, roomID, externalWhiteboardRef, username, savedCanvasInfoRef, darkMode} = useContext(ThemeContext)
+  const {sendJsonMessage, roomID, roomName, externalWhiteboardRef, username, savedCanvasInfoRef, darkMode} = useContext(ThemeContext)
 
   const canvasRef = useRef(null)
   const cxtRef = useRef(null)
@@ -88,7 +88,8 @@ function Whiteboard(){
 
   useLayoutEffect(()=>{
     canvasRef.current && zoom("out")
-  },[roomID])
+  },[roomID])  
+
   function externalWhiteboard(data){
     /* when data.type differentiates canvas actions
     from other things we want to do on the whiteboard 
@@ -349,6 +350,26 @@ function Whiteboard(){
     sendJsonMessage(update)
     handleCanvasAction(update)
   } 
+  async function capturePNG(){
+    if (!canvasRef.current) return
+
+    const blob = await new Promise(resolve=>{
+      canvasRef.current.toBlob(b=>resolve(b), "image/png")
+    })
+    const url = URL.createObjectURL(blob)
+
+    const tempLink = document.createElement("a")
+    tempLink.href = url
+    const formattedDate = new Date().toISOString().split(":")
+    tempLink.download = `${roomName} ${formattedDate[0]}:${formattedDate[1]}.png`
+    document.body.appendChild(tempLink)
+    tempLink.click()
+    document.body.removeChild(tempLink)
+
+    URL.revokeObjectURL(url)
+
+  }
+
   function changeLineWidth(e){
     if (e.target.value < 1 || e.target.value > 30){
       e.target.value = canvasInfo.current["lineWidth"]
@@ -455,6 +476,10 @@ function Whiteboard(){
           > 
             <img src="/wb_handle/0.png" alt="handle" />
           </span>
+          <section className={`${styles.modesContainer} ${styles.specialTools}`}>
+            <button onClick={()=>{capturePNG()}}><img src="/tool_icons/camera.png" alt="snapshot" /></button>
+          </section>
+          <span className={styles.separator}></span>
           <section className={styles.modesContainer}>
             <button className={selectedTool === "draw" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "draw";setSelectedTool("draw")}}><img src="/tool_icons/pencil.png" alt="draw" /></button>
             <button className={selectedTool === "erase" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "erase";setSelectedTool("erase")}}><img src="/tool_icons/eraser.png" alt="erase" /></button>
