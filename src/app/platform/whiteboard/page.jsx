@@ -41,6 +41,7 @@ function Whiteboard(){
   const [isSelecting, setIsSelecting] = useState(false)
   const pixelInputsRef = useRef(null)
   const colorSelectorRef = useRef(null)
+  const [previewURL, setPreviewURL] = useState(null)
 
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
@@ -366,8 +367,12 @@ function Whiteboard(){
     tempLink.click()
     document.body.removeChild(tempLink)
 
-    URL.revokeObjectURL(url)
-
+    setPreviewURL(url)
+    setTimeout(()=>{
+      URL.revokeObjectURL(url)
+      setPreviewURL(null)
+    },5000)
+    
   }
 
   function changeLineWidth(e){
@@ -524,6 +529,7 @@ function Whiteboard(){
         </div>
       </div>
       }
+      {previewURL && <span className={styles.screenshotPreview} ><img src={previewURL} alt="preview"/></span>}
     </div>
   )
 }
