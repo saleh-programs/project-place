@@ -280,6 +280,33 @@ function Whiteboard(){
     canvasRef.current.addEventListener("mousemove", onMoveStroke)
     document.addEventListener("mouseup", onReleaseStroke)
   }
+  function clickCanvas(e){
+    if (!["fill", "colorpick"].includes(canvasInfo.current?.["type"]) || !canvasRef.current) {
+      return
+    }
+    const rect = canvasRef.current.getBoundingClientRect()
+    const pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
+
+    if (canvasInfo.current["type"] === "colorpick"){
+        const color = cxtRef.current.getImageData(pos[0], pos[1],1,1).data
+        const formattedColor = `rgba(${color[0]},${color[1]},${color[2]},${255})`
+        changeColor(formattedColor)
+        return
+    }
+    const update = {
+      "origin": "whiteboard",
+      "type": "fill",
+      "username": username,
+      "data": pos,
+      "metadata":{
+        "color": canvasInfo.current["color"]
+      }
+    }
+    sendJsonMessage(update)
+    handleCanvasAction(update)
+
+  }
+
   function navigate(e){
     if (canvasInfo.current["type"] !== "navigate"){
       return
@@ -321,7 +348,6 @@ function Whiteboard(){
     document.addEventListener("mousemove", onMoveNavigate)
     document.addEventListener("mouseup", onReleaseNavigate)
   }
-  
   function zoom(type){
     const increment = type === "in" ? 0.2 :  -0.2
     canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
@@ -412,24 +438,7 @@ function Whiteboard(){
                 width={1000} 
                 height={1000}
                 onMouseDown={startStroke}
-                onClick={e=>{
-                  if (canvasInfo.current["type"] !== "fill") {
-                    return
-                  }
-                  const rect = canvasRef.current.getBoundingClientRect()
-                  const pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
-                  const update = {
-                    "origin": "whiteboard",
-                    "type": "fill",
-                    "username": username,
-                    "data": pos,
-                    "metadata":{
-                      "color": canvasInfo.current["color"]
-                    }
-                  }
-                  sendJsonMessage(update)
-                  handleCanvasAction(update)
-                }}
+                onClick={clickCanvas}
                 />
                 <span style={{backgroundColor: selectedColor}} className={styles.selectedColor} onClick={(e)=>{
                   setIsSelecting(true)
@@ -489,6 +498,7 @@ function Whiteboard(){
             <button className={selectedTool === "draw" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "draw";setSelectedTool("draw")}}><img src="/tool_icons/pencil.png" alt="draw" /></button>
             <button className={selectedTool === "erase" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "erase";setSelectedTool("erase")}}><img src="/tool_icons/eraser.png" alt="erase" /></button>
             <button className={selectedTool === "fill" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "fill";setSelectedTool("fill")}}><img src="/tool_icons/fill.png" alt="fill" /></button>
+            <button className={selectedTool === "colorpick" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "colorpick";setSelectedTool("colorpick")}}><img src="/tool_icons/colorpicker.png" alt="color picker" /></button>
             <button className={selectedTool === "navigate" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "navigate";setSelectedTool("navigate")}}><img src="/tool_icons/navigate.png" alt="draw" /></button>
           </section>
           <section ref={pixelInputsRef} className={styles.pixelInput}>
