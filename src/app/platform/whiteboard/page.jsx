@@ -231,7 +231,7 @@ function Whiteboard(){
   }
 
   function startStroke(event){
-    if (canvasInfo.current["type"] !== "draw" && canvasInfo.current["type"] !== "erase"){
+    if (!["draw", "erase"].includes(canvasInfo.current["type"]) || event.button === 1){
       return
     }
     const rect = canvasRef.current.getBoundingClientRect()
@@ -322,7 +322,7 @@ function Whiteboard(){
   }
 
   function navigate(e){
-    if (canvasInfo.current["type"] !== "navigate"){
+    if (canvasInfo.current["type"] !== "navigate" && e.button !== 1){
       return
     }
     const containerRect = e.currentTarget.getBoundingClientRect()
