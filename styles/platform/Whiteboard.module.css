@@ -10,6 +10,9 @@
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  &:focus{
+    outline: none;
+  }
 }
 .title{
   padding: 5px;

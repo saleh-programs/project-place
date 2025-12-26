@@ -15,6 +15,8 @@ function Whiteboard(){
   const hiddenCanvasRef = useRef(null)
   const hiddenCxt = useRef(null) 
 
+  const undoRedoTimer = useRef(null)
+
   const canvasInfo = useRef({
     "type": "draw",
     "color": "black",
@@ -94,7 +96,7 @@ function Whiteboard(){
   function externalWhiteboard(data){
     /* when data.type differentiates canvas actions
     from other things we want to do on the whiteboard 
-    page, this function will be  alot more meaningful*/
+    page, this function will be much more meaningful*/
     if (data === "canvasReceived"){
       savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
       return
@@ -307,6 +309,18 @@ function Whiteboard(){
 
   }
 
+  function handleKeyPress(e){
+    if (e.repeat) return
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z"){
+      redo()
+      return
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === "z"){
+      undo()
+      return
+    }
+  }
+
   function navigate(e){
     if (canvasInfo.current["type"] !== "navigate"){
       return
@@ -354,9 +368,13 @@ function Whiteboard(){
     canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
   function undo(){
-    if (savedCanvasInfoRef.current["latestOp"] < 0){
+    if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] < 0){
       return
     }
+    undoRedoTimer.current = setTimeout(()=>{
+      undoRedoTimer.current = null
+    }, 50)
+
     const update = {
       "origin": "whiteboard",
       "type": "undo",
@@ -366,9 +384,12 @@ function Whiteboard(){
     handleCanvasAction(update)
   }
   function redo(){
-    if (savedCanvasInfoRef.current["latestOp"] >= savedCanvasInfoRef.current["operations"].length-1){
+    if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] >= savedCanvasInfoRef.current["operations"].length-1){
       return
     }
+    undoRedoTimer.current = setTimeout(()=>{
+      undoRedoTimer.current = null
+    }, 50)
     const update = {
       "origin": "whiteboard",
       "type": "redo",
@@ -425,7 +446,7 @@ function Whiteboard(){
     setSelectedColor(color)
   }
   return (
-    <div className={`${styles.whiteboardPage} ${darkMode ? styles.darkMode : ""}`}>
+    <div className={`${styles.whiteboardPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={handleKeyPress} tabIndex={0}>
       <h1 className={styles.title}>
         <Animation key={darkMode ? "dark" : "light"} path={darkMode ? "/dark/whiteboard?34" : "/light/whiteboard?34"} type="once" speed={10}/> 
       </h1>
