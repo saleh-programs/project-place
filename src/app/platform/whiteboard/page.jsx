@@ -4,7 +4,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import Animation from "src/components/Animation"
 import styles from "styles/platform/Whiteboard.module.css"
 
-import { draw, fill, clear } from "utils/canvasArt.js"
+import { draw, fill,optimizedfill, timeFunction, clear } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 import { HexColorPicker } from "react-colorful"
 function Whiteboard(){
@@ -44,6 +44,8 @@ function Whiteboard(){
   const pixelInputsRef = useRef(null)
   const colorSelectorRef = useRef(null)
   const [previewURL, setPreviewURL] = useState(null)
+
+  const fillToggle = useRef(false)
 
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
@@ -134,7 +136,7 @@ function Whiteboard(){
       default:
         state["latestOp"] += 1
         state["operations"] = state["operations"].slice(0, state["latestOp"])
-        state["operations"].push(data)
+        // state["operations"].push(data)
 
         if (state["operations"].length > 10){
           cxtRef.current.putImageData(state["snapshot"], 0, 0)
@@ -173,12 +175,23 @@ function Whiteboard(){
       case "erase":
         draw(data["data"], hiddenCanvasRef.current, data["metadata"])
 
-        cxtRef.current.globalCompositeOperation = "destination-out"
+        cxtRef.current.globalCompositeOperation = "destfillination-out"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         cxtRef.current.globalCompositeOperation = storeOp
         break
       case "fill":
-        fill(data["data"], canvasRef.current, data["metadata"]["color"])
+        if (fillToggle.current){
+          const dt = timeFunction(()=>{
+            fill(data["data"], canvasRef.current, data["metadata"]["color"])
+          })
+          console.log("normal fill took", dt)
+        }else{
+          const dt = timeFunction(()=>{
+            optimizedfill(data["data"], canvasRef.current, data["metadata"]["color"])
+          })
+          console.log("optimized fill took", dt)
+
+        }
         break
       case "clear":
         clear(canvasRef.current)
@@ -479,6 +492,7 @@ function Whiteboard(){
               <button className={styles.redoButton} onClick={redo}><img src="/tool_icons/redo.png" alt="redo" /></button>
               <button onClick={()=>zoom("in")}><img src="/tool_icons/zoomin.png" alt="zoom in" /></button>
               <button onClick={()=>zoom("out")}><img src="/tool_icons/zoomout.png" alt="zoom out" /></button>
+              <button onClick={()=>{fillToggle.current=!fillToggle.current}}>{fillToggle.current ? "normal fill active" : "optimized fill is active"}</button>
             </span>
             <button className={styles.clearButton} onClick={()=>{
               const update = {
