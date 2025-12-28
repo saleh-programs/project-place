@@ -6,7 +6,7 @@ import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq,getRoomUsersReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
-import { draw, fill, clear } from "../../utils/canvasArt.js"
+import { draw, linefill as fill, clear } from "../../utils/canvasArt.js"
 import { writeFileSync } from "fs"
 import { buffer } from "stream/consumers"
 
@@ -143,6 +143,9 @@ async function processChat(data, uuid){
     case "delete":
       await deleteMessageReq(data.data, users[uuid]["roomID"], token)
       break
+    case "isTyping":
+      broadcastAll(uuid, data)
+      return
   } 
   broadcastAll(uuid, data, true);
 }

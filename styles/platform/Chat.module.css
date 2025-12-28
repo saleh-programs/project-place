@@ -221,7 +221,10 @@
 .chatHub{
   display: flex;
   flex-direction: column;
-  background-color: rgba(209, 218, 226, 0.389);
+  background-color: rgba(209, 218, 226, 0.389);  
+  position: relative;
+
+
 }
 .darkMode .chatHub{
   background-color: #8ba38b89;
@@ -310,4 +313,14 @@
 .chatHubMain button.clicked img{
   filter: invert(.4);
   transform: scale(1.2);
+}
+.isTyping{
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  transform: translate(10px, -5px);
+
+  font-size: 1.7rem;
+  font-family: "Exo 2";
+  font-weight: bold;
 }

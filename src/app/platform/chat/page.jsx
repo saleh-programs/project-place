@@ -24,6 +24,7 @@ function Chat(){
 
   const [displayListRange, setDisplayListRange] = useState([0, numMsgsAvailable])
 
+  const justTypedTimer = useRef(null)
   const canSendRef = useRef(true)
   const [newMessage, setNewMessage] = useState("")
   const [selectedID, setSelectedID] = useState(null)
@@ -40,6 +41,8 @@ function Chat(){
 
   const [groupedMessages, setGroupedMessages] = useState([])
   const [mappedMessages, setMappedMessages] = useState({})
+
+  const [peersTyping, setPeersTyping] = useState([])
  
   /*
 
@@ -484,7 +487,16 @@ function Chat(){
             }
           }
         })
-        msg["username"] !== username && setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
+        if (msg["username"] !== username){
+          setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
+          setPeersTyping(prev => prev.filter(p => {
+            if (p["username"] === msg["username"]){
+              clearTimeout(p["timer"])
+              return false
+            }
+            return true
+          }))
+         }
 
         break
       case "edit":
@@ -530,11 +542,53 @@ function Chat(){
           return prev
         })
         break
+      case "isTyping":
+        setPeersTyping(prev => {
+          const newPeers = [...prev]
+
+          for (let i = 0; i < newPeers.length; i++){
+            if (newPeers[i]["username"] === data["username"]){
+              clearTimeout(newPeers[i]["timer"])
+              newPeers[i]["timer"] = setTimeout(()=>{
+                setPeersTyping(prev2 => prev2.filter(p => p["username"] !== data["username"]))
+              }, 100000) 
+              return newPeers
+            }
+          }
+          newPeers.push({
+            "username": data["username"],
+            "timer":  setTimeout(()=>{
+              setPeersTyping(prev2 => prev2.filter(p => p["username"] !== data["username"]))
+            }, 100000) 
+          })
+          return newPeers
+        })
+        break
     }
   }
 
-  let lastSeenDay = null
+  function getPeersTyping(){
+    if (peersTyping.length === 0) return null
+    if (peersTyping.length === 1) return <span className={styles.isTyping}>{`${peersTyping[0]["username"]} is typing...`}</span>
+    if (peersTyping.length === 2) return <span className={styles.isTyping}>{`${peersTyping[0]["username"]} and ${peersTyping[1]["username"]} are typing...`}</span>
+    if (peersTyping.length === 3) return <span className={styles.isTyping}>{`${peersTyping[0]["username"]}, ${peersTyping[1]["username"]} and ${peersTyping[2]["username"]} are typing...`}</span>
+    return <span className={styles.isTyping}>{`${peersTyping[0]["username"]}, ${peersTyping[1]["username"]}, ${peersTyping[2]["username"]} and ${peersTyping.length - 3} more are typing...`}</span>
+  }
 
+  function handleKeyPress(e){
+    e.key === "Enter" && e.preventDefault()
+    if (!justTypedTimer.current){
+      sendJsonMessage({
+        "origin": "chat",
+        "type": "isTyping",
+        "username": username,
+      })
+      justTypedTimer.current = setTimeout(()=>{
+        justTypedTimer.current = null
+      },100)
+    }
+  }
+  let lastSeenDay = null
   function getMessageElem(msgID){
     const msg = mappedMessages[msgID]
 
@@ -635,6 +689,7 @@ function Chat(){
       </Fragment>
     )
   }
+
   return(
     <div className={`${styles.chatPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={(e)=>e.key === "Enter" && handleMessage()} tabIndex={0}>
 
@@ -691,11 +746,15 @@ function Chat(){
                 }}
                 />
                 </label>
-                <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={(e)=>{e.key === "Enter" && e.preventDefault()}}/>
+                <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={handleKeyPress}/>
                 <button onClick={handleMessage} className={`${isClicked ? styles.clicked : ""}`}>    
                   <img src={"/submit_icon.png"} />
                 </button>
             </section>
+
+            {
+              getPeersTyping()
+            } 
           </div>
         </>
       }

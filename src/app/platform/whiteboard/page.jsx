@@ -173,7 +173,7 @@ function Whiteboard(){
       case "erase":
         draw(data["data"], hiddenCanvasRef.current, data["metadata"])
 
-        cxtRef.current.globalCompositeOperation = "destfillination-out"
+        cxtRef.current.globalCompositeOperation = "destination-out"
         cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
         cxtRef.current.globalCompositeOperation = storeOp
         break
@@ -479,7 +479,6 @@ function Whiteboard(){
               <button className={styles.redoButton} onClick={redo}><img src="/tool_icons/redo.png" alt="redo" /></button>
               <button onClick={()=>zoom("in")}><img src="/tool_icons/zoomin.png" alt="zoom in" /></button>
               <button onClick={()=>zoom("out")}><img src="/tool_icons/zoomout.png" alt="zoom out" /></button>
-              <button onClick={()=>{fillToggle.current=!fillToggle.current}}>{fillToggle.current ? "normal fill active" : "optimized fill is active"}</button>
             </span>
             <button className={styles.clearButton} onClick={()=>{
               const update = {
