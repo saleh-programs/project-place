@@ -44,6 +44,10 @@ function Whiteboard(){
   const pixelInputsRef = useRef(null)
   const colorSelectorRef = useRef(null)
   const [previewURL, setPreviewURL] = useState(null)
+  
+  const [isImporting, setIsImporting] = useState(false)
+  const storeImportRef = useRef(null)
+  const importInputRef = useRef(null)
 
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
@@ -309,6 +313,23 @@ function Whiteboard(){
 
   }
 
+  async function processImport(e){
+    setIsImporting(true)
+
+    const newCanvas = document.createElement("canvas")
+    const url = URL.createObjectURL(e.files[0])
+    const img = new Image()
+    img.src = url
+    img.onload = async () => {
+      newCanvas.width = img.width
+      newCanvas.height = img.height
+      newCanvas.drawImage(img, 0, 0)
+
+      storeImportRef.current = new Promise(resolve => newCanvas.toBlob(resolve, "image/png"))
+      URL.revokeObjectURL(url)
+    }
+  }
+
   function handleKeyPress(e){
     if (e.repeat) return
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z"){
@@ -513,6 +534,12 @@ function Whiteboard(){
           </span>
           <section className={`${styles.modesContainer} ${styles.specialTools}`}>
             <button onClick={()=>{capturePNG()}}><img src="/tool_icons/camera.png" alt="snapshot" /></button>
+            <button onClick={()=>{}}>
+                <label className={styles.fileInput}>
+                  <img src="/tool_icons/import.png" alt="import" />
+                  <input ref={importInputRef} type="file" multiple hidden accept='.png,.jpg,.jpeg,.webp' onChange={processImport}/>
+                </label>
+            </button>
           </section>
           <span className={styles.separator}></span>
           <section className={styles.modesContainer}>
@@ -559,6 +586,11 @@ function Whiteboard(){
           </section>
         </div>
       </div>
+      }
+      {isImporting &&
+      <section>
+
+      </section>
       }
       {previewURL && <span className={styles.screenshotPreview} ><img src={previewURL} alt="preview"/></span>}
     </div>

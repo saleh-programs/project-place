@@ -562,6 +562,9 @@ function updateServerCanvas(data, roomID){
     case "clear":
       clear(mainCanvas)
       break
+    case "import":
+      import(data["data"], mainCanvas, data["metadata"]["anchor"])
+      break
   }
 }
 
