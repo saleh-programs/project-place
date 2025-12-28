@@ -6,7 +6,7 @@ import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq,getRoomUsersReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
-import { draw, linefill as fill, clear } from "../../utils/canvasArt.js"
+import { draw, linefill as fill, clear, importImage} from "../../utils/canvasArt.js"
 import { writeFileSync } from "fs"
 import { buffer } from "stream/consumers"
 
@@ -563,7 +563,7 @@ function updateServerCanvas(data, roomID){
       clear(mainCanvas)
       break
     case "import":
-      import(data["data"], mainCanvas, data["metadata"]["anchor"])
+      importImage(data["data"], mainCanvas, data["metadata"]["anchor"])
       break
   }
 }

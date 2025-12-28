@@ -4,7 +4,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import Animation from "src/components/Animation"
 import styles from "styles/platform/Whiteboard.module.css"
 
-import { draw, linefill as fill, clear } from "utils/canvasArt.js"
+import { draw, linefill as fill, clear, importImage } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 import { HexColorPicker } from "react-colorful"
 function Whiteboard(){
@@ -48,6 +48,8 @@ function Whiteboard(){
   const [isImporting, setIsImporting] = useState(false)
   const storeImportRef = useRef(null)
   const importInputRef = useRef(null)
+  const [selectedAnchor, setSelectedAnchor] = useState(null)
+  const selectedAnchorRef = useRef(null)
 
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
@@ -118,7 +120,7 @@ function Whiteboard(){
     }
   }
 
-  function handleCanvasAction(data, client = false){
+  async function handleCanvasAction(data, client = false){
     const state = savedCanvasInfoRef.current
     switch (data.type){ 
       case "undo":
@@ -143,7 +145,7 @@ function Whiteboard(){
         if (state["operations"].length > 10){
           cxtRef.current.putImageData(state["snapshot"], 0, 0)
           for (let i = 0; i <= state["latestOp"]; i++){
-            updateCanvas(state["operations"][i])
+            await updateCanvas(state["operations"][i])
             if (i == 4){
               state["snapshot"] = cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height)
             }
@@ -156,7 +158,7 @@ function Whiteboard(){
         
     }
   }
-  function updateCanvas(data){
+  async function updateCanvas(data){
     const mapActions = {
       "isErasing": "erase",
       "doneErasing": "erase",
@@ -186,6 +188,9 @@ function Whiteboard(){
         break
       case "clear":
         clear(canvasRef.current)
+        break
+      case "import": 
+        await importImage(data["data"], canvasRef.current, data["metadata"]["anchor"])
         break
     }
     clear(hiddenCanvasRef.current)
@@ -310,24 +315,39 @@ function Whiteboard(){
     }
     sendJsonMessage(update)
     handleCanvasAction(update)
-
   }
 
   async function processImport(e){
     setIsImporting(true)
 
     const newCanvas = document.createElement("canvas")
-    const url = URL.createObjectURL(e.files[0])
+    const url = URL.createObjectURL(e.target.files[0])
     const img = new Image()
     img.src = url
     img.onload = async () => {
       newCanvas.width = img.width
       newCanvas.height = img.height
-      newCanvas.drawImage(img, 0, 0)
+      newCanvas.getContext("2d").drawImage(img, 0, 0)
 
       storeImportRef.current = new Promise(resolve => newCanvas.toBlob(resolve, "image/png"))
+
       URL.revokeObjectURL(url)
     }
+  }
+  async function completeImport() {
+    const canvasBlob = await storeImportRef.current
+    const update = {
+      "origin": "whiteboard",
+      "username": username,
+      "type": "import",
+      "data": canvasBlob,
+      "metadata": {"anchor": selectedAnchor}
+    }
+    sendJsonMessage(update)
+    await handleCanvasAction(update)
+    setIsImporting(false)
+    setSelectedAnchor(null)
+    storeImportRef.current = null
   }
 
   function handleKeyPress(e){
@@ -585,14 +605,30 @@ function Whiteboard(){
               }
           </section>
         </div>
+        {isImporting &&
+        <section className={styles.isImporting}>
+          <h2>Select Anchor Point</h2>
+          <span>This is where to place the image</span>
+          <section>
+            {Array.from({length:9}).map((_,i) => 
+            <span 
+            className={selectedAnchor === i+1 ? styles.anchor : ""}
+            onClick={() => setSelectedAnchor(i+1)}
+            >{i+1}</span>)}
+          </section>
+          <button onClick={()=>{
+            setSelectedAnchor(null)
+            storeImportRef.current = null
+            setIsImporting(false)
+          }}>X</button>
+          {selectedAnchor && 
+          <button onClick={completeImport}>Import</button>
+          }
+        </section>
+        }
+        {previewURL && <span className={styles.screenshotPreview} ><img src={previewURL} alt="preview"/></span>}
       </div>
       }
-      {isImporting &&
-      <section>
-
-      </section>
-      }
-      {previewURL && <span className={styles.screenshotPreview} ><img src={previewURL} alt="preview"/></span>}
     </div>
   )
 }
