@@ -4,7 +4,7 @@ import ThemeContext from "src/assets/ThemeContext"
 import Animation from "src/components/Animation"
 import styles from "styles/platform/Whiteboard.module.css"
 
-import { draw, fill,optimizedfill, timeFunction, clear } from "utils/canvasArt.js"
+import { draw, linefill as fill, clear } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 import { HexColorPicker } from "react-colorful"
 function Whiteboard(){
@@ -44,8 +44,6 @@ function Whiteboard(){
   const pixelInputsRef = useRef(null)
   const colorSelectorRef = useRef(null)
   const [previewURL, setPreviewURL] = useState(null)
-
-  const fillToggle = useRef(false)
 
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
@@ -136,7 +134,7 @@ function Whiteboard(){
       default:
         state["latestOp"] += 1
         state["operations"] = state["operations"].slice(0, state["latestOp"])
-        // state["operations"].push(data)
+        state["operations"].push(data)
 
         if (state["operations"].length > 10){
           cxtRef.current.putImageData(state["snapshot"], 0, 0)
@@ -180,18 +178,7 @@ function Whiteboard(){
         cxtRef.current.globalCompositeOperation = storeOp
         break
       case "fill":
-        if (fillToggle.current){
-          const dt = timeFunction(()=>{
-            fill(data["data"], canvasRef.current, data["metadata"]["color"])
-          })
-          console.log("normal fill took", dt)
-        }else{
-          const dt = timeFunction(()=>{
-            optimizedfill(data["data"], canvasRef.current, data["metadata"]["color"])
-          })
-          console.log("optimized fill took", dt)
-
-        }
+        fill(data["data"], canvasRef.current, data["metadata"]["color"])
         break
       case "clear":
         clear(canvasRef.current)

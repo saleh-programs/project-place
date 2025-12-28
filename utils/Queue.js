@@ -1,49 +1,27 @@
 
-class Node{
+class Queue{
   constructor(data=null){
-    this.data = data
-    this.next = null
-    this.prev = null
-  }
-}
-
-class Queue {
-  constructor() {
-    this.head = null
-    this.tail = null
-    this.size = 0
+    this.queue = []
+    this.head = -1;
+    this.TRUNCATION_SIZE = 2000000
   }
 
   enqueue(data){
-    this.size += 1
-    const newValue = new Node(data)
-    if (this.head === null){
-      this.head = newValue
-      this.tail = newValue
-      return
+    this.queue.push(data)
+    if (this.head > this.TRUNCATION_SIZE){
+      this.queue = this.queue.slice(this.head + 1)
+      this.head = -1
     }
-    this.head.prev = newValue
-    newValue.next = this.head
-    this.head = newValue 
   }
   dequeue(){
-    if (this.head === null){
+    if (this.head === this.queue.length - 1){
       return null
     }
-    this.size -= 1
-    if (this.head === this.tail){
-      const value = this.tail.data
-      this.head = null
-      this.tail = null
-      return value
-    }
-    const value = this.tail.data
-    this.tail = this.tail.prev
-    this.tail.next = null
-    return value
+    this.head += 1
+    return this.queue[this.head]
   }
   isEmpty(){
-    return this.head === null
+    return this.head === this.queue.length - 1
   }
 }
 
