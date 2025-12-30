@@ -183,24 +183,23 @@ function linefill([X,Y], canvas, color){
   cxt.putImageData(canvasImage,0,0)
 }
 
-async function importImage(blob, canvas, anchor){
+async function importImage(img, canvas, anchor){
 
-  console.log(blob)
-  const surface = await createImageBitmap(blob)
   const row = Math.floor((anchor-1) / 3)
   const col = Math.floor((anchor-1) % 3)
 
   let top
   let left
   if (row === 0) top = 0
-  if (row === 1) top = (canvas.height / 2 - surface.height / 2 )
-  if (row === 2) top = canvas.height - surface.height
+  if (row === 1) top = (canvas.height / 2 - img.height / 2 )
+  if (row === 2) top = canvas.height - img.height
 
   if (col === 0) left = 0
-  if (col === 1) left = (canvas.width / 2 - surface.width / 2 )
-  if (col === 2) left = canvas.width - surface.width
+  if (col === 1) left = (canvas.width / 2 - img.width / 2 )
+  if (col === 2) left = canvas.width - img.width
 
-  canvas.getContext("2d").drawImage(surface, top, left)
+
+  canvas.getContext("2d").drawImage(img, left, top)
 }
 
 function timeFunction(func){

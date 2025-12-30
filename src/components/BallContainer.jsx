@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react"
-import styles from "styles/components/BallContainer.module.css"
+import { memo, useEffect, useRef } from "react"
 
+
+import styles from "styles/components/BallContainer.module.css"
 import Ball from "utils/ball.js"
 
 
@@ -8,11 +9,9 @@ function BallContainer({userList}){
 
     const containerRef = useRef(null)
     const canvasRef = useRef(null)
-    const cxtRef = useRef(null)
+
     const ballGroup = useRef([])
-
     const rafRef = useRef(null) 
-
     const BALL_RADIUS = 15
 
     useEffect(()=>{
@@ -20,16 +19,16 @@ function BallContainer({userList}){
             return
         }
         addBalls()
-    },[userList])
+    },[userList]) 
 
     useEffect(()=>{
         let rect = containerRef.current.getBoundingClientRect()
+        const canvas = canvasRef.current
+        const cxt = canvasRef.current.getContext("2d")
+
         canvasRef.current.width = rect.width
         canvasRef.current.height = rect.height
-        cxtRef.current = canvasRef.current.getContext("2d")
 
-        const cxt = cxtRef.current
-        const canvas = canvasRef.current
 
         addBalls()
         
@@ -136,4 +135,4 @@ function BallContainer({userList}){
     )
 }
 
-export default BallContainer 
+export default memo(BallContainer)

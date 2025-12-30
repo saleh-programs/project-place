@@ -303,3 +303,16 @@
   object-fit: cover;
 }
 
+.importErrorMsg{
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #e9c6b4;
+  padding: 6px;
+  border: 2px solid;
+  border-radius: 5px;
+
+  color: red;
+  font-size: 1.5rem;
+}

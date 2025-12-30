@@ -21,7 +21,7 @@ const extensionToMimeType = {
     "css": "text/css",
     "js": "text/javascript",
     "ts": "text/typescript",
-    "c": "text/x-c",
+    "c": "text/x-c", 
     "cpp": "text/x-c++",
     "py": "text/x-python",
 

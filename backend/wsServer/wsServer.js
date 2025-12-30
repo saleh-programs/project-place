@@ -47,13 +47,14 @@ getToken()
 
 
 
-// any message layout:
+
+// any message layout (may not have all fields):
 /*
 {
-  "origin" : chat/whiteboard/documents, ---all have this---
+  "origin" : chat/whiteboard/documents, 
   "type" :  erase/newMessage/fill (specific type)
-  "user": username,  ---all have this---
-  "data": draw commands/fill instructions/newest chat, ---all have this---
+  "user": username,  
+  "data": draw commands/fill instructions/newest chat, 
   "metadata": user's color/ stroke size/ draw status(isDraw/doneDraw)
 }
  */
@@ -150,7 +151,7 @@ async function processChat(data, uuid){
   broadcastAll(uuid, data, true);
 }
 function processWhiteboard(data, uuid){
-  if (data.type === "getCanvas"){
+  if (data["type"] === "getCanvas"){
     const roomCanvasInfo = rooms[users[uuid]["roomID"]]?.["whiteboard"]
     if (!roomCanvasInfo) return
     const tempCanvas = createCanvas(1000,1000)
@@ -166,6 +167,7 @@ function processWhiteboard(data, uuid){
     return
   }
 
+
   broadcastAll(uuid, data, false)
   handleCanvasAction(data, users[uuid]["roomID"])
 
@@ -175,7 +177,7 @@ function processWhiteboard(data, uuid){
 }
 
 async function processGroupcall(data, uuid){
-  const roomID = users[uuid]["roomID"]
+  const roomID = users[uuid]["roomID"] 
   const roomCallInfo = rooms[roomID]["groupcall"]
   const userCallInfo = users[uuid]["groupcall"]
 
@@ -500,7 +502,7 @@ async function getToken() {
 };
 
 // Canvas/Drawing
-function handleCanvasAction(data, roomID){
+async function handleCanvasAction(data, roomID){
   const exclude = ["isDrawing", "isErasing"]
   if (exclude.includes(data.type)){
     return
@@ -525,7 +527,7 @@ function handleCanvasAction(data, roomID){
       if (wbInfo["operations"].length > 10){
         wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"], 0, 0)
         for (let i = 0; i <= wbInfo["latestOp"]; i++){
-          updateServerCanvas(wbInfo["operations"][i], roomID)
+          await updateServerCanvas(wbInfo["operations"][i], roomID)
           if (i == 4){
             wbInfo["snapshot"] = wbInfo["canvas"].getContext("2d").getImageData(0,0,wbInfo["canvas"].width, wbInfo["canvas"].height)
           }
@@ -538,15 +540,15 @@ function handleCanvasAction(data, roomID){
   }
 }
 
-function redrawCanvas(roomID){
+async function redrawCanvas(roomID){
   const wbInfo = rooms[roomID]["whiteboard"]
 
   wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"],0,0)
   for (let i = 0; i <= wbInfo["latestOp"]; i++){
-    updateServerCanvas(wbInfo["operations"][i], roomID)
+    await updateServerCanvas(wbInfo["operations"][i], roomID)
   }
 }
-function updateServerCanvas(data, roomID){
+async function updateServerCanvas(data, roomID){
   const mainCanvas = rooms[roomID]["whiteboard"]["canvas"]
     
   switch (data.type){
@@ -563,7 +565,8 @@ function updateServerCanvas(data, roomID){
       clear(mainCanvas)
       break
     case "import":
-      importImage(data["data"], mainCanvas, data["metadata"]["anchor"])
+      const img = await loadImage(data["data"])      
+      importImage(img, mainCanvas, data["metadata"]["anchor"])
       break
   }
 }

@@ -8,4 +8,6 @@ const ChatContext = createContext(null)
 const VideoChatContext = createContext(null)
 const WhiteboardContext = createContext(null)
 
-export {AppearanceContext, UserContext, RoomContext, PeersContext, ChatContext, VideoChatContext, WhiteboardContext}; 
+const WebSocketContext = createContext(null)
+
+export {AppearanceContext, UserContext, RoomContext, PeersContext, ChatContext, VideoChatContext, WhiteboardContext, WebSocketContext}; 
