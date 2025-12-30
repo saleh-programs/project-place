@@ -1,16 +1,22 @@
 "use client"
-import { useContext,useRef, useState, useEffect } from "react"
-import ThemeContext from "src/assets/ThemeContext"
+import { memo, useContext,useRef, useState, useEffect } from "react"
+
+import { UserContext, AppearanceContext, RoomContext, VideoChatContext, WebSocketContext } from "src/providers/contexts"
 import styles from "styles/platform/GroupCall.module.css"
 import Animation from "src/components/Animation"
 
 function GroupCall(){
-    const { device, externalGroupcallRef, sendJsonMessage, username, darkMode } = useContext(ThemeContext)
+    const {username} = useContext(UserContext)
+    const {darkMode} = useContext(AppearanceContext)
+    const {externalGroupcallRef} = useContext(RoomContext)
+    const {device} = useContext(VideoChatContext)
+    const {sendJsonMessage} = useContext(WebSocketContext)
+
 
     const [isJoined, setIsJoined] = useState(false)
     const connectionStateRef = useRef("disconnected")
     const localCam = useRef(null)
-
+ 
     const callInfo = useRef({
         "sendTransport":{
             "ref": null,
@@ -402,4 +408,4 @@ function GroupCall(){
         </div>
     )
 }
-export default GroupCall
+export default memo(GroupCall)

@@ -1,11 +1,15 @@
 "use client"
-import React, { useContext, useEffect, useRef, useState } from "react"
-import ThemeContext from "src/assets/ThemeContext"
+import { memo, useContext } from "react"
+import { useRouter } from "next/navigation"
+
+import { AppearanceContext, RoomContext } from "src/providers/contexts"
 import styles from "styles/platform/VideoChat.module.css"
 import Animation from "src/components/Animation"
-import { useRouter } from "next/navigation"
+
 function VideoChat(){
-  const {darkMode, roomID} = useContext(ThemeContext)
+  const {darkMode} = useContext(AppearanceContext)
+  const {roomID} = useContext(RoomContext)
+
   const router = useRouter()
 
   return(
@@ -19,9 +23,8 @@ function VideoChat(){
           <button onClick={()=>router.push("/platform/videochat/groupcall")}>Join Group Call</button>
         </div>
       }
-
     </div>
   )
 }
 
-export default VideoChat  
+export default memo(VideoChat)

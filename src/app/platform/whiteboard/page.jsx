@@ -1,19 +1,24 @@
 "use client"
-import { useRef, useEffect, useContext, useState, useLayoutEffect } from "react"
-import ThemeContext from "src/assets/ThemeContext"
-import Animation from "src/components/Animation"
-import styles from "styles/platform/Whiteboard.module.css"
+import { memo, useRef, useEffect, useContext, useState, useLayoutEffect, use } from "react"
+import { HexColorPicker } from "react-colorful"
 
+import { UserContext, AppearanceContext, RoomContext, WhiteboardContext, WebSocketContext } from "src/providers/contexts"
+import Animation from "src/components/Animation"
 import { draw, linefill as fill, clear, importImage } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
-import { HexColorPicker } from "react-colorful"
+
+import styles from "styles/platform/Whiteboard.module.css"
+
+
 function Whiteboard(){
-  const {sendJsonMessage, roomID, roomName, externalWhiteboardRef, username, savedCanvasInfoRef, darkMode} = useContext(ThemeContext)
+  const {username} = useContext(UserContext)
+  const {darkMode} = useContext(AppearanceContext)
+  const {roomID, roomName, externalWhiteboardRef} = useContext(RoomContext)
+  const {savedCanvasInfoRef} = useContext(WhiteboardContext)
+  const {sendJsonMessage} = useContext(WebSocketContext)
 
   const canvasRef = useRef(null)
-  const cxtRef = useRef(null)
   const hiddenCanvasRef = useRef(null)
-  const hiddenCxt = useRef(null) 
 
   const undoRedoTimer = useRef(null)
 
@@ -38,7 +43,7 @@ function Whiteboard(){
   ]
   const toolsRef = useRef(null)
   const [queuedColors, setQueuedColors] = useState([])
-  const [selectedTool, setSelectedTool] = useState("draw")
+  const [selectedTool, setSelectedTool] = useState("draw") 
   const [selectedColor, setSelectedColor] = useState("black")
   const [isSelecting, setIsSelecting] = useState(false)
   const pixelInputsRef = useRef(null)
@@ -49,7 +54,7 @@ function Whiteboard(){
   const storeImportRef = useRef(null)
   const importInputRef = useRef(null)
   const [selectedAnchor, setSelectedAnchor] = useState(null)
-  const selectedAnchorRef = useRef(null)
+  const [importErrorMsg, setImportErrorMsg] = useState("")
 
   useEffect(()=>{  
     externalWhiteboardRef.current = externalWhiteboard
@@ -78,20 +83,22 @@ function Whiteboard(){
       "origin": "whiteboard",
       "type": "getCanvas"
     })
-    cxtRef.current = canvasRef.current.getContext("2d", {willReadFrequently: true})
+
     hiddenCanvasRef.current = Object.assign(document.createElement("canvas"), {
       "width":canvasRef.current.width, 
       "height": canvasRef.current.width
     })
-    hiddenCxt.current = hiddenCanvasRef.current.getContext("2d", {willReadFrequently: true})
 
     const customizations = {
       "lineCap": "round",
       "lineJoin": "round"
     }
-    Object.assign(cxtRef.current, customizations)
-    Object.assign(hiddenCxt.current, customizations)
-    savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
+    Object.assign(canvasRef.current.getContext("2d"), customizations)
+    Object.assign(hiddenCanvasRef.current.getContext("2d"), customizations)
+
+    return () => {
+      savedCanvasInfoRef.current["snapshot"] = null
+    }
     
   },[roomID])
 
@@ -104,20 +111,32 @@ function Whiteboard(){
     from other things we want to do on the whiteboard 
     page, this function will be much more meaningful*/
     if (data === "canvasReceived"){
-      savedCanvasInfoRef.current["snapshot"] && redrawCanvas()
+      savedCanvasInfoRef.current["snapshot"] && rebuildCanvas()
       return
     }
     handleCanvasAction(data)
   }
 
-  function redrawCanvas(){
+  async function rebuildCanvas(snapshot = null) {
     if (!savedCanvasInfoRef.current["snapshot"]){
       return
     }
-    cxtRef.current.putImageData(savedCanvasInfoRef.current["snapshot"],0,0)
+
+    const canvas = document.createElement("canvas")
+    canvas.width = 1000
+    canvas.height = 1000
+
+    canvas.getContext("2d").drawImage(savedCanvasInfoRef.current["snapshot"], 0, 0)
     for (let i = 0; i <= savedCanvasInfoRef.current["latestOp"]; i++){
-      updateCanvas(savedCanvasInfoRef.current["operations"][i])
+      await updateCanvas(savedCanvasInfoRef.current["operations"][i], canvas)
+
+      //used when operations list is full in handleCanvasAction
+      if (snapshot && i == 4){
+        snapshot.getContext("2d").drawImage(canvas, 0, 0)
+      }
     }
+    clear(canvasRef.current)
+    canvasRef.current.getContext("2d").drawImage(canvas, 0, 0)
   }
 
   async function handleCanvasAction(data, client = false){
@@ -125,7 +144,7 @@ function Whiteboard(){
     switch (data.type){ 
       case "undo":
         state["latestOp"] -= 1
-        redrawCanvas()
+        rebuildCanvas()
         break
       case "redo":
         state["latestOp"] += 1
@@ -143,22 +162,28 @@ function Whiteboard(){
         state["operations"].push(data)
 
         if (state["operations"].length > 10){
-          cxtRef.current.putImageData(state["snapshot"], 0, 0)
-          for (let i = 0; i <= state["latestOp"]; i++){
-            await updateCanvas(state["operations"][i])
-            if (i == 4){
-              state["snapshot"] = cxtRef.current.getImageData(0,0,canvasRef.current.width, canvasRef.current.height)
-            }
-          }
+          const snapshot = document.createElement("canvas")
+          snapshot.width = 1000
+          snapshot.height = 1000
+          await rebuildCanvas(snapshot)
+          state["snapshot"] = snapshot
+
           state["operations"] = state["operations"].slice(5)
           state["latestOp"] = 5
           return
         }
-        !client && updateCanvas(data)
+
+        !client && await updateCanvas(data)
         
     }
   }
-  async function updateCanvas(data){
+  async function updateCanvas(data, falseCanvas=null){
+    let canvas = canvasRef.current
+    let cxt = canvasRef.current.getContext("2d")
+    if (falseCanvas){
+      canvas = falseCanvas
+      cxt = falseCanvas.getContext("2d")
+    }
     const mapActions = {
       "isErasing": "erase",
       "doneErasing": "erase",
@@ -167,30 +192,35 @@ function Whiteboard(){
     }
 
     const action = data.type in mapActions ? mapActions[data.type] : data.type
-    const storeOp = cxtRef.current.globalCompositeOperation 
+    const storeOp = cxt.globalCompositeOperation 
     switch (action){
       case "draw":
         draw(data["data"], hiddenCanvasRef.current, data["metadata"])
 
-        cxtRef.current.globalCompositeOperation = "source-over"
-        cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
-        cxtRef.current.globalCompositeOperation = storeOp
+        cxt.globalCompositeOperation = "source-over"
+        cxt.drawImage(hiddenCanvasRef.current,0,0)
+        cxt.globalCompositeOperation = storeOp
         break
       case "erase":
         draw(data["data"], hiddenCanvasRef.current, data["metadata"])
 
-        cxtRef.current.globalCompositeOperation = "destination-out"
-        cxtRef.current.drawImage(hiddenCanvasRef.current,0,0)
-        cxtRef.current.globalCompositeOperation = storeOp
+        cxt.globalCompositeOperation = "destination-out"
+        cxt.drawImage(hiddenCanvasRef.current,0,0)
+        cxt.globalCompositeOperation = storeOp
         break
       case "fill":
-        fill(data["data"], canvasRef.current, data["metadata"]["color"])
+        fill(data["data"], canvas, data["metadata"]["color"])
         break
       case "clear":
-        clear(canvasRef.current)
+        clear(canvas)
         break
       case "import": 
-        await importImage(data["data"], canvasRef.current, data["metadata"]["anchor"])
+        const img = new Image()
+        await new Promise(resolve => {
+          img.onload = resolve
+          img.src = data["data"]
+        })
+        importImage(img, canvas, data["metadata"]["anchor"])
         break
     }
     clear(hiddenCanvasRef.current)
@@ -280,8 +310,9 @@ function Whiteboard(){
     function onReleaseStroke(e){
       requestAnimationFrame(()=>{
         cancelBatchSend()
-        cxtRef.current.lineTo(...last)
-        cxtRef.current.stroke()
+        const cxt = canvasRef.current.getContext("2d")
+        cxt.lineTo(...last)
+        cxt.stroke()
         sendStroke()
       })
 
@@ -299,7 +330,7 @@ function Whiteboard(){
     const pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
 
     if (canvasInfo.current["type"] === "colorpick"){
-        const color = cxtRef.current.getImageData(pos[0], pos[1],1,1).data
+        const color = canvasRef.current.getContext("2d").getImageData(pos[0], pos[1],1,1).data
         const formattedColor = `rgba(${color[0]},${color[1]},${color[2]},${255})`
         changeColor(formattedColor)
         return
@@ -318,39 +349,48 @@ function Whiteboard(){
   }
 
   async function processImport(e){
+    if (e.target.files[0] >  1024 * 1024){
+      setImportErrorMsg("The imported image was too large (> 2 MB)")
+      setTimeout(()=>setImportErrorMsg(""),3000)
+      cancelImport()
+      return
+    }
     setIsImporting(true)
 
     const newCanvas = document.createElement("canvas")
     const url = URL.createObjectURL(e.target.files[0])
     const img = new Image()
-    img.src = url
-    img.onload = async () => {
-      newCanvas.width = img.width
-      newCanvas.height = img.height
-      newCanvas.getContext("2d").drawImage(img, 0, 0)
+    storeImportRef.current = new Promise(resolve=>{
+      img.onload = () => {
 
-      storeImportRef.current = new Promise(resolve => newCanvas.toBlob(resolve, "image/png"))
+        newCanvas.width = img.width
+        newCanvas.height = img.height
+        newCanvas.getContext("2d").drawImage(img, 0, 0)
 
-      URL.revokeObjectURL(url)
-    }
+        URL.revokeObjectURL(url)
+        resolve(newCanvas.toDataURL("image/png"))
+      }
+      img.src = url
+    })
+
   }
   async function completeImport() {
-    const canvasBlob = await storeImportRef.current
+    const canvasBase64 = await storeImportRef.current
+    if (!canvasBase64) return
+    
     const update = {
       "origin": "whiteboard",
       "username": username,
       "type": "import",
-      "data": canvasBlob,
+      "data": canvasBase64,
       "metadata": {"anchor": selectedAnchor}
     }
     sendJsonMessage(update)
     await handleCanvasAction(update)
-    setIsImporting(false)
-    setSelectedAnchor(null)
-    storeImportRef.current = null
+    cancelImport()
   }
 
-  function handleKeyPress(e){
+  function handleKeyPress(e){null
     if (e.repeat) return
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z"){
       redo()
@@ -409,6 +449,8 @@ function Whiteboard(){
     canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
   function undo(){
+    console.log(savedCanvasInfoRef.current, undoRedoTimer.current)
+
     if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] < 0){
       return
     }
@@ -485,6 +527,13 @@ function Whiteboard(){
     canvasInfo.current["color"] = color;
     setQueuedColors(prev=>[color,...prev].slice(0,8))
     setSelectedColor(color)
+  }
+
+  function cancelImport(){
+    setIsImporting(false)
+    setSelectedAnchor(null)
+    storeImportRef.current = null
+    importInputRef.current.value = ""
   }
   return (
     <div className={`${styles.whiteboardPage} ${darkMode ? styles.darkMode : ""}`} onKeyDown={handleKeyPress} tabIndex={0}>
@@ -611,7 +660,7 @@ function Whiteboard(){
           <span>This is where to place the image</span>
           <section>
             {Array.from({length:9}).map((_,i) => 
-            <span 
+            <span key={i}
             className={selectedAnchor === i+1 ? styles.anchor : ""}
             onClick={() => setSelectedAnchor(i+1)}
             >{i+1}</span>)}
@@ -626,10 +675,11 @@ function Whiteboard(){
           }
         </section>
         }
+        {importErrorMsg && <span className={styles.importErrorMsg}>{importErrorMsg}</span>}
         {previewURL && <span className={styles.screenshotPreview} ><img src={previewURL} alt="preview"/></span>}
       </div>
       }
     </div>
   )
 }
-export default Whiteboard
+export default memo(Whiteboard)

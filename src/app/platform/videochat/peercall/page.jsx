@@ -1,14 +1,20 @@
 "use client"
-
+import { memo, useContext, useEffect, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useContext, useEffect, useRef, useState } from "react"
 
-import ThemeContext from "src/assets/ThemeContext"
-import Animation from "src/components/Animation"
+import { UserContext, AppearanceContext, RoomContext, VideoChatContext, WebSocketContext, PeersContext } from "src/providers/contexts"
+import Animation from "src/components/Animation" 
 import styles from "styles/platform/PeerCall.module.css"
 
 function PeerCall(){
-    const { externalPeercallRef, userStates, username,sendJsonMessage, darkMode, setCallOffers, callOffersRef, stunCandidates  } = useContext(ThemeContext)
+    const {username} = useContext(UserContext)
+    const {darkMode} = useContext(AppearanceContext)
+    const {externalPeercallRef} = useContext(RoomContext)
+    const {userStates} = useContext(PeersContext)
+    const {setCallOffers, callOffersRef, stunCandidates} = useContext(VideoChatContext)
+    const {sendJsonMessage} = useContext(WebSocketContext)
+
+
     const searchParams = useSearchParams()
     const router = useRouter()
 
@@ -540,4 +546,4 @@ function PeerCall(){
         </div>
     )
 }
-export default PeerCall
+export default memo(PeerCall)

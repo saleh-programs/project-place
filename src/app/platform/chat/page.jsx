@@ -1,15 +1,21 @@
 "use client"
-import { useState, useContext, useEffect, useRef, useLayoutEffect } from "react"
-import ThemeContext from "src/assets/ThemeContext.js"
+import { memo, Fragment, useState, useContext, useEffect, useRef, useLayoutEffect } from "react"
+
+import { UserContext, AppearanceContext, RoomContext, PeersContext, WebSocketContext, ChatContext } from "src/providers/contexts"
 import Animation from "src/components/Animation"
 import FileViewer from "src/components/FileViewer"
-import { Fragment } from "react"
-
-import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
 import styles from "styles/platform/Chat.module.css"
+import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
+
 
 function Chat(){
-  const {externalChatRef, sendJsonMessage, roomID, roomIDRef, messagesRef, username, userInfo, userStates, setUserStates, siteHistoryRef, darkMode} = useContext(ThemeContext)
+  const {username} = useContext(UserContext)
+  const {darkMode} = useContext(AppearanceContext)
+  const {roomID, roomIDRef, externalChatRef, siteHistoryRef} = useContext(RoomContext)
+  const {userStates} = useContext(PeersContext)
+  const {messagesRef} = useContext(ChatContext)
+  const {sendJsonMessage} = useContext(WebSocketContext)
+
 
   const mainScrollableRef = useRef(null)
   const numMsgsAvailable = 30 // actual number of messages available - 1
@@ -762,4 +768,4 @@ function Chat(){
   )
 }
 
-export default Chat 
+export default memo(Chat) 
