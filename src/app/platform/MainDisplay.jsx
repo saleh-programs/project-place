@@ -1,207 +1,21 @@
 "use client"
-import * as mediasoupClient from "mediasoup-client"
-import {useLayoutEffect, useEffect, useRef, useState } from "react"
-import ThemeContext from "src/assets/ThemeContext"
-import useWebSocket from "react-use-websocket"
+import { useContext } from "react"
+import { useRouter } from "next/navigation"
 
+import { UserContext, PeersContext,AppearanceContext, RoomContext, VideoChatContext, WebSocketContext} from "src/providers/contexts"
 import styles from "styles/components/MainDisplay.module.css"
-import Sidebar from "src/components/Sidebar"
-import { useRouter, usePathname } from "next/navigation"
+import Sidebar from "src/components/sidebar/Sidebar"
 
-function MainDisplay({children, username, initialUserInfo}){
+
+function MainDisplay({children}){
+  const {username} = useContext(UserContext)
+  const {darkMode} = useContext(AppearanceContext)
+  const {roomID, setRoomID, roomName, setRoomName} = useContext(RoomContext)
+  const {setUserStates} = useContext(PeersContext)
+  const {callOffers, setCallOffers, callOffersRef} = useContext(VideoChatContext)
+  const {sendJsonMessage} = useContext(WebSocketContext)
+
   const router = useRouter()
-  
-  const [userInfo, setUserInfo] = useState(initialUserInfo)
-  const [roomID, setRoomID] = useState(()=>initialUserInfo["storedRoomID"] ? initialUserInfo["storedRoomID"] : "")
-  const [roomName, setRoomName] = useState(()=>initialUserInfo["storedRoomName"] ? initialUserInfo["storedRoomName"] : "")
-  const roomIDRef = useRef("")
-  const [userStates, setUserStates] = useState({})
-  
-  const [darkMode, setDarkMode] = useState(false)
-
-  const messagesRef= useRef([])
-  const savedCanvasInfoRef = useRef({
-    "snapshot": null,
-    "operations": [],
-    "latestOp": -1
-  })
-
-  const siteHistoryRef = useRef({
-    "chatHistoryReceived": false,
-    "canvasHistoryReceived": false,
-    "userHistoryReceived": false
-  })
-
-  const device = useRef(null)
-  const [callOffers, setCallOffers] = useState({})
-  const callOffersRef = useRef(callOffers)
-  const stunCandidates = useRef({})
-  
-  const externalChatRef = useRef((param1)=>{})
-  const externalWhiteboardRef = useRef((param1)=>{})
-  const externalGroupcallRef = useRef((param1)=>{})
-  const externalPeercallRef = useRef((param1)=>{})
-
-
-  const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
-    queryParams:{
-      "username": username,
-      "roomID": roomID
-    }, 
-    onMessage:(event)=>{
-      if (event.data instanceof Blob){
-        reconstructCanvas(event.data)
-        return
-      }
-
-      const data = JSON.parse(event.data)
-      switch (data.origin){
-        case "user":
-          updateUserStates(data)
-          break
-        case "chat":
-          if (data.type === "chatHistory"){
-            messagesRef.current = data.data
-            siteHistoryRef.current["chatHistoryReceived"] = true;
-          }else if (data.type === "newMessage"){ 
-            messagesRef.current.push(data.data)
-          }else if(data.type === "edit"){
-            messagesRef.current = messagesRef.current.map(msg => {
-              if (msg["metadata"]["messageID"] === data.data["messageID"]){
-                return {
-                  ...msg,
-                  "content": data.data["content"],
-                  "metadata": {...msg["metadata"], "edited": true}
-                }
-              }
-              return msg
-            })
-          }else if (data.type === "delete"){
-            messagesRef.current = messagesRef.current.filter(msg => {
-              return msg["metadata"]["messageID"] !== data.data["messageID"]
-            })
-          }
-          externalChatRef.current(data)
-          break
-        case "whiteboard":
-          externalWhiteboardRef.current(data)
-          break
-        case "groupcall":
-          if (data.type === "setup"){
-            const {routerRtpCapabilities} = data.data
-            device.current = new mediasoupClient.Device()
-            device.current.load({routerRtpCapabilities})
-            break
-          }
-          externalGroupcallRef.current(data)
-          break
-        case "peercall":
-          if (data.type === "callRequest"){
-            callOffersRef.current[data["username"]] = data.data["offer"]
-            setCallOffers({...callOffersRef.current})
-          }
-          if (data.type === "disconnect" && callOffersRef.current.hasOwnProperty(data["username"])){
-            delete callOffersRef.current[data["username"]]
-            setCallOffers({...callOffersRef.current})
-
-            if (stunCandidates.current.hasOwnProperty(data["username"])){
-              delete stunCandidates.current[data["username"]]
-            }
-          }
-
-          if (data.type === "stunCandidate"){
-              if (!stunCandidates.current.hasOwnProperty(data["username"])){
-                stunCandidates.current[data["username"]] = [data.data["candidate"]]
-              }else{
-                stunCandidates.current[data["username"]].push(data.data["candidate"])
-              }
-          }
-          externalPeercallRef.current(data)
-          break
-      }
-    }
-  },roomID !== "")
-  
-  const shared = {
-    siteHistoryRef ,username,userInfo, setUserInfo, userStates, setUserStates, setDarkMode, darkMode,
-    sendJsonMessage, savedCanvasInfoRef, device, callOffers, setCallOffers, callOffersRef, stunCandidates,
-    externalWhiteboardRef,externalChatRef, externalGroupcallRef, externalPeercallRef,
-    roomID, setRoomID, roomIDRef, roomName, setRoomName,
-    messagesRef
-  }
-
-  useEffect(()=>{
-    roomIDRef.current = roomID
-    document.cookie = `roomID=${roomID}; path=/`
-    document.cookie = `roomName=${roomName}; path=/`
-  },[roomID, roomName])
-
-  async function reconstructCanvas(data){
-    const canvasBuffer = await data.arrayBuffer()
-
-    const view = new DataView(canvasBuffer)
-    const opsLen = view.getUint32(0, false)
-
-    savedCanvasInfoRef.current["latestOp"] = view.getInt8(4)
-    savedCanvasInfoRef.current["operations"] = JSON.parse(new TextDecoder().decode(canvasBuffer.slice(5,5+opsLen)))
-
-    const img = await createImageBitmap(new Blob([canvasBuffer.slice(5+opsLen)], {"type": "image/png"}))
-    
-    const tempCanvas = Object.assign(document.createElement("canvas"), {"width":1000, "height":1000})
-    const tempCxt = tempCanvas.getContext("2d")
-    tempCxt.drawImage(img, 0, 0)
-    savedCanvasInfoRef.current["snapshot"] = tempCxt.getImageData(0,0,1000,1000)
-    img.close()
-
-    externalWhiteboardRef.current("canvasReceived")
-    siteHistoryRef.current["canvasHistoryReceived"] = true;
-  }
-
-
-  function updateUserStates(data){
-    switch (data.type){
-      case "newUser":
-        setUserStates(prev => {
-          return ({
-            ...prev, 
-            [data["username"]]: {
-                "avatar": `http://localhost:5000/users/images/${data["username"]}`,
-                "status": "idle",
-                "location": "chat"
-            }})
-        })
-        break
-      case "userInfo":
-        setUserStates(prev => {
-          console.log(prev)
-          return ({
-            ...prev, 
-            [data["username"]]: {
-                ...prev[data["username"]],
-                ...data["data"]
-            }})
-        })
-        break
-      case "getUsers":
-        const users = {
-          [username]: {
-            "avatar": initialUserInfo["avatar"],
-            "status": "idle",
-            "location": "chat"
-          }
-        }
-        data["data"].forEach(user => {
-           users[user] = {
-            "avatar": `http://localhost:5000/users/images/${user}`,
-            "status": "idle",
-            "location": "chat"          
-          }
-        })
-        setUserStates(users)
-        siteHistoryRef.current["userHistoryReceived"] = true;
-        break
-    }
-  }
 
   function rejectCall(peerName) {
       sendJsonMessage({
@@ -213,19 +27,18 @@ function MainDisplay({children, username, initialUserInfo}){
       delete callOffersRef.current[peerName]
       setCallOffers({...callOffersRef.current})
   }
+
   return(
-    <ThemeContext.Provider value={shared}>
       <div className={styles.columnWrapper}>
         {roomID && 
           <h1 className={darkMode ? styles.darkMode : ""}>
             <span>{roomID}</span>
             <span>"{roomName}"</span>
             <button onClick={()=>{setRoomID("");setRoomName("");setUserStates({});}}>Leave Room</button>
-
           </h1>
         }
         <div className={styles.siteWrapper}>
-          <Sidebar {...{userStates, sendJsonMessage, username}}/>
+          <Sidebar/>
           <div className={styles.pageContainer} style={roomID === "" ? {boxShadow: "10px 10px 90px black inset",opacity: ".5"} : {}}>
             {children}
             {Object.keys(callOffers).map((name) => {
@@ -240,8 +53,8 @@ function MainDisplay({children, username, initialUserInfo}){
           </div>
         </div>
       </div>
-    </ThemeContext.Provider>
   ) 
 }
+
 
 export default MainDisplay

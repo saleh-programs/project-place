@@ -1,8 +1,9 @@
-import MainDisplay from "./MainDisplay"
-import { getUserInfoReq } from "../../../backend/requests"
-
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
+
+import MainDisplay from "./MainDisplay"
+import { getUserInfoReq } from "backend/requests"
+import AllProviders from "src/providers/00_AllProviders"
 
 async function PlatformLayout({ children }) {
 
@@ -26,9 +27,11 @@ async function PlatformLayout({ children }) {
     redirect(`/accountsetup`) 
   } 
   return (
-    <MainDisplay {...{username, initialUserInfo}}>
-      {children}
-    </MainDisplay>
+    <AllProviders initialUserInfo={initialUserInfo}>
+      <MainDisplay>
+        {children}
+      </MainDisplay>
+    </AllProviders>
   )
 }
 
