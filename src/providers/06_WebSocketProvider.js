@@ -8,8 +8,8 @@ import { WebSocketContext, UserContext, RoomContext, PeersContext, ChatContext, 
 
 function WebSocketProvider({children}){  
     const {username} = useContext(UserContext)
-    const {updateUserStates} = useContext(PeersContext)
-    const {roomID, siteHistoryRef, externalChatRef, externalGroupcallRef, externalPeercallRef, externalWhiteboardRef} = useContext(RoomContext)
+    const {setUserStates, updateUserStates} = useContext(PeersContext)
+    const {roomID, setRoomID, setRoomName, siteHistoryRef, externalChatRef, externalGroupcallRef, externalPeercallRef, externalWhiteboardRef} = useContext(RoomContext)
     const {messagesRef} = useContext(ChatContext)
     const {reconstructCanvas} = useContext(WhiteboardContext)
     const {callOffersRef, setCallOffers, device, stunCandidates} = useContext(VideoChatContext)
@@ -90,6 +90,14 @@ function WebSocketProvider({children}){
             externalPeercallRef.current(data)
             break
         }
+    },
+    onOpen: () => {console.log("connected")},
+    shouldReconnect: () => {
+        console.log("disconnected")
+        setRoomID("")
+        setRoomName("")
+        setUserStates({})
+        return true
     }
     }, roomID !== "")
 

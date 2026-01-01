@@ -117,7 +117,7 @@ function Whiteboard(){
     handleCanvasAction(data)
   }
 
-  async function rebuildCanvas(snapshot = null) {
+  async function rebuildCanvas(updateSnapshot = false) {
     if (!savedCanvasInfoRef.current["snapshot"]){
       return
     }
@@ -131,10 +131,14 @@ function Whiteboard(){
       await updateCanvas(savedCanvasInfoRef.current["operations"][i], canvas)
 
       //used when operations list is full in handleCanvasAction
-      if (snapshot && i == 4){
-        snapshot.getContext("2d").drawImage(canvas, 0, 0)
+      if (updateSnapshot && i == 4){
+        clear(savedCanvasInfoRef.current["snapshot"])
+        savedCanvasInfoRef.current["snapshot"].getContext("2d").drawImage(canvas, 0, 0)
       }
     }
+    
+    const cxt = canvasRef.current.getContext("2d")
+    cxt.globalCompositeOperation = "source-over"
     clear(canvasRef.current)
     canvasRef.current.getContext("2d").drawImage(canvas, 0, 0)
   }
@@ -144,17 +148,17 @@ function Whiteboard(){
     switch (data.type){ 
       case "undo":
         state["latestOp"] -= 1
-        rebuildCanvas()
+        await rebuildCanvas()
         break
       case "redo":
         state["latestOp"] += 1
-        updateCanvas(state["operations"][state["latestOp"]])
+        await updateCanvas(state["operations"][state["latestOp"]])
         break
       case "isDrawing":
-        updateCanvas(data)
+        await updateCanvas(data)
         break
       case "isErasing":
-        updateCanvas(data)
+        await updateCanvas(data)
         break
       default:
         state["latestOp"] += 1
@@ -162,11 +166,8 @@ function Whiteboard(){
         state["operations"].push(data)
 
         if (state["operations"].length > 10){
-          const snapshot = document.createElement("canvas")
-          snapshot.width = 1000
-          snapshot.height = 1000
-          await rebuildCanvas(snapshot)
-          state["snapshot"] = snapshot
+          console.log("fired")
+          await rebuildCanvas(true)
 
           state["operations"] = state["operations"].slice(5)
           state["latestOp"] = 5
@@ -174,7 +175,6 @@ function Whiteboard(){
         }
 
         !client && await updateCanvas(data)
-        
     }
   }
   async function updateCanvas(data, falseCanvas=null){
@@ -248,7 +248,7 @@ function Whiteboard(){
     strokes.current["batchStroke"] = []
   }
 
-  function sendStroke(){
+  async function sendStroke(){
     if (strokes.current["fullStroke"].length === 0){
       return
     }
@@ -265,7 +265,7 @@ function Whiteboard(){
       }
     }
     sendJsonMessage(update)
-    handleCanvasAction(update, true)
+    await handleCanvasAction(update, true)
     strokes.current["fullStroke"] = []
   }
 
@@ -293,18 +293,18 @@ function Whiteboard(){
     let last = pos;
     function onMoveStroke(e){
       pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
-      if(done){
-        return
-      }
+      // if(done){
+      //   return
+      // }
       done = true
-      requestAnimationFrame(()=>{
+      // requestAnimationFrame(()=>{
         draw([pos], canvasRef.current, {persistent: true, prev: last})
         strokes.current["batchStroke"].push(pos)
         strokes.current["fullStroke"].push(pos)
         sendBatchStrokesThrottled()   
         last = pos
         done = false
-      })  
+      // })  
     }     
 
     function onReleaseStroke(e){
@@ -322,7 +322,8 @@ function Whiteboard(){
     canvasRef.current.addEventListener("mousemove", onMoveStroke)
     document.addEventListener("mouseup", onReleaseStroke)
   }
-  function clickCanvas(e){
+
+  async function clickCanvas(e){
     if (!["fill", "colorpick"].includes(canvasInfo.current?.["type"]) || !canvasRef.current) {
       return
     }
@@ -345,10 +346,10 @@ function Whiteboard(){
       }
     }
     sendJsonMessage(update)
-    handleCanvasAction(update)
+    await handleCanvasAction(update)
   }
 
-  async function processImport(e){
+  function processImport(e){
     if (e.target.files[0] >  1024 * 1024){
       setImportErrorMsg("The imported image was too large (> 2 MB)")
       setTimeout(()=>setImportErrorMsg(""),3000)
@@ -372,7 +373,6 @@ function Whiteboard(){
       }
       img.src = url
     })
-
   }
   async function completeImport() {
     const canvasBase64 = await storeImportRef.current
@@ -390,7 +390,7 @@ function Whiteboard(){
     cancelImport()
   }
 
-  function handleKeyPress(e){null
+  function handleKeyPress(e){
     if (e.repeat) return
     if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z"){
       redo()
@@ -448,9 +448,7 @@ function Whiteboard(){
     canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
     canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
-  function undo(){
-    console.log(savedCanvasInfoRef.current, undoRedoTimer.current)
-
+  async function undo(){
     if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] < 0){
       return
     }
@@ -464,9 +462,9 @@ function Whiteboard(){
       "username": username,
     }
     sendJsonMessage(update)
-    handleCanvasAction(update)
+    await handleCanvasAction(update)
   }
-  function redo(){
+  async function redo(){
     if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] >= savedCanvasInfoRef.current["operations"].length-1){
       return
     }
@@ -479,7 +477,7 @@ function Whiteboard(){
       "username": username,
     }  
     sendJsonMessage(update)
-    handleCanvasAction(update)
+    await handleCanvasAction(update)
   } 
   async function capturePNG(){
     if (!canvasRef.current) return

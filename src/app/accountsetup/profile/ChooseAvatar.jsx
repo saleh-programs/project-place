@@ -1,6 +1,6 @@
 "use client"
 
-import styles from "styles/accountsetup/profile/ChooseAvatar.module.css"
+import styles from "styles/accountsetup/ChooseAvatar.module.css"
 import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"

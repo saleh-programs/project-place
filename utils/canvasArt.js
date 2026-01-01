@@ -135,7 +135,6 @@ function linefill([X,Y], canvas, color){
       }
       return matchesColor
   }
-
   while (!pixelQueue.isEmpty()){
     const [x, y] = pixelQueue.dequeue()
 
@@ -180,10 +179,11 @@ function linefill([X,Y], canvas, color){
       }
     }
   }
+
   cxt.putImageData(canvasImage,0,0)
 }
 
-async function importImage(img, canvas, anchor){
+function importImage(img, canvas, anchor){
 
   const row = Math.floor((anchor-1) / 3)
   const col = Math.floor((anchor-1) % 3)
@@ -198,8 +198,9 @@ async function importImage(img, canvas, anchor){
   if (col === 1) left = (canvas.width / 2 - img.width / 2 )
   if (col === 2) left = canvas.width - img.width
 
-
-  canvas.getContext("2d").drawImage(img, left, top)
+  const cxt = canvas.getContext("2d")
+  cxt.globalCompositeOperation = "source-over"
+  cxt.drawImage(img, left, top)
 }
 
 function timeFunction(func){

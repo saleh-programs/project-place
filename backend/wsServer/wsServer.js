@@ -63,7 +63,7 @@ wsServer.on("connection", async (connection, request)=>{
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
   const isMember = await validateRoomUserReq(roomID, username, token)
-  console.log(isMember)
+
   if (!isMember){
     connection.close()
     return
@@ -100,10 +100,9 @@ function handleClose(uuid){
 
 
   if (rooms[roomID]["users"].length === 0){
-    rooms[roomID]["whiteboard"]["canvas"].getContext("2d").putImageData(rooms[roomID]["whiteboard"]["snapshot"],0,0)
-    const savedCanvasBuffer = rooms[roomID]["whiteboard"]["canvas"].toBuffer("image/png")
+    const savedCanvasBuffer = rooms[roomID]["whiteboard"]["snapshot"].toBuffer("image/png")
     updateCanvasSnapshotReq(savedCanvasBuffer, roomID, token)
-    updateCanvasInstructionsReq(rooms[roomID]["operations"], roomID, token)
+    updateCanvasInstructionsReq(rooms[roomID]["whiteboard"]["operations"], roomID, token)
 
     rooms[roomID]["groupcall"]["router"].close()
     delete rooms[roomID]
@@ -150,12 +149,13 @@ async function processChat(data, uuid){
   } 
   broadcastAll(uuid, data, true);
 }
+
 function processWhiteboard(data, uuid){
   if (data["type"] === "getCanvas"){
     const roomCanvasInfo = rooms[users[uuid]["roomID"]]?.["whiteboard"]
     if (!roomCanvasInfo) return
     const tempCanvas = createCanvas(1000,1000)
-    tempCanvas.getContext("2d").putImageData(roomCanvasInfo["snapshot"],0,0)
+    tempCanvas.getContext("2d").drawImage(roomCanvasInfo["snapshot"],0,0)
 
     const opsBuffer = Buffer.from(JSON.stringify(roomCanvasInfo["operations"]))
     const canvasBuffer = tempCanvas.toBuffer("image/png")
@@ -407,10 +407,12 @@ async function sendServerInfo(uuid) {
   const [chatHistory, canvasSnapshot, canvasInstructions] = await Promise.all(roomHistories)
 
   if (initializing){
+    const snapshotCopy = createCanvas(1000, 1000)
+    snapshotCopy.getContext("2d").drawImage(snapshotCopy, 0, 0)
     rooms[roomID] = {
       "users": [uuid],
       "whiteboard": {
-        "snapshot": canvasSnapshot.getContext("2d").getImageData(0,0,canvasSnapshot.width, canvasSnapshot.height),
+        "snapshot": snapshotCopy,
         "canvas": canvasSnapshot,
         "operations": canvasInstructions,
         "latestOp": canvasInstructions.length - 1
@@ -512,12 +514,12 @@ async function handleCanvasAction(data, roomID){
   switch (data.type){
     case "undo":
       wbInfo["latestOp"] -= 1
-      wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"], 0, 0)
-      redrawCanvas(roomID)
+      wbInfo["canvas"].getContext("2d").drawImage(wbInfo["snapshot"], 0, 0)
+      await redrawCanvas(roomID)
       break
     case "redo":
       wbInfo["latestOp"] += 1
-      updateServerCanvas(wbInfo["operations"][wbInfo["latestOp"]], roomID)
+      await updateServerCanvas(wbInfo["operations"][wbInfo["latestOp"]], roomID)
       break
     default:
       wbInfo["latestOp"] += 1
@@ -525,17 +527,19 @@ async function handleCanvasAction(data, roomID){
       wbInfo["operations"].push(data)
 
       if (wbInfo["operations"].length > 10){
-        wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"], 0, 0)
+        clear(wbInfo["canvas"])
+        wbInfo["canvas"].getContext("2d").drawImage(wbInfo["snapshot"], 0, 0)
         for (let i = 0; i <= wbInfo["latestOp"]; i++){
           await updateServerCanvas(wbInfo["operations"][i], roomID)
           if (i == 4){
-            wbInfo["snapshot"] = wbInfo["canvas"].getContext("2d").getImageData(0,0,wbInfo["canvas"].width, wbInfo["canvas"].height)
+            clear(wbInfo["snapshot"])
+            wbInfo["snapshot"].getContext("2d").drawImage(wbInfo["canvas"], 0, 0)
           }
         }
         wbInfo["operations"] = wbInfo["operations"].slice(5)
         wbInfo["latestOp"] = 5
       }else{
-          updateServerCanvas(data, roomID)
+          await updateServerCanvas(data, roomID)
       }
   }
 }
@@ -543,7 +547,8 @@ async function handleCanvasAction(data, roomID){
 async function redrawCanvas(roomID){
   const wbInfo = rooms[roomID]["whiteboard"]
 
-  wbInfo["canvas"].getContext("2d").putImageData(wbInfo["snapshot"],0,0)
+  clear(wbInfo["canvas"])
+  wbInfo["canvas"].getContext("2d").drawImage(wbInfo["snapshot"],0,0)
   for (let i = 0; i <= wbInfo["latestOp"]; i++){
     await updateServerCanvas(wbInfo["operations"][i], roomID)
   }
