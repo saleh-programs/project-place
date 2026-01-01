@@ -9,7 +9,7 @@ import styles from "styles/components/AccountHub.module.css"
 
 function AccountHub(){
   const {username, userInfo} = useContext(UserContext)
-  const {darkMode} = useContext(AppearanceContext)
+  const {darkMode, setDarkMode} = useContext(AppearanceContext)
 
   const [isCreatingRoom, setIsCreatingRoom] = useState(false)
   const [isLoadingRoom, setIsLoadingRoom] = useState(false)

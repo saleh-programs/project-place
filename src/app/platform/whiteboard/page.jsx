@@ -4,7 +4,7 @@ import { HexColorPicker } from "react-colorful"
 
 import { UserContext, AppearanceContext, RoomContext, WhiteboardContext, WebSocketContext } from "src/providers/contexts"
 import Animation from "src/components/Animation"
-import { draw, linefill as fill, clear, importImage } from "utils/canvasArt.js"
+import { draw, linefill as fill, clear, importImage, moveArea } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 
 import styles from "styles/platform/Whiteboard.module.css"
@@ -54,7 +54,8 @@ function Whiteboard(){
   const [selectingState, setSelectingState] = useState("off")
   const selectAreaRef = useRef(null)
   const selectedRegion = useRef(null)
-  
+  const mouseDownTimeRef = useRef(null)
+
   const [isImporting, setIsImporting] = useState(false)
   const storeImportRef = useRef(null)
   const importInputRef = useRef(null)
@@ -108,7 +109,7 @@ function Whiteboard(){
   },[roomID])
 
   useLayoutEffect(()=>{
-    // canvasRef.current && zoom("out")
+    canvasRef.current && zoom("out")
   },[roomID])  
 
   useEffect(()=>{
@@ -282,19 +283,28 @@ function Whiteboard(){
   }
 
   function handleCanvasMouseDown(e){
-    if (["draw", "erase"].includes(canvasInfo.current["type"]) && event.button !== 1){
+    if (["draw", "erase"].includes(canvasInfo.current["type"]) && e.button !== 1){
       startStroke(e)
       return
     }
-    if (canvasInfo.current["type"] === "select"){
-      startSelect(e)
-      return
-    }
   }
+  
   function startSelect(event){
-    if (!canvasRef.current || selectingState === "full"){
+    if (!canvasRef.current || selectAreaRef.current?.matches(":hover") || selectingState === "full"){
       return
     }
+    if (selectedRegion.current){
+      if (selectAreaRef.current){
+        selectAreaRef.current.style.width = "0"
+        selectAreaRef.current.style.height = "0"
+        clear(selectAreaRef.current)
+      }
+      
+      clearInterval(selectedRegion.current["regionUpdateInterval"])
+      selectedRegion.current = null
+    }
+
+    const container = event.currentTarget
     const rect = canvasRef.current.getBoundingClientRect()
     const startPoint = [Math.round((event.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((event.clientY - rect.top)/ canvasInfo.current["scale"])]
     setSelectingState("on")
@@ -321,20 +331,22 @@ function Whiteboard(){
 
     function onReleaseSelect(){
       setSelectingState("empty")
-      canvasRef.current.removeEventListener("mousemove", onMoveSelect)
+      container.removeEventListener("mousemove", onMoveSelect)
       document.removeEventListener("mouseup", onReleaseSelect) 
     } 
-    canvasRef.current.addEventListener("mousemove", onMoveSelect)
+
+    container.addEventListener("mousemove", onMoveSelect)
     document.addEventListener("mouseup", onReleaseSelect)
   }
 
   function moveSelectedArea(event){
     if (!canvasRef.current) return
 
-    setSelectingState("full")
+    setSelectingState("empty")
     const canvasRect = canvasRef.current.getBoundingClientRect()
     const selectRect = selectAreaRef.current.getBoundingClientRect()
     const startPoint = [Math.round((event.clientX - canvasRect.left) / canvasInfo.current["scale"]), Math.round((event.clientY - canvasRect.top) / canvasInfo.current["scale"])]
+    
     const currentTop = Math.round((selectRect.top - canvasRect.top) / canvasInfo.current["scale"])
     const currentLeft = Math.round((selectRect.left - canvasRect.left) / canvasInfo.current["scale"])
     const currentWidth = Math.round(selectRect.width / canvasInfo.current["scale"])
@@ -348,17 +360,27 @@ function Whiteboard(){
         canvasRef.current, currentLeft, currentTop, currentWidth, currentHeight,
         0, 0, currentWidth,currentHeight
       )
-      selectedRegion.current = [currentLeft, currentTop, currentWidth, currentHeight]
-      setInterval(() => {
-
+      selectedRegion.current = {
+        "region": [currentLeft, currentTop, currentWidth, currentHeight],
+        "regionUpdateInterval": null
+      }
+      const id = setInterval(() => {
+        if (!selectAreaRef.current || !canvasRef.current){
+          clearInterval(id)
+          return
+        }
+        clear(selectAreaRef.current)
+        cxt.drawImage(
+          canvasRef.current, currentLeft, currentTop, currentWidth, currentHeight,
+          0, 0, currentWidth,currentHeight
+        )
       }, 1000)
+      selectedRegion.current["regionUpdateInterval"] = id
     }
 
     
     let done = false
     function onMoveDrag(e){
-    console.log("je")
-
       if (done) return
       done = true
       requestAnimationFrame(()=>{
@@ -373,15 +395,34 @@ function Whiteboard(){
     }
 
     function onReleaseDrag(){
+      setSelectingState("full")
       document.removeEventListener("mousemove", onMoveDrag)
       document.removeEventListener("mouseup", onReleaseDrag) 
     } 
     document.addEventListener("mousemove", onMoveDrag)
     document.addEventListener("mouseup", onReleaseDrag)
   }
-  function moveToSelectedArea(event){
 
+  function moveToSelectedArea(){
+    if (!selectedRegion.current) return
+    clearInterval(selectedRegion.current["regionUpdateInterval"])
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const selectRect = selectAreaRef.current.getBoundingClientRect()
+    
+    const currentTop = Math.round((selectRect.top - canvasRect.top) / canvasInfo.current["scale"])
+    const currentLeft = Math.round((selectRect.left - canvasRect.left) / canvasInfo.current["scale"])
+    const currentWidth = Math.round(selectRect.width / canvasInfo.current["scale"])
+    const currentHeight = Math.round(selectRect.height / canvasInfo.current["scale"])
+
+    const storedRegion = Object.assign(document.createElement("canvas"), {width: currentWidth, height: currentHeight})
+    canvasRef.current.getContext("2d").globalCompositeOperation = "source-over"
+    storedRegion.getContext("2d").drawImage(canvasRef.current, ...selectedRegion.current["region"], 0, 0, currentWidth, currentHeight)
+
+    moveArea(canvasRef.current, storedRegion, selectedRegion.current["region"], [currentLeft, currentTop, currentWidth, currentHeight])
+    setSelectingState("off")
   }
+
+
   function startStroke(event){
     const rect = canvasRef.current.getBoundingClientRect()
     const startPoint = [Math.round((event.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((event.clientY - rect.top)/ canvasInfo.current["scale"])]
@@ -433,10 +474,11 @@ function Whiteboard(){
     document.addEventListener("mouseup", onReleaseStroke)
   }
 
-  async function clickCanvas(e){
+  async function handleCanvasClick(e){
     if (!canvasRef.current) {
       return
     }
+
     const rect = canvasRef.current.getBoundingClientRect()
     const pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
     if (canvasInfo.current?.["type"] === "fill"){
@@ -459,17 +501,19 @@ function Whiteboard(){
       changeColor(formattedColor)
       return
     }
-    if (canvasInfo.current?.["type"] === "select"){
+  }
+
+  async function handleContainerClick(e) {
+    if (!canvasInfo.current || !mouseDownTimeRef.current) return
+    if (mouseDownTimeRef.current[0] !== e.clientX || mouseDownTimeRef.current[1] !== e.clientY) return
+    
+    if (canvasInfo.current["type"] === "select"){
       setSelectingState("off")
       if (selectingState === "full"){
         moveToSelectedArea()
       }
       return
     }
-
-
-
-
   }
 
   function processImport(e){
@@ -525,8 +569,22 @@ function Whiteboard(){
     }
   }
 
+  function handleContainerMouseDown(e){
+    if (!canvasInfo.current) return
+    mouseDownTimeRef.current = [e.clientX, e.clientY]
+
+    if (canvasInfo.current["type"] === "navigate"){
+      navigate(e)
+      return
+    }
+    if (canvasInfo.current["type"] === "select"){
+      startSelect(e)
+      return
+    }
+
+  }
   function navigate(e){
-    if (canvasInfo.current["type"] !== "navigate" && e.button !== 1){
+    if (e.button !== 1){
       return
     }
     const containerRect = e.currentTarget.getBoundingClientRect()
@@ -664,20 +722,31 @@ function Whiteboard(){
       {roomID &&
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
-          <div className={styles.whiteboardScrollable} onMouseDown={navigate}>
+          <div className={styles.whiteboardScrollable} 
+          onMouseDown={handleContainerMouseDown}
+          onClick={handleContainerClick}>
             <span ref={transformedCanvasViewRef} className={styles.transformedCanvasView}>
                 <canvas 
                 ref={canvasRef} 
                 width={1000} 
                 height={1000}
                 onMouseDown={handleCanvasMouseDown}
-                onClick={clickCanvas}
+                onClick={handleCanvasClick}
                 />
                 {selectingState !== "off" && 
-                <canvas 
-                ref={selectAreaRef} 
-                className={`${styles.selectArea} ${selectingState !== "on" ? styles.fixed : ""}`}
-                onMouseDown={moveSelectedArea}/>}
+                <span>
+                  <canvas 
+                  ref={selectAreaRef} 
+                  className={`${styles.selectArea} ${selectingState !== "on" ? styles.fixed : ""}`}
+                  onMouseDown={moveSelectedArea}/>
+                  {selectingState === "full" &&
+                  <span>
+                    <button>Move</button>
+                    <button>Cancel</button>
+                  </span>
+                  }
+                </span>
+                }
             </span>
             <span style={{backgroundColor: selectedColor}} className={styles.selectedColor} onClick={(e)=>{
               setIsSelectingColor(true)
