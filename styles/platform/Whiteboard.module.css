@@ -54,7 +54,7 @@
 }
 
 
-.whiteboardScrollable canvas{
+.transformedCanvasView{
   background-color: white;
   transform-origin: center;
   border-radius: 5px;
@@ -63,6 +63,18 @@
   left: 50%;
   transform: translate(-50%,-50%);
 }
+
+.selectArea{ 
+  position: absolute;
+  border: 2px dotted;
+  pointer-events: none;
+  opacity: .5;
+  &.fixed{
+    pointer-events: auto;
+    animation: offsetDashes .5s linear infinite;
+  }
+}
+
 .quickToolbar{
   position: absolute;
   top: 0;
@@ -315,4 +327,12 @@
 
   color: red;
   font-size: 1.5rem;
+}
+
+
+@keyframes offsetDashes{
+  to{
+    border: 4px dotted;
+  }
+
 }

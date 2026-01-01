@@ -19,6 +19,7 @@ function Whiteboard(){
 
   const canvasRef = useRef(null)
   const hiddenCanvasRef = useRef(null)
+  const transformedCanvasViewRef = useRef(null)
 
   const undoRedoTimer = useRef(null)
 
@@ -45,10 +46,14 @@ function Whiteboard(){
   const [queuedColors, setQueuedColors] = useState([])
   const [selectedTool, setSelectedTool] = useState("draw") 
   const [selectedColor, setSelectedColor] = useState("black")
-  const [isSelecting, setIsSelecting] = useState(false)
+  const [isSelectingColor, setIsSelectingColor] = useState(false)
   const pixelInputsRef = useRef(null)
   const colorSelectorRef = useRef(null)
   const [previewURL, setPreviewURL] = useState(null)
+
+  const [selectingState, setSelectingState] = useState("off")
+  const selectAreaRef = useRef(null)
+  const selectedRegion = useRef(null)
   
   const [isImporting, setIsImporting] = useState(false)
   const storeImportRef = useRef(null)
@@ -61,7 +66,7 @@ function Whiteboard(){
 
     const exitPicker = (e) => {
       if (colorSelectorRef.current && !colorSelectorRef.current.contains(e.target)){
-        setIsSelecting(false)
+        setIsSelectingColor(false)
         setSelectedColor(canvasInfo.current["selectingColor"])
         changeColor(canvasInfo.current["selectingColor"])
         return
@@ -103,8 +108,15 @@ function Whiteboard(){
   },[roomID])
 
   useLayoutEffect(()=>{
-    canvasRef.current && zoom("out")
+    // canvasRef.current && zoom("out")
   },[roomID])  
+
+  useEffect(()=>{
+    if (selectedTool !== "select" && selectingState !== "off"){
+      clear(selectAreaRef.current)
+      setSelectingState("off")
+    }
+  },[selectedTool])
 
   function externalWhiteboard(data){
     /* when data.type differentiates canvas actions
@@ -269,10 +281,108 @@ function Whiteboard(){
     strokes.current["fullStroke"] = []
   }
 
-  function startStroke(event){
-    if (!["draw", "erase"].includes(canvasInfo.current["type"]) || event.button === 1){
+  function handleCanvasMouseDown(e){
+    if (["draw", "erase"].includes(canvasInfo.current["type"]) && event.button !== 1){
+      startStroke(e)
       return
     }
+    if (canvasInfo.current["type"] === "select"){
+      startSelect(e)
+      return
+    }
+  }
+  function startSelect(event){
+    if (!canvasRef.current || selectingState === "full"){
+      return
+    }
+    const rect = canvasRef.current.getBoundingClientRect()
+    const startPoint = [Math.round((event.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((event.clientY - rect.top)/ canvasInfo.current["scale"])]
+    setSelectingState("on")
+
+    let done = false
+    function onMoveSelect(e){
+      if (done) return
+      done = true
+      requestAnimationFrame(()=>{
+        if (!selectAreaRef.current) return
+
+        const pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
+        const width = Math.abs(startPoint[0] - pos[0])
+        const height = Math.abs(startPoint[1] - pos[1])
+        let left = startPoint[0] < pos[0] ? startPoint[0] : pos[0]
+        let top = startPoint[1] < pos[1] ? startPoint[1] : pos[1]
+        selectAreaRef.current.style.width = `${width}px`
+        selectAreaRef.current.style.height = `${height}px`
+        selectAreaRef.current.style.top = `${top}px`
+        selectAreaRef.current.style.left = `${left}px`
+        done = false
+      })
+    }
+
+    function onReleaseSelect(){
+      setSelectingState("empty")
+      canvasRef.current.removeEventListener("mousemove", onMoveSelect)
+      document.removeEventListener("mouseup", onReleaseSelect) 
+    } 
+    canvasRef.current.addEventListener("mousemove", onMoveSelect)
+    document.addEventListener("mouseup", onReleaseSelect)
+  }
+
+  function moveSelectedArea(event){
+    if (!canvasRef.current) return
+
+    setSelectingState("full")
+    const canvasRect = canvasRef.current.getBoundingClientRect()
+    const selectRect = selectAreaRef.current.getBoundingClientRect()
+    const startPoint = [Math.round((event.clientX - canvasRect.left) / canvasInfo.current["scale"]), Math.round((event.clientY - canvasRect.top) / canvasInfo.current["scale"])]
+    const currentTop = Math.round((selectRect.top - canvasRect.top) / canvasInfo.current["scale"])
+    const currentLeft = Math.round((selectRect.left - canvasRect.left) / canvasInfo.current["scale"])
+    const currentWidth = Math.round(selectRect.width / canvasInfo.current["scale"])
+    const currentHeight = Math.round(selectRect.height / canvasInfo.current["scale"])
+
+    if (selectingState !== "full"){
+      selectAreaRef.current.width = currentWidth
+      selectAreaRef.current.height = currentHeight
+      const cxt = selectAreaRef.current.getContext("2d")
+      cxt.drawImage(
+        canvasRef.current, currentLeft, currentTop, currentWidth, currentHeight,
+        0, 0, currentWidth,currentHeight
+      )
+      selectedRegion.current = [currentLeft, currentTop, currentWidth, currentHeight]
+      setInterval(() => {
+
+      }, 1000)
+    }
+
+    
+    let done = false
+    function onMoveDrag(e){
+    console.log("je")
+
+      if (done) return
+      done = true
+      requestAnimationFrame(()=>{
+        const pos = [Math.round((e.clientX - canvasRect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - canvasRect.top) / canvasInfo.current["scale"])]
+        const hortizontalOffset = startPoint[0] - pos[0]
+        const verticalOffset = startPoint[1] - pos[1]
+
+        selectAreaRef.current.style.top = `${currentTop - verticalOffset}px`
+        selectAreaRef.current.style.left = `${currentLeft - hortizontalOffset}px`
+        done = false
+      })
+    }
+
+    function onReleaseDrag(){
+      document.removeEventListener("mousemove", onMoveDrag)
+      document.removeEventListener("mouseup", onReleaseDrag) 
+    } 
+    document.addEventListener("mousemove", onMoveDrag)
+    document.addEventListener("mouseup", onReleaseDrag)
+  }
+  function moveToSelectedArea(event){
+
+  }
+  function startStroke(event){
     const rect = canvasRef.current.getBoundingClientRect()
     const startPoint = [Math.round((event.clientX - rect.left) / canvasInfo.current["scale"]),Math.round((event.clientY - rect.top)/ canvasInfo.current["scale"])]
     strokes.current = {
@@ -324,29 +434,42 @@ function Whiteboard(){
   }
 
   async function clickCanvas(e){
-    if (!["fill", "colorpick"].includes(canvasInfo.current?.["type"]) || !canvasRef.current) {
+    if (!canvasRef.current) {
       return
     }
     const rect = canvasRef.current.getBoundingClientRect()
     const pos = [Math.round((e.clientX - rect.left) / canvasInfo.current["scale"]), Math.round((e.clientY - rect.top) / canvasInfo.current["scale"])]
-
-    if (canvasInfo.current["type"] === "colorpick"){
-        const color = canvasRef.current.getContext("2d").getImageData(pos[0], pos[1],1,1).data
-        const formattedColor = `rgba(${color[0]},${color[1]},${color[2]},${255})`
-        changeColor(formattedColor)
-        return
-    }
-    const update = {
-      "origin": "whiteboard",
-      "type": "fill",
-      "username": username,
-      "data": pos,
-      "metadata":{
-        "color": canvasInfo.current["color"]
+    if (canvasInfo.current?.["type"] === "fill"){
+      const update = {
+        "origin": "whiteboard",
+        "type": "fill",
+        "username": username,
+        "data": pos,
+        "metadata":{
+          "color": canvasInfo.current["color"]
+        }
       }
+      sendJsonMessage(update)
+      await handleCanvasAction(update)
+      return
     }
-    sendJsonMessage(update)
-    await handleCanvasAction(update)
+    if (canvasInfo.current?.["type"] === "colorpick"){
+      const color = canvasRef.current.getContext("2d").getImageData(pos[0], pos[1],1,1).data
+      const formattedColor = `rgba(${color[0]},${color[1]},${color[2]},${255})`
+      changeColor(formattedColor)
+      return
+    }
+    if (canvasInfo.current?.["type"] === "select"){
+      setSelectingState("off")
+      if (selectingState === "full"){
+        moveToSelectedArea()
+      }
+      return
+    }
+
+
+
+
   }
 
   function processImport(e){
@@ -428,7 +551,7 @@ function Whiteboard(){
       if (withinVerticalBounds){
         newShiftY = shiftY + offset[1]
       }
-      canvasRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasInfo.current["scale"]})`;
+      transformedCanvasViewRef.current.style.transform = `translate(${newShiftX}px, ${newShiftY}px) scale(${canvasInfo.current["scale"]})`;
       canvasInfo.current["translateX"] = newShiftX
       canvasInfo.current["translateY"] = newShiftY
     }
@@ -446,7 +569,7 @@ function Whiteboard(){
   function zoom(type){
     const increment = type === "in" ? 0.2 :  -0.2
     canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
-    canvasRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
+    transformedCanvasViewRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
   async function undo(){
     if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] < 0){
@@ -542,24 +665,31 @@ function Whiteboard(){
       <div className={styles.mainContent}>
         <div className={styles.whiteboardContainer}>
           <div className={styles.whiteboardScrollable} onMouseDown={navigate}>
-              <canvas 
+            <span ref={transformedCanvasViewRef} className={styles.transformedCanvasView}>
+                <canvas 
                 ref={canvasRef} 
                 width={1000} 
                 height={1000}
-                onMouseDown={startStroke}
+                onMouseDown={handleCanvasMouseDown}
                 onClick={clickCanvas}
                 />
-                <span style={{backgroundColor: selectedColor}} className={styles.selectedColor} onClick={(e)=>{
-                  setIsSelecting(true)
-                }}>
-                  {isSelecting &&
-                  <span ref={colorSelectorRef}>
-                    <HexColorPicker color={"#000000"} onChange={(c)=>{
-                      canvasInfo.current["selectingColor"] = c;
-                      }}/>
-                  </span>
-                  }
-                </span>
+                {selectingState !== "off" && 
+                <canvas 
+                ref={selectAreaRef} 
+                className={`${styles.selectArea} ${selectingState !== "on" ? styles.fixed : ""}`}
+                onMouseDown={moveSelectedArea}/>}
+            </span>
+            <span style={{backgroundColor: selectedColor}} className={styles.selectedColor} onClick={(e)=>{
+              setIsSelectingColor(true)
+            }}>
+              {isSelectingColor &&
+              <span ref={colorSelectorRef}>
+                <HexColorPicker color={"#000000"} onChange={(c)=>{
+                  canvasInfo.current["selectingColor"] = c;
+                  }}/>
+              </span>
+              }
+            </span>
           </div>
           <section className={styles.quickToolbar}>
             <span className={styles.reverseButtons}>
@@ -615,6 +745,8 @@ function Whiteboard(){
             <button className={selectedTool === "fill" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "fill";setSelectedTool("fill")}}><img src="/tool_icons/fill.png" alt="fill" /></button>
             <button className={selectedTool === "colorpick" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "colorpick";setSelectedTool("colorpick")}}><img src="/tool_icons/colorpicker.png" alt="color picker" /></button>
             <button className={selectedTool === "navigate" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "navigate";setSelectedTool("navigate")}}><img src="/tool_icons/navigate.png" alt="draw" /></button>
+            <button className={selectedTool === "select" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "select";setSelectedTool("select")}}>select</button>
+
           </section>
           <section ref={pixelInputsRef} className={styles.pixelInput}>
             <input type="range" min={1} max={30} defaultValue={canvasInfo.current["lineWidth"]} onChange={changeLineWidth} />
