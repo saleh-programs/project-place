@@ -66,9 +66,10 @@
 
 .selectArea{ 
   position: absolute;
-  border: 2px dotted;
+  border: 1px dotted;
   pointer-events: none;
   opacity: .5;
+
   &.fixed{
     pointer-events: auto;
     animation: offsetDashes .5s linear infinite;
@@ -332,7 +333,7 @@
 
 @keyframes offsetDashes{
   to{
-    border: 4px dotted;
+    border: 3px dotted;
   }
 
 }

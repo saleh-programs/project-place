@@ -203,6 +203,14 @@ function importImage(img, canvas, anchor){
   cxt.drawImage(img, left, top)
 }
 
+function moveArea(canvas, storedRegion, region1, region2){
+  const cxt = canvas.getContext("2d")
+
+  cxt.globalCompositeOperation = "source-over"  
+  cxt.clearRect(...region1)
+  cxt.drawImage(storedRegion, ...region2)
+}
+
 function timeFunction(func){
   const t0 = performance.now()
   func()
@@ -214,4 +222,4 @@ function clear(canvas){
   canvas.getContext("2d").clearRect(0,0,canvas.width, canvas.height)
 }
 
-export {draw, floodFill, linefill, clear, importImage, timeFunction}
+export {draw, floodFill, linefill, clear, importImage, timeFunction, moveArea}
