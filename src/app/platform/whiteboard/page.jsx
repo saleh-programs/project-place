@@ -55,6 +55,8 @@ function Whiteboard(){
   const selectAreaRef = useRef(null)
   const selectedRegion = useRef(null)
   const mouseDownTimeRef = useRef(null)
+  const completeSelectionButtonsRef = useRef(null)
+  const [completeSelectionPos, setCompleteSelectionPos] = useState(null)
 
   const [isImporting, setIsImporting] = useState(false)
   const storeImportRef = useRef(null)
@@ -395,7 +397,16 @@ function Whiteboard(){
     }
 
     function onReleaseDrag(){
+      const canvasRect = canvasRef.current.getBoundingClientRect()
+      const selectRect = selectAreaRef.current.getBoundingClientRect()
+      
+      const currentTop = Math.round((selectRect.top - canvasRect.top) / canvasInfo.current["scale"])
+      const currentLeft = Math.round((selectRect.left - canvasRect.left) / canvasInfo.current["scale"])
+      const currentWidth = Math.round(selectRect.width / canvasInfo.current["scale"])
+      const currentHeight = Math.round(selectRect.height / canvasInfo.current["scale"])
+      setCompleteSelectionPos([`${currentLeft + Math.round(currentWidth/2)}px`,`${currentTop + currentHeight}px`])
       setSelectingState("full")
+
       document.removeEventListener("mousemove", onMoveDrag)
       document.removeEventListener("mouseup", onReleaseDrag) 
     } 
@@ -736,11 +747,14 @@ function Whiteboard(){
                 {selectingState !== "off" && 
                 <span>
                   <canvas 
-                  ref={selectAreaRef} 
-                  className={`${styles.selectArea} ${selectingState !== "on" ? styles.fixed : ""}`}
+                  ref={selectAreaRef}
+                  className={`${styles.selectArea} ${selectingState !== "on" ? styles.fixed : ""}`} 
                   onMouseDown={moveSelectedArea}/>
                   {selectingState === "full" &&
-                  <span>
+                  <span 
+                  className={styles.completeSelection} 
+                  ref={completeSelectionButtonsRef}
+                  style={{left: completeSelectionPos[0], top: completeSelectionPos[1]}}>
                     <button>Move</button>
                     <button>Cancel</button>
                   </span>
