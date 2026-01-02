@@ -6,7 +6,7 @@ import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq,getRoomUsersReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
-import { draw, linefill as fill, clear, importImage} from "../../utils/canvasArt.js"
+import { draw, linefill as fill, clear, importImage, moveArea} from "../../utils/canvasArt.js"
 import { writeFileSync } from "fs"
 import { buffer } from "stream/consumers"
 
@@ -572,6 +572,10 @@ async function updateServerCanvas(data, roomID){
     case "import":
       const img = await loadImage(data["data"])      
       importImage(img, mainCanvas, data["metadata"]["anchor"])
+      break
+    case "move":
+      const storedRegion = createCanvas(data["data"]["region1"][2], data["data"]["region2"][3])
+      moveArea(mainCanvas, storedRegion, data["data"]["region1"], data["data"]["region2"])
       break
   }
 }

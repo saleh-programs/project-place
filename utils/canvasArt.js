@@ -206,6 +206,9 @@ function importImage(img, canvas, anchor){
 function moveArea(canvas, storedRegion, region1, region2){
   const cxt = canvas.getContext("2d")
 
+  cxt.globalCompositeOperation = "source-over"
+  storedRegion.getContext("2d").drawImage(canvas, ...region1, 0, 0, region1[2], region1[3])
+
   cxt.globalCompositeOperation = "source-over"  
   cxt.clearRect(...region1)
   cxt.drawImage(storedRegion, ...region2)

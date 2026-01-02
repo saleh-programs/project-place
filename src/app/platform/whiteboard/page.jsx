@@ -206,7 +206,7 @@ function Whiteboard(){
       "doneDrawing": "draw"
     }
 
-    const action = data.type in mapActions ? mapActions[data.type] : data.type
+    const action = data["type"] in mapActions ? mapActions[data["type"]] : data.type
     const storeOp = cxt.globalCompositeOperation 
     switch (action){
       case "draw":
@@ -237,6 +237,11 @@ function Whiteboard(){
         })
         importImage(img, canvas, data["metadata"]["anchor"])
         break
+      case "move":
+        const storedRegion = Object.assign(document.createElement("canvas"), {width: data["data"]["region1"][2], height: data["data"]["region2"][3]})
+        moveArea(canvas, storedRegion, data["data"]["region1"], data["data"]["region2"])
+        break
+
     }
     clear(hiddenCanvasRef.current)
   }
@@ -414,7 +419,7 @@ function Whiteboard(){
     document.addEventListener("mouseup", onReleaseDrag)
   }
 
-  function moveToSelectedArea(){
+  async function moveToSelectedArea(){
     if (!selectedRegion.current) return
     clearInterval(selectedRegion.current["regionUpdateInterval"])
     const canvasRect = canvasRef.current.getBoundingClientRect()
@@ -425,11 +430,20 @@ function Whiteboard(){
     const currentWidth = Math.round(selectRect.width / canvasInfo.current["scale"])
     const currentHeight = Math.round(selectRect.height / canvasInfo.current["scale"])
 
-    const storedRegion = Object.assign(document.createElement("canvas"), {width: currentWidth, height: currentHeight})
-    canvasRef.current.getContext("2d").globalCompositeOperation = "source-over"
-    storedRegion.getContext("2d").drawImage(canvasRef.current, ...selectedRegion.current["region"], 0, 0, currentWidth, currentHeight)
 
-    moveArea(canvasRef.current, storedRegion, selectedRegion.current["region"], [currentLeft, currentTop, currentWidth, currentHeight])
+    console.log("exist")
+    // moveArea(canvasRef.current, storedRegion, selectedRegion.current["region"], [currentLeft, currentTop, currentWidth, currentHeight])
+    const update = {
+      "origin": "whiteboard",
+      "username": username,
+      "type": "move",
+      "data": {
+        "region1": selectedRegion.current["region"],
+        "region2": [currentLeft, currentTop, currentWidth, currentHeight]
+      }
+    }
+    sendJsonMessage(update)
+    await handleCanvasAction(update)
     setSelectingState("off")
   }
 
@@ -520,9 +534,6 @@ function Whiteboard(){
     
     if (canvasInfo.current["type"] === "select"){
       setSelectingState("off")
-      if (selectingState === "full"){
-        moveToSelectedArea()
-      }
       return
     }
   }
@@ -755,8 +766,8 @@ function Whiteboard(){
                   className={styles.completeSelection} 
                   ref={completeSelectionButtonsRef}
                   style={{left: completeSelectionPos[0], top: completeSelectionPos[1]}}>
-                    <button>Move</button>
-                    <button>Cancel</button>
+                    <button onClick={moveToSelectedArea}>Move</button>
+                    <button onClick={()=>setSelectingState("off")}>Cancel</button>
                   </span>
                   }
                 </span>
