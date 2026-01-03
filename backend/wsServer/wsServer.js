@@ -465,7 +465,7 @@ async function makeTransport(roomID) {
 }
 
 function broadcastAll(uuid, data, toSender=false){
-  rooms[users[uuid]["roomID"]]["users"].forEach(id =>{
+  rooms[users[uuid]["roomID"]]?.["users"]?.forEach(id =>{
     (id !== uuid || toSender) && connections[id].send(JSON.stringify(data))
   })
 }

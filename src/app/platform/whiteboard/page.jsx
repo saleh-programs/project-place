@@ -431,7 +431,6 @@ function Whiteboard(){
     const currentHeight = Math.round(selectRect.height / canvasInfo.current["scale"])
 
 
-    console.log("exist")
     // moveArea(canvasRef.current, storedRegion, selectedRegion.current["region"], [currentLeft, currentTop, currentWidth, currentHeight])
     const update = {
       "origin": "whiteboard",
@@ -606,7 +605,7 @@ function Whiteboard(){
 
   }
   function navigate(e){
-    if (e.button !== 1){
+    if (e.button === 1){
       return
     }
     const containerRect = e.currentTarget.getBoundingClientRect()

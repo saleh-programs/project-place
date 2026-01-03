@@ -92,7 +92,7 @@ function floodFill([X,Y], canvas, color){
 }
 
 function linefill([X,Y], canvas, color){
-  const cxt = canvas.getContext('2d')
+  const cxt = canvas.getContext('2d', {willReadFrequently: true})
   const startImage = cxt.getImageData(X, Y,1,1)
   const startColor = startImage.data
 
@@ -183,6 +183,7 @@ function linefill([X,Y], canvas, color){
   cxt.putImageData(canvasImage,0,0)
 }
 
+
 function importImage(img, canvas, anchor){
 
   const row = Math.floor((anchor-1) / 3)
@@ -218,6 +219,7 @@ function timeFunction(func){
   const t0 = performance.now()
   func()
   const t1 = performance.now()
+  console.log(t1 - t0)
   return t1 - t0
 }
  

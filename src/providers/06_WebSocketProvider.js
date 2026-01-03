@@ -1,5 +1,5 @@
 import * as mediasoupClient from "mediasoup-client"
-import { useContext, useMemo } from "react"
+import { useContext, useMemo, useRef } from "react"
 import useWebSocket from "react-use-websocket"
 
 import { WebSocketContext, UserContext, RoomContext, PeersContext, ChatContext, WhiteboardContext, VideoChatContext } from "./contexts"
@@ -9,11 +9,12 @@ import { WebSocketContext, UserContext, RoomContext, PeersContext, ChatContext, 
 function WebSocketProvider({children}){  
     const {username} = useContext(UserContext)
     const {setUserStates, updateUserStates} = useContext(PeersContext)
-    const {roomID, setRoomID, setRoomName, siteHistoryRef, externalChatRef, externalGroupcallRef, externalPeercallRef, externalWhiteboardRef} = useContext(RoomContext)
+    const {roomID, roomIDRef, setRoomID, setRoomName, siteHistoryRef, externalChatRef, externalGroupcallRef, externalPeercallRef, externalWhiteboardRef} = useContext(RoomContext)
     const {messagesRef} = useContext(ChatContext)
     const {reconstructCanvas} = useContext(WhiteboardContext)
     const {callOffersRef, setCallOffers, device, stunCandidates} = useContext(VideoChatContext)
 
+    const connectedRoomRef = useRef(null)
     const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
     queryParams:{
         "username": username,
@@ -91,13 +92,18 @@ function WebSocketProvider({children}){
             break
         }
     },
-    onOpen: () => {console.log("connected")},
+    onOpen: () => {
+        console.log("connected")
+        connectedRoomRef.current = roomID
+    },
     shouldReconnect: () => {
-        console.log("disconnected")
-        setRoomID("")
-        setRoomName("")
-        setUserStates({})
-        return true
+        if (roomIDRef.current === connectedRoomRef.current){
+            setRoomID("")
+            setRoomName("")
+            setUserStates({})
+            connectedRoomRef.current = null
+        }
+        return false
     }
     }, roomID !== "")
 
