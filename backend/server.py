@@ -184,24 +184,13 @@ def getUserInfo():
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
 @app.route("/users", methods=["PUT"])
-@handleError("Failed to update user info")
+@handleError("Failed to assign username")
 @authenticateClient
-def updateUserInfo():
+def assignUsername():
   data = request.get_json()
-  fields = data["fields"]
-
-  modifiedFields = []
-  allowedToModify = {"images", "rooms"}
-  for col in fields.keys():
-    if col not in allowedToModify:
-      return {"success": False}, 500
-    modifiedFields.append(f"{col} = %s")
-  modifiedFields = ", ".join(modifiedFields)
-
-  newValues = tuple(list(fields.values()) + [session["userID"]])
-
+  username = data["username"]
   with AccessDatabase() as cursor:
-    cursor.execute(f"UPDATE users SET {modifiedFields} WHERE userID = %s", newValues)
+    cursor.execute(f"UPDATE users SET username = %s WHERE userID = %s AND username IS NULL", (username, session["userID"]))
 
   return jsonify({"success":True}), 200
 
@@ -256,6 +245,10 @@ def uploadImage():
   imageID = "userImages/" + str(uuid.uuid4()) + f".{extension}"
   s3Upload(imageFile, imageID)
   url = getS3Url(imageID)
+
+  with AccessDatabase() as cursor:
+    cursor.execute("UPDATE users SET images = JSON_ARRAY_APPEND(images, '$', %s) WHERE userID = %s", (imageID, session["userID"]))
+
 
   return {"success": True, "data": {"path": url}}, 200
 

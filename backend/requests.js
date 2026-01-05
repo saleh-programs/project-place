@@ -38,12 +38,12 @@ async function getUserRoomsReq() {
   }
   return data.data["rooms"]
 }
-async function updateUserInfoReq(modifiedFields) {
+async function assignUsernameReq(username) {
   const response = await fetch(baseurl + "/users", {
     "method": "PUT",
     "credentials": "include",
     "headers": {"Content-Type": "application/json"},
-    "body": JSON.stringify({"fields": modifiedFields})
+    "body": JSON.stringify({"username": username})
   })
   const data = await response.json()
   if (!data.success){
@@ -91,7 +91,7 @@ async function createRoomReq(roomName, password=null) {
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
-  return data.data["roomID"]
+  return data["data"]["roomID"]
 }
 
 async function checkRoomExistsReq(roomID) {
@@ -176,7 +176,7 @@ async function uploadFilesReq(files) {
   if (!data.success){
     throw new Error(data.message ||"req failed")
   }
-  return data.data
+  return data["data"]
 }
 async function storeMessageReq(message, roomID, token=null) {
   let options;
@@ -329,11 +329,11 @@ async function getCanvasSnapshotReq(roomID, token=null){
     }
   }
   const response = await fetch(baseurl + `/rooms/${roomID}/canvas/snapshot`, options)
-  if (response.status !== 200){
-    throw new Error("req failed")
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
   }
-  const webBuffer = await response.arrayBuffer() 
-  return Buffer.from(webBuffer)
+  return data["data"]["url"]
 }
 
 async function updateCanvasInstructionsReq(instructions, roomID, token=null) {
@@ -384,7 +384,7 @@ async function getCanvasInstructionsReq(roomID, token=null){
 }
 
 getUserInfoReq = handleError(getUserInfoReq)
-updateUserInfoReq = handleError(updateUserInfoReq)
+assignUsernameReq = handleError(assignUsernameReq)
 validateUsernameReq = handleError(validateUsernameReq)
 getUserInfoReq = handleError(getUserInfoReq)
 uploadNewImageReq = handleError(uploadNewImageReq)
@@ -421,5 +421,5 @@ function getUniqueMessageID(){
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, validateRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
   createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
-  getUserInfoReq, updateUserInfoReq, getUserRoomsReq, validateUsernameReq,
+  getUserInfoReq, assignUsernameReq, getUserRoomsReq, validateUsernameReq,
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}
