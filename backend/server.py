@@ -119,7 +119,6 @@ with AccessDatabase() as cursor:
     CREATE TABLE IF NOT EXISTS users (
       userID VARCHAR(100) PRIMARY KEY,
       username VARCHAR(70) UNIQUE,
-      avatar VARCHAR(300),
       images JSON,
       rooms JSON
     )
@@ -131,12 +130,12 @@ with AccessDatabase() as cursor:
       id INTEGER AUTO_INCREMENT PRIMARY KEY,
       messageID VARCHAR(50) UNIQUE,
       roomID VARCHAR(10),
-      files JSON,
-      dimensions JSON,
       text TEXT,
       username VARCHAR(70),
       timestamp BIGINT,
-      edited BOOLEAN
+      edited BOOLEAN,
+      files JSON,
+      dimensions JSON,
     )
     '''
   )
@@ -154,20 +153,11 @@ with AccessDatabase() as cursor:
     '''
     CREATE TABLE IF NOT EXISTS canvases (
       roomID VARCHAR(10) PRIMARY KEY,
-      canvas BLOB,
+      canvas VARCHAR(1000),
       instructions JSON
     )
     '''
   )
-  cursor.execute(
-    '''
-    CREATE TABLE IF NOT EXISTS images (
-      path VARCHAR(300) PRIMARY KEY,
-      owner VARCHAR(70)
-    )
-    '''
-  )
-   
 
 
 
@@ -178,13 +168,18 @@ with AccessDatabase() as cursor:
 @authenticateClient
 def getUserInfo():
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, avatar, images FROM users WHERE userID = %s", (session["userID"],))
+    cursor.execute("SELECT username, images FROM users WHERE userID = %s", (session["userID"],))
+
+    images = json.loads(values[2])
+    urls = []
+    for imgKey in images:
+      url = getS3Url(imgKey)
+      urls.append(url)
 
     values = cursor.fetchone()
     userInfo = {
       "username": values[0],
-      "avatar": values[1],
-      "images": json.loads(values[2])
+      "images": urls
     }
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
@@ -196,10 +191,10 @@ def updateUserInfo():
   fields = data["fields"]
 
   modifiedFields = []
-  allowedToModify = {"username", "avatar", "images", "rooms"}
+  allowedToModify = {"images", "rooms"}
   for col in fields.keys():
     if col not in allowedToModify:
-      return {"success": False}
+      return {"success": False}, 500
     modifiedFields.append(f"{col} = %s")
   modifiedFields = ", ".join(modifiedFields)
 
@@ -229,16 +224,20 @@ def getUserRooms():
   rooms = []
   with AccessDatabase() as cursor:
     cursor.execute("SELECT rooms FROM users WHERE userID = %s", (session["userID"],))
-    values = json.loads(cursor.fetchone()[0])
+    result = cursor.fetchone()
+    if result is None:
+      return jsonify({"success": True, "data": {"rooms": []}}), 200
+    values = json.loads(result[0])
 
     for roomID in values:
       cursor.execute("SELECT roomName FROM rooms WHERE roomID = %s", (roomID,))
-      roomName = cursor.fetchone()
-      if roomName is None:
+      result = cursor.fetchone()
+      if result is None:
         continue
+      roomName = result[0]
       rooms.append({
         "roomID": roomID,
-        "roomName": roomName[0]
+        "roomName": roomName
       })
   return jsonify({"success": True, "data": {"rooms": rooms}}), 200
 
@@ -254,42 +253,40 @@ def uploadImage():
   if extension not in allowedExtensions or len(extension) == len(imageFile.filename):
     return {"success": False}, 500
 
-  imageID = str(uuid.uuid4()) + f".{extension}"
-  exposedPath = f"http://localhost:5000/users/images/{imageID}"
-  localPath = f"images/{imageID}"
-  imageFile.save(localPath)
-  with AccessDatabase() as cursor:
-    cursor.execute("INSERT INTO images (path, owner) VALUES (%s,%s)", (exposedPath, session["userID"]))
-  return {"success": True, "data": {"path": exposedPath}}, 200
+  imageID = "userImages/" + str(uuid.uuid4()) + f".{extension}"
+  s3Upload(imageFile, imageID)
+  url = getS3Url(imageID)
 
-@app.route("/users/images/public/<imageID>", methods=["GET"])
-@handleError("failed to get public image")
-@authenticateClient
-def getPublicImage(imageID):
-  if not os.path.exists(f"images/public/{imageID}"):
-    return {"success": False}, 500
-  return send_file(f"images/public/{imageID}"), 200
+  return {"success": True, "data": {"path": url}}, 200
 
-@app.route("/users/images/<imageID>", methods=["GET"])
-@handleError("failed to get image")
-@authenticateClient
-def getImage(imageID):
-  relativeURL = None
-  with AccessDatabase() as cursor:
-    cursor.execute("SELECT avatar FROM users WHERE username = %s", (imageID,))
-    relativeURL = cursor.fetchone()
+# @app.route("/users/images/public/<imageID>", methods=["GET"])
+# @handleError("failed to get public image")
+# @authenticateClient
+# def getPublicImage(imageID):
+#   if not os.path.exists(f"images/public/{imageID}"):
+#     return {"success": False}, 500
+#   return send_file(f"images/public/{imageID}"), 200
 
-    #in case frontend makes imageID the username
-    if (relativeURL is not None):
-      relativeURL = relativeURL[0][relativeURL[0].find("images/"):]
-    else:
-      relativeURL = f"images/{imageID}"
+# @app.route("/users/images/<imageID>", methods=["GET"])
+# @handleError("failed to get image")
+# @authenticateClient
+# def getImage(imageID):
+#   relativeURL = None
+#   with AccessDatabase() as cursor:
+#     cursor.execute("SELECT avatar FROM users WHERE username = %s", (imageID,))
+#     relativeURL = cursor.fetchone()
+
+#     #in case frontend makes imageID the username
+#     if (relativeURL is not None):
+#       relativeURL = relativeURL[0][relativeURL[0].find("images/"):]
+#     else:
+#       relativeURL = f"images/{imageID}"
   
-  print(relativeURL)
-  if not os.path.exists(relativeURL):
-    return {"success": False}, 500
+#   print(relativeURL)
+#   if not os.path.exists(relativeURL):
+#     return {"success": False}, 500
   
-  return send_file(relativeURL), 200
+#   return send_file(relativeURL), 200
 
 
 
@@ -320,8 +317,10 @@ def createRoom():
     canvasImg = Image.new(mode = "RGBA", size=(1000,1000), color=(0,0,0,0))
     buffer = io.BytesIO()
     canvasImg.save(buffer, format="PNG")
-    canvasBytes = buffer.getvalue()
-    cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (canvasBytes, "[]", roomID))
+
+    key = "canvases/" + str(uuid.uuid4()) + ".png"
+    s3Upload(buffer, key)
+    cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (buffer, "[]", roomID))
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
 @app.route("/rooms/files", methods=["POST"])
@@ -329,19 +328,18 @@ def createRoom():
 @authenticateClient
 def uploadFiles():
   files = request.files.getlist("files")
-  exposedPaths = []
+  urls = []
   dimensions = []
   for file in files:
     extension = file.filename.split(".")[-1].lower()
-
     allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
     if extension not in allowedExtensions or len(extension) == len(file.filename):
       return {"success": False}, 500
 
-    fileID = str(uuid.uuid4()) + f".{extension}"
-    exposedPaths.append(f"http://localhost:5000/rooms/files/{fileID}")
-    localPath = f"files/{fileID}"
-    file.save(localPath)
+    fileID = "chatImages/" +  str(uuid.uuid4()) + f".{extension}"
+    s3Upload(file, fileID)
+    url = getS3Url(fileID)
+    urls.append(url)
 
     fileType = file.mimetype.split("/")[0]
     if (fileType == "image"):
@@ -351,15 +349,15 @@ def uploadFiles():
     else:
       dimensions.append(None)
     
-  return jsonify({"success":True, "data": {"paths": exposedPaths, "dimensions": dimensions}}),200
+  return jsonify({"success":True, "data": {"paths": urls, "dimensions": dimensions}}),200
 
-@app.route("/rooms/files/<fileID>", methods=["GET"])
-@handleError("failed to get file")
-@authenticateClient
-def getFile(fileID):
-  if not os.path.exists(f"files/{fileID}"):
-    return {"success": False}, 500
-  return send_file(f"files/{fileID}")
+# @app.route("/rooms/files/<fileID>", methods=["GET"])
+# @handleError("failed to get file")
+# @authenticateClient
+# def getFile(fileID):
+#   if not os.path.exists(f"files/{fileID}"):
+#     return {"success": False}, 500
+#   return send_file(f"files/{fileID}")
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
 @handleError("failed to validate room")
@@ -411,10 +409,9 @@ def getRoomUsers(roomID):
     cursor.execute("SELECT users FROM rooms WHERE roomID = %s", (roomID,))
     users = json.loads(cursor.fetchone()[0])
 
-
   return jsonify({"success":True,"data": {"users": users}}), 200
 
-# this uses users table but I liked it in rooms area
+# Uses users table but liked it in rooms area
 @app.route("/rooms/<roomID>/users/<username>", methods=["GET"])
 @handleError("failed to validate room user")
 @authenticateServer
@@ -434,7 +431,7 @@ def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
   with AccessDatabase() as cursor:  
-    cursor.execute("INSERT INTO messages (username, text, files,dimensions, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s,%s, %s, %s)", 
+    cursor.execute("INSERT INTO messages (username, text, files, dimensions, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s,%s, %s, %s)", 
     (message["username"], message["text"], json.dumps(message["files"]),json.dumps(message["metadata"]["dimensions"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
 
   return jsonify({"success":True}),200
@@ -464,9 +461,7 @@ def deleteMessage(roomID):
     if (files):
       files = json.loads(files[0])
       for f in files:
-        if os.path.exists(f"files/{os.path.basename(f)}"):
-          os.remove(f"files/{os.path.basename(f)}")
-
+        s3Delete(f)
     cursor.execute("DELETE FROM messages WHERE messageID = %s", (messageID,))
     
   return jsonify({"success":True}),200
@@ -481,10 +476,16 @@ def getMessages(roomID):
     jsonMessages = []
     for i in range(len(messages)-1,-1,-1):
       tpl = messages[i]
+      files = json.loads(tpl[2])
+      urls = []
+      for f in files:
+        url = getS3Url(f)
+        urls.append(url)
+
       jsonMessages.append({
         "username": tpl[0],
         "text": tpl[1],
-        "files": json.loads(tpl[2]),
+        "files": urls,
         "metadata": {
           "dimensions": json.loads(tpl[3]),
           "timestamp": tpl[4],
@@ -508,10 +509,15 @@ def getMoreMessages(roomID):
     jsonMessages = []
     for i in range(len(messages)-1,-1,-1):
       tpl = messages[i]
+      files = json.loads(tpl[2])
+      urls = []
+      for f in files:
+        url = getS3Url(f)
+        urls.append(url)
       jsonMessages.append({
         "username": tpl[0],
         "text": tpl[1],
-        "files": json.loads(tpl[2]),
+        "files": urls,
         "metadata": {
           "dimensions": json.loads(tpl[3]),
           "timestamp": tpl[4],
@@ -527,8 +533,14 @@ def getMoreMessages(roomID):
 @authenticateServer
 def updateCanvasSnapshot(roomID):
   canvasBytes = request.get_data()
+  fileObj = io.BytesIO(canvasBytes)
   with AccessDatabase() as cursor:    
-    cursor.execute("UPDATE canvases SET canvas = %s WHERE roomID = %s", (canvasBytes, roomID))
+    cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s", (roomID,))
+    result = cursor.fetchone()
+    if result is None:
+      return {"success": False, "message": "canvas does not exist"}, 500
+    canvasKey = result[0]
+    s3Upload(fileObj, canvasKey)
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["GET"])
@@ -537,8 +549,13 @@ def updateCanvasSnapshot(roomID):
 def getCanvasSnapshot(roomID):
   with AccessDatabase() as cursor:
     cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s",(roomID,))
-    canvasBytes = cursor.fetchone()[0]
-  return Response(canvasBytes, mimetype='application/octet-stream', status=200)
+    result = cursor.fetchone()
+    if result is None:
+      return {"success": False, "message": "canvas does not exist"}, 500
+    canvasKey = result[0]
+    url = getS3Url(canvasKey)
+
+  return {"success": True, "data": {"url": url}}, 200
 
 @app.route("/rooms/<roomID>/canvas/instructions", methods=["PUT"])
 @handleError("failed to update canvas instructions")
@@ -555,7 +572,6 @@ def updateCanvasInstructions(roomID):
 @authenticateServer
 def getCanvasInstructions(roomID):
   with AccessDatabase() as cursor:
-    print("am here?")
     cursor.execute("SELECT instructions FROM canvases WHERE roomID = %s",(roomID,))
     instructions = json.loads(cursor.fetchone()[0])
   return {"success": True, "data": {"instructions": instructions}}, 200
@@ -609,15 +625,21 @@ def logout():
   )
 
 # -----------------S3 STUFF (TEMPLATES THAT I USE IN A SECOND)--------------------
-def upload():
-    s3.upload_file("test.png", S3_BUCKET_NAME, "3")
-    return
-def get():
-    s3.download_file(S3_BUCKET_NAME,"3", "somewhere.jpg")
-    return
-def delete():
-    s3.delete_object(Bucket=S3_BUCKET_NAME, Key="3")
-    return
+# All are called within handleError
+
+def s3Upload(fileObj, key):
+  s3.upload_fileobj(fileObj, S3_BUCKET_NAME, key)
+
+def getS3Url(key):
+  url = s3.generate_presigned_url(
+    "get_object", 
+    Params={"Bucket": S3_BUCKET_NAME, "Key", key}, 
+    ExpiresIn=3600)  return
+
+  return url
+
+def s3Delete(key):
+  s3.delete_object(Bucket=S3_BUCKET_NAME, Key=key)
 
 # -------------------Miscellaneous------
 # returns random 6 digit string. [A-Z]or [0-9]. Letters more likely
