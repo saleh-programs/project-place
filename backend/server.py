@@ -7,6 +7,7 @@ from PIL import Image
 import io
 from functools import wraps
 import bcrypt
+import boto3
 
 from authlib.integrations.flask_client import OAuth
 from authlib.jose import JsonWebToken, JsonWebKey
@@ -15,24 +16,51 @@ from flask import Flask, Response, request, jsonify, redirect, render_template, 
 from flask_cors import CORS
 import uuid
 from dotenv import load_dotenv
-load_dotenv(dotenv_path="../.env")
+load_dotenv(dotenv_path=".env")
+
+S3_BUCKET_ACCESSKEY = env.get("S3_BUCKET_ACCESSKEY")
+S3_BUCKET_SECRET_ACCESSKEY = env.get("S3_BUCKET_SECRET_ACCESSKEY")
+S3_BUCKET_REGION = env.get("S3_BUCKET_REGION")
+S3_BUCKET_NAME = env.get("S3_BUCKET_NAME")
+
+APP_SECRET_KEY = env.get("APP_SECRET_KEY")
+
+AUTH0_DOMAIN = env.get('AUTH0_DOMAIN')
+AUTH0_CLIENT_ID = env.get("AUTH0_CLIENT_ID"),
+AUTH0_CLIENT_SECRET = env.get("AUTH0_CLIENT_SECRET")
+AUTH0_API_AUDIENCE = env.get("AUTH0_API_AUDIENCE")
+
+
+DB_PASSWORD = env.get("DB_PASSWORD")
+
+FRONTEND_URL = env.get("FRONTEND_URL")
+
+
+s3 = boto3.client(
+    "s3",
+    aws_access_key_id=S3_BUCKET_ACCESSKEY,
+    aws_secret_access_key=S3_BUCKET_SECRET_ACCESSKEY,
+    region_name=S3_BUCKET_REGION
+)
+
 
 # create flask app and register with the Auth0 service
 app = Flask(__name__)
-app.secret_key = env.get("APP_SECRET_KEY")
-CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
+app.secret_key = APP_SECRET_KEY
+CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
 
 jwt = JsonWebToken(["RS256"])
 JWKS = JsonWebKey.import_key_set(
-    requests.get(f"https://{env.get('AUTH0_DOMAIN')}/.well-known/jwks.json").json()
+    requests.get(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json").json()
 )
+
 oauth = OAuth(app)
 oauth.register(
   "auth0",
-  client_id = env.get("AUTH0_CLIENT_ID"),
-  client_secret = env.get("AUTH0_CLIENT_SECRET"),
+  client_id = AUTH0_CLIENT_ID,
+  client_secret = AUTH0_CLIENT_SECRET,
   client_kwargs = {"scope": "openid profile email"},
-  server_metadata_url = f'https://{env.get("AUTH0_DOMAIN")}/.well-known/openid-configuration'
+  server_metadata_url = f'https://{AUTH0_DOMAIN}/.well-known/openid-configuration'
 )
 
 #context manager for opening/closing connection and cursor easily
@@ -42,10 +70,10 @@ class AccessDatabase:
     self.cursor = None
   def __enter__(self):
     self.conn = mysql.connector.connect(
-      host= "localhost", #localhost cuz we started it on our computer
-      user="root",  #the user can be root (the admin) or a user we added
-      passwd= f"{os.getenv('DB_PASSWORD')}", #whatever pass
-      database= "projectplace" #the database u work with
+      host= "localhost",
+      user="root",  
+      passwd= f"{DB_PASSWORD}", 
+      database= "projectplace"
     )
     self.cursor = self.conn.cursor()
     return self.cursor
@@ -541,7 +569,6 @@ def createUser():
     if (not exists):
       cursor.execute("INSERT INTO users (userID, username, avatar, images, rooms) VALUES (%s, %s, %s, %s, %s)", (session["userID"], None, "http://localhost:5000/users/images/public/willow.png", "[]","[]"))
 
-
 #-----------------AUTH0 STUFF------------------
 
 # Redirects user to auth0 login page
@@ -550,7 +577,7 @@ def login():
   # HARDCODE THE URL FOR REDIRECT_URI IF YOU WANT TO TEST MOBILE MURAD
   return oauth.auth0.authorize_redirect(
     redirect_uri = url_for("callback",_external=True),
-    audience=env.get("AUTH0_API_AUDIENCE")
+    audience= AUTH0_API_AUDIENCE
   )
  
 # Redirects user to home page (or page after authentication)
@@ -570,17 +597,29 @@ def logout():
   session.clear()
   return redirect(
     "https://"
-    + env.get("AUTH0_DOMAIN")
+    + AUTH0_DOMAIN
     + "/v2/logout?"
     + urlencode(
         {
           "returnTo": "http://localhost:3000", 
-          "client_id": env.get("AUTH0_CLIENT_ID"),
+          "client_id": AUTH0_CLIENT_ID,
         },
         quote_via=quote_plus,
     )
   )
 
+# -----------------S3 STUFF (TEMPLATES THAT I USE IN A SECOND)--------------------
+def upload():
+    s3.upload_file("test.png", S3_BUCKET_NAME, "3")
+    return
+def get():
+    s3.download_file(S3_BUCKET_NAME,"3", "somewhere.jpg")
+    return
+def delete():
+    s3.delete_object(Bucket=S3_BUCKET_NAME, Key="3")
+    return
+
+# -------------------Miscellaneous------
 # returns random 6 digit string. [A-Z]or [0-9]. Letters more likely
 def generateRoomCode():
   code = []

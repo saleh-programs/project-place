@@ -1,5 +1,6 @@
-const baseurl = "http://localhost:5000/"
-
+const baseurl = typeof window === "undefined" 
+? process.env.FRONTEND_URL
+: import.meta.env.FRONTEND_URL
 
 function handleError(fn){
   return async (...args) => {
@@ -14,7 +15,7 @@ function handleError(fn){
 
 
 async function getUserInfoReq(session) {
-  const response = await fetch(baseurl + "users",{
+  const response = await fetch(baseurl + "/users",{
       "method": "GET",
       "headers": {
         "cookie": `session=${session}`
@@ -27,7 +28,7 @@ async function getUserInfoReq(session) {
   return data["data"]["userInfo"]
 }
 async function getUserRoomsReq() {
-  const response = await fetch(baseurl + `users/rooms`,{
+  const response = await fetch(baseurl + `/users/rooms`,{
     "method": "GET",
     "credentials": "include"
   })
@@ -38,7 +39,7 @@ async function getUserRoomsReq() {
   return data.data["rooms"]
 }
 async function updateUserInfoReq(modifiedFields) {
-  const response = await fetch(baseurl + "users", {
+  const response = await fetch(baseurl + "/users", {
     "method": "PUT",
     "credentials": "include",
     "headers": {"Content-Type": "application/json"},
@@ -52,7 +53,7 @@ async function updateUserInfoReq(modifiedFields) {
   return data
 }
 async function validateUsernameReq(username) {
-  const response = await fetch(baseurl + `users/${username}`, {
+  const response = await fetch(baseurl + `/users/${username}`, {
     "method": "GET",
     "credentials": "include"
   })
@@ -65,7 +66,7 @@ async function validateUsernameReq(username) {
 async function uploadNewImageReq(imageFile) {
   const fileInfo = new FormData()
   fileInfo.append("img", imageFile)
-  const response = await fetch(baseurl + "users/images", {
+  const response = await fetch(baseurl + "/users/images", {
     "method": "POST",
     "credentials": "include",
     "body": fileInfo
@@ -80,7 +81,7 @@ async function uploadNewImageReq(imageFile) {
 
 
 async function createRoomReq(roomName, password=null) {
-  const response = await fetch(baseurl + "rooms",{
+  const response = await fetch(baseurl + "/rooms",{
     "method": "POST",
     "credentials": "include",
     "headers" : {"Content-Type": "application/json"},
@@ -92,8 +93,9 @@ async function createRoomReq(roomName, password=null) {
   }
   return data.data["roomID"]
 }
+
 async function checkRoomExistsReq(roomID) {
-  const response = await fetch(baseurl + `rooms/${roomID}/exists`,{
+  const response = await fetch(baseurl + `/rooms/${roomID}/exists`,{
     "method": "GET",
     "credentials": "include"
   })
@@ -104,7 +106,7 @@ async function checkRoomExistsReq(roomID) {
   return data["data"]?.["roomInfo"]
 }
 async function addRoomUserReq(roomID, password=null) {
-  const response = await fetch(baseurl + `rooms/${roomID}/users`,{
+  const response = await fetch(baseurl + `/rooms/${roomID}/users`,{
     "method": "PUT",
     "credentials": "include",
     "headers": {"Content-Type": "application/json"},
@@ -130,7 +132,7 @@ async function getRoomUsersReq(roomID, token=null) {
     }
   }
 
-  const response = await fetch(baseurl + `rooms/${roomID}/users`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/users`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -151,7 +153,7 @@ async function validateRoomUserReq(roomID, username, token=null) {
     }
   }
 
-  const response = await fetch(baseurl + `rooms/${roomID}/users/${username}`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/users/${username}`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -165,7 +167,7 @@ async function uploadFilesReq(files) {
   for (const file of files){
     fileInfo.append("files", file)
   }
-  const response = await fetch(baseurl + `rooms/files`,{
+  const response = await fetch(baseurl + `/rooms/files`,{
     "method": "POST",
     "credentials": "include",
     "body": fileInfo
@@ -195,7 +197,7 @@ async function storeMessageReq(message, roomID, token=null) {
       "body": JSON.stringify({"message": message})
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/messages`,options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -221,7 +223,7 @@ async function editMessageReq({messageID, text}, roomID, token=null) {
       "body": JSON.stringify({"messageID": messageID, "text": text})
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/messages`,options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -247,7 +249,7 @@ async function deleteMessageReq({messageID}, roomID, token=null) {
       "body": JSON.stringify({"messageID": messageID})
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/messages`,options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/messages`,options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -267,7 +269,7 @@ async function getMessagesReq(roomID, token=null) {
       "credentials": "include",
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/messages`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/messages`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message ||"req failed")
@@ -275,7 +277,7 @@ async function getMessagesReq(roomID, token=null) {
   return data["data"]["messages"]
 }
 async function getOlderMessagesReq(messageID, roomID){
-  const response = await fetch(baseurl + `rooms/${roomID}/messages/more?messageID=${messageID}`, {
+  const response = await fetch(baseurl + `/rooms/${roomID}/messages/more?messageID=${messageID}`, {
     "method": "GET",
     "credentials": "include",
   })
@@ -306,7 +308,7 @@ async function updateCanvasSnapshotReq(canvasBuffer,roomID, token=null){
     "body": canvasBuffer
     } 
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/canvas/snapshot`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
@@ -326,7 +328,7 @@ async function getCanvasSnapshotReq(roomID, token=null){
       "credentials": "include",
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/snapshot`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/canvas/snapshot`, options)
   if (response.status !== 200){
     throw new Error("req failed")
   }
@@ -353,7 +355,7 @@ async function updateCanvasInstructionsReq(instructions, roomID, token=null) {
       "body": JSON.stringify({"instructions": instructions})
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/canvas/instructions`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
@@ -373,7 +375,7 @@ async function getCanvasInstructionsReq(roomID, token=null){
       "credentials": "include",
     }
   }
-  const response = await fetch(baseurl + `rooms/${roomID}/canvas/instructions`, options)
+  const response = await fetch(baseurl + `/rooms/${roomID}/canvas/instructions`, options)
   const data = await response.json()
   if (!data.success){
     throw new Error(data.message || "req failed")
