@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react";
-import {updateUserInfoReq, validateUsernameReq } from "backend/requests";
+import {assignUsernameReq, validateUsernameReq } from "backend/requests";
 import { useRouter } from "next/navigation";
 
 import styles from "styles/accountsetup/SelectUsername.module.css"
+
+const NODE_PUBLIC_HTTP_BACKEND_URL = process.env.NODE_PUBLIC_HTTP_BACKEND_URL
 
 function AccountSetup(){
   const router = useRouter()
@@ -19,6 +21,7 @@ function AccountSetup(){
     document.cookie = "roomName=; Max-Age=0; path=/" 
     inputRef.current.focus()
   },[])
+  
   async function handleSubmit(){
     const userExists = await validateUsernameReq(inputRef.current.value)
     if (!userExists){
@@ -26,7 +29,7 @@ function AccountSetup(){
       setTimeout(()=>setErrMessage(""),3000)
       return
     }
-    const response = await updateUserInfoReq({"username": inputRef.current.value})
+    const response = await assignUsernameReq(inputRef.current.value)
     if (!response){
       return
     }
@@ -52,7 +55,7 @@ function AccountSetup(){
         </section>
 
       </div>
-      <button className={styles.logout} onClick={()=>{window.location.href="http://localhost:5000/logout"}}>
+      <button className={styles.logout} onClick={()=>{window.location.href=`${NODE_PUBLIC_HTTP_BACKEND_URL}/logout`}}>
         Log Out
       </button>
     </div>

@@ -681,7 +681,7 @@ function Chat(){
                 <span className={styles.timestamp}>
                   {timestamp}
                 </span>
-                <img src={userStates[group["username"]]["avatar"]} alt="nth" />
+                <img src={userStates[group["username"]]?.["avatar"]} alt="nth" />
               </section>
               <section className={styles.groupRight}>
                 <div className={styles.username}>

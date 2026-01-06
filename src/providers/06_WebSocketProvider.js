@@ -4,7 +4,7 @@ import useWebSocket from "react-use-websocket"
 
 import { WebSocketContext, UserContext, RoomContext, PeersContext, ChatContext, WhiteboardContext, VideoChatContext } from "./contexts"
 
-
+const NODE_PUBLIC_WS_BACKEND_URL = process.env.NODE_PUBLIC_WS_BACKEND_URL
 
 function WebSocketProvider({children}){  
     const {username} = useContext(UserContext)
@@ -15,7 +15,7 @@ function WebSocketProvider({children}){
     const {callOffersRef, setCallOffers, device, stunCandidates} = useContext(VideoChatContext)
 
     const connectedRoomRef = useRef(null)
-    const {sendJsonMessage} = useWebSocket("ws://localhost:8000",{
+    const {sendJsonMessage} = useWebSocket(NODE_PUBLIC_WS_BACKEND_URL, {
     queryParams:{
         "username": username,
         "roomID": roomID
