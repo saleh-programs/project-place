@@ -200,10 +200,12 @@ def assignUsername():
 
   avatars = listS3DefaultAvatars()
   chosenAvatar = choice(avatars)["Key"]
+  extension = chosenAvatar.split(".")[-1]
 
-  fileObj = getS3File(chosenAvatar)
-  key = f"public/avatar/{username}.png"
-  s3Upload(fileObj, key)
+  fileInfo = getS3File(chosenAvatar)
+  
+  key = f"public/avatar/{username}.{extension}"
+  s3Upload(fileInfo["Body"], key, fileInfo["ContentType"])
 
   with AccessDatabase() as cursor:
     cursor.execute(f"UPDATE users SET username = %s WHERE userID = %s AND username IS NULL", (username, session["userID"]))
@@ -223,11 +225,11 @@ def updateProfilePicture():
     username = result[0]
 
 
-    fileObj = getS3File(key)
+    fileInfo = getS3File(key)
     extension = key.split(".")[-1]
     userAvatarKey = f"public/avatars/{username}.{extension}"
 
-    s3Upload(fileObj, userAvatarKey)
+    s3Upload(fileInfo["Body"], userAvatarKey, fileInfo["ContentType"])
   return {"success": True}, 200
 
 @app.route("/users/rooms", methods=["GET"])
@@ -266,7 +268,7 @@ def uploadImage():
     return {"success": False}, 500
 
   key = f"users/{str(uuid.uuid4())}.{extension}"
-  s3Upload(imageFile, key)
+  s3Upload(imageFile, key, imageFile.mimetype)
   url = getS3Url(key)
   image = {
     "url": url,
@@ -350,7 +352,7 @@ def createRoom():
     canvasImg.save(buffer, format="PNG")
 
     key = f"canvases/{str(uuid.uuid4())}.png"
-    s3Upload(buffer, key)
+    s3Upload(buffer, key, "image/png")
     cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (key, "[]", roomID))
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
@@ -368,7 +370,7 @@ def uploadFiles():
       return {"success": False}, 500
 
     key = f"chats/{str(uuid.uuid4())}.{extension}"
-    s3Upload(file, key)
+    s3Upload(file, key, file.mimetype)
     url = getS3Url(key)
     urls.append(url)
 
@@ -572,7 +574,7 @@ def updateCanvasSnapshot(roomID):
     if result is None:
       return {"success": False, "message": "canvas does not exist"}, 404
     key = result[0]
-    s3Upload(fileObj, key)
+    s3Upload(fileObj, key, "image/png")
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["GET"])
@@ -665,15 +667,16 @@ def getDefaultAvatars():
   return {"success": True, "data": {"keys": avatarKeys}}, 200
 
 
-def s3Upload(fileObj, key):
-  s3.upload_fileobj(fileObj, S3_BUCKET_NAME, key)
+def s3Upload(fileObj, key, contentType):
+  s3.upload_fileobj(fileObj, S3_BUCKET_NAME, key,
+  ExtraArgs={"ContentType": contentType})
 
 def getS3File(key):
   fileObj = s3.get_object(
     Bucket=S3_BUCKET_NAME,
     Key=key
   )
-  return fileObj["Body"]
+  return fileObj
 
 def getS3Url(key):
   url = s3.generate_presigned_url(
