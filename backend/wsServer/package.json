@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "canvas": "^3.1.2",
+    "dotenv": "^17.2.3",
     "http": "^0.0.1-security",
     "mediasoup": "^3.19.2",
     "url": "^0.11.4",

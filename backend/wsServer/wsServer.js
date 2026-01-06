@@ -5,10 +5,18 @@ import url from "url"
 import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
-import { storeMessageReq, getMessagesReq,getRoomUsersReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
+import { storeMessageReq, getMessagesReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
 import { draw, linefill as fill, clear, importImage, moveArea} from "../../utils/canvasArt.js"
 import { writeFileSync } from "fs"
 import { buffer } from "stream/consumers"
+
+import "dotenv/config"
+
+const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID
+const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET
+const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN
+const AUTH0_API_AUDIENCE = process.env.AUTH0_API_AUDIENCE
+
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -39,11 +47,38 @@ mediasoup.createWorker()
 .then(w => {
   worker = w;
 })
+
 let token;
 getToken()
 .then(t =>{
   token = t;
 })
+
+async function getToken() {
+  try {
+      const response = await fetch(`https://${AUTH0_DOMAIN}/oauth/token`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          "client_id": AUTH0_CLIENT_ID,
+          "client_secret": AUTH0_CLIENT_SECRET,
+          "audience":AUTH0_API_AUDIENCE,
+          "grant_type":"client_credentials"
+        }),
+      });
+
+      if (!response.ok) {
+          throw new Error('Network response was not ok');
+      }
+
+      const data = await response.json();
+      return data["access_token"]
+  } catch (error) {
+      console.error('Error fetching token:', error);
+      process.exit(0)
+  }
+};
+
 
 
 
@@ -397,7 +432,7 @@ async function sendServerInfo(uuid) {
     })
     roomHistories.push(
       getCanvasSnapshotReq(roomID, token)
-      .then(buffer => loadImage(buffer))
+      .then(url => loadImage(url))
       .then(img => {
         cxt.drawImage(img,0,0);
         return canvas
@@ -479,29 +514,6 @@ function broadcastOne(uuid, data, peerUsername){
     }
   }
 }
-async function getToken() {
-  try {
-      const response = await fetch('https://dev-projectplace.us.auth0.com/oauth/token', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          "client_id":"SSFgwe9fepsAecFde32FpkMumdQfq9uU",
-          "client_secret":"kYYPqNp-MUKJnfbTlv-6knpaCxcXxANWj2hq0MCg_LwnYb3d1i249XofPMfEOKJ8",
-          "audience":"http://projectplace/backend",
-          "grant_type":"client_credentials"
-        }),
-      });
-
-      if (!response.ok) {
-          throw new Error('Network response was not ok');
-      }
-
-      const data = await response.json();
-      return data["access_token"]
-  } catch (error) {
-      console.error('Error fetching token:', error);
-  }
-};
 
 // Canvas/Drawing
 async function handleCanvasAction(data, roomID){
