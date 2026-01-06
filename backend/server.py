@@ -135,7 +135,7 @@ with AccessDatabase() as cursor:
       timestamp BIGINT,
       edited BOOLEAN,
       files JSON,
-      dimensions JSON,
+      dimensions JSON
     )
     '''
   )
@@ -153,7 +153,7 @@ with AccessDatabase() as cursor:
     '''
     CREATE TABLE IF NOT EXISTS canvases (
       roomID VARCHAR(10) PRIMARY KEY,
-      canvas VARCHAR(1000),
+      canvas VARCHAR(100),
       instructions JSON
     )
     '''
@@ -169,18 +169,26 @@ with AccessDatabase() as cursor:
 def getUserInfo():
   with AccessDatabase() as cursor:
     cursor.execute("SELECT username, images FROM users WHERE userID = %s", (session["userID"],))
-
-    images = json.loads(values[2])
-    urls = []
-    for imgKey in images:
-      url = getS3Url(imgKey)
-      urls.append(url)
-
     values = cursor.fetchone()
+    if values is None:
+      return {"success": False, "message": "user not found"}, 404
+
+    images = json.loads(values[1])
+    imageObjects = []
+    for i in range(len(images)):
+      imgKey = images[i]
+      url = getS3Url(imgKey)
+
+      imageObjects.append({
+        "url": url,
+        "key": imgKey
+      })
+    
     userInfo = {
       "username": values[0],
-      "images": urls
+      "images": imageObjects
     }
+  
   return jsonify({"success": True, "data": {"userInfo": userInfo}}), 200
 
 @app.route("/users", methods=["PUT"])
@@ -189,22 +197,38 @@ def getUserInfo():
 def assignUsername():
   data = request.get_json()
   username = data["username"]
+
+  avatars = listS3DefaultAvatars()
+  chosenAvatar = choice(avatars)["Key"]
+
+  fileObj = getS3File(chosenAvatar)
+  key = f"public/avatar/{username}.png"
+  s3Upload(fileObj, key)
+
   with AccessDatabase() as cursor:
     cursor.execute(f"UPDATE users SET username = %s WHERE userID = %s AND username IS NULL", (username, session["userID"]))
-
   return jsonify({"success":True}), 200
 
-@app.route("/users/<username>", methods=["GET"])
-@handleError("Failed to validate username")
+@app.route("/users/images/profile", methods=["PUT"])
+@handleError("failed to change profile picture")
 @authenticateClient
-def validateUsername(username):
+def updateProfilePicture():
+  data = request.get_json()
+  key = data["key"]
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
-    if cursor.fetchone() is not None:
-      return jsonify({"success":True}), 200
+    cursor.execute("SELECT username FROM users WHERE userID = %s", (session["userID"],))
+    result = cursor.fetchone()
+    if result is None:
+      return {"success": False, "message": "user does not exist"}, 404
+    username = result[0]
 
-  return jsonify({"success":True, "data": {"username": username}}), 200
 
+    fileObj = getS3File(key)
+    extension = key.split(".")[-1]
+    userAvatarKey = f"public/avatars/{username}.{extension}"
+
+    s3Upload(fileObj, userAvatarKey)
+  return {"success": True}, 200
 
 @app.route("/users/rooms", methods=["GET"])
 @handleError("Failed to get user's rooms")
@@ -230,7 +254,6 @@ def getUserRooms():
       })
   return jsonify({"success": True, "data": {"rooms": rooms}}), 200
 
-
 @app.route("/users/images", methods=["POST"])
 @handleError("failed to upload image")
 @authenticateClient
@@ -242,15 +265,30 @@ def uploadImage():
   if extension not in allowedExtensions or len(extension) == len(imageFile.filename):
     return {"success": False}, 500
 
-  imageID = "userImages/" + str(uuid.uuid4()) + f".{extension}"
-  s3Upload(imageFile, imageID)
-  url = getS3Url(imageID)
+  key = f"users/{str(uuid.uuid4())}.{extension}"
+  s3Upload(imageFile, key)
+  url = getS3Url(key)
+  image = {
+    "url": url,
+    "key": key
+  }
 
   with AccessDatabase() as cursor:
-    cursor.execute("UPDATE users SET images = JSON_ARRAY_APPEND(images, '$', %s) WHERE userID = %s", (imageID, session["userID"]))
+    cursor.execute("UPDATE users SET images = JSON_ARRAY_APPEND(images, '$', %s) WHERE userID = %s", (key, session["userID"]))
+  return {"success": True, "data": {"image": image}}, 200
 
 
-  return {"success": True, "data": {"path": url}}, 200
+@app.route("/users/<username>", methods=["GET"])
+@handleError("Failed to validate username")
+@authenticateClient
+def validateUsername(username):
+  with AccessDatabase() as cursor:
+    cursor.execute("SELECT 1 FROM users WHERE username = %s", (username,))
+    if cursor.fetchone() is not None:
+      return jsonify({"success":True}), 200
+
+  return jsonify({"success":True, "data": {"username": username}}), 200
+
 
 # @app.route("/users/images/public/<imageID>", methods=["GET"])
 # @handleError("failed to get public image")
@@ -311,9 +349,9 @@ def createRoom():
     buffer = io.BytesIO()
     canvasImg.save(buffer, format="PNG")
 
-    key = "canvases/" + str(uuid.uuid4()) + ".png"
+    key = f"canvases/{str(uuid.uuid4())}.png"
     s3Upload(buffer, key)
-    cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (buffer, "[]", roomID))
+    cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (key, "[]", roomID))
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
 @app.route("/rooms/files", methods=["POST"])
@@ -329,14 +367,15 @@ def uploadFiles():
     if extension not in allowedExtensions or len(extension) == len(file.filename):
       return {"success": False}, 500
 
-    fileID = "chatImages/" +  str(uuid.uuid4()) + f".{extension}"
-    s3Upload(file, fileID)
-    url = getS3Url(fileID)
+    key = f"chats/{str(uuid.uuid4())}.{extension}"
+    s3Upload(file, key)
+    url = getS3Url(key)
     urls.append(url)
 
     fileType = file.mimetype.split("/")[0]
     if (fileType == "image"):
-      with Image.open(localPath) as img:
+      file.seek(0)
+      with Image.open(file) as img:
         w,h = img.size
         dimensions.append([w, h])
     else:
@@ -404,7 +443,7 @@ def getRoomUsers(roomID):
 
   return jsonify({"success":True,"data": {"users": users}}), 200
 
-# Uses users table but liked it in rooms area
+# Uses users table, but liked it in rooms area
 @app.route("/rooms/<roomID>/users/<username>", methods=["GET"])
 @handleError("failed to validate room user")
 @authenticateServer
@@ -464,7 +503,7 @@ def deleteMessage(roomID):
 @authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, text, files, dimensions,timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
+    cursor.execute("SELECT username, text, files, dimensions, timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
     messages = cursor.fetchall()
     jsonMessages = []
     for i in range(len(messages)-1,-1,-1):
@@ -531,9 +570,9 @@ def updateCanvasSnapshot(roomID):
     cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s", (roomID,))
     result = cursor.fetchone()
     if result is None:
-      return {"success": False, "message": "canvas does not exist"}, 500
-    canvasKey = result[0]
-    s3Upload(fileObj, canvasKey)
+      return {"success": False, "message": "canvas does not exist"}, 404
+    key = result[0]
+    s3Upload(fileObj, key)
   return {"success": True}, 200
 
 @app.route("/rooms/<roomID>/canvas/snapshot", methods=["GET"])
@@ -544,9 +583,9 @@ def getCanvasSnapshot(roomID):
     cursor.execute("SELECT canvas FROM canvases WHERE roomID = %s",(roomID,))
     result = cursor.fetchone()
     if result is None:
-      return {"success": False, "message": "canvas does not exist"}, 500
-    canvasKey = result[0]
-    url = getS3Url(canvasKey)
+      return {"success": False, "message": "canvas does not exist"}, 404
+    key = result[0]
+    url = getS3Url(key)
 
   return {"success": True, "data": {"url": url}}, 200
 
@@ -574,9 +613,8 @@ def createUser():
   with AccessDatabase() as cursor:
     cursor.execute("SELECT 1 FROM users WHERE userID = %s", (session["userID"],))
     exists = cursor.fetchone() is not None
-
     if (not exists):
-      cursor.execute("INSERT INTO users (userID, username, avatar, images, rooms) VALUES (%s, %s, %s, %s, %s)", (session["userID"], None, "http://localhost:5000/users/images/public/willow.png", "[]","[]"))
+      cursor.execute("INSERT INTO users (userID, username, images, rooms) VALUES (%s, %s, %s, %s)", (session["userID"], None, "[]","[]"))
 
 #-----------------AUTH0 STUFF------------------
 
@@ -598,7 +636,7 @@ def callback():
   session["userID"] = jwt.decode(token["id_token"], key=JWKS)["sub"]
   createUser()
 
-  return redirect("http://localhost:3000/platform")
+  return redirect(f"{FRONTEND_URL}/platform")
 
 # Ends the user's session, and redirects them to home page.
 @app.route("/logout")
@@ -610,7 +648,7 @@ def logout():
     + "/v2/logout?"
     + urlencode(
         {
-          "returnTo": "http://localhost:3000", 
+          "returnTo": FRONTEND_URL, 
           "client_id": AUTH0_CLIENT_ID,
         },
         quote_via=quote_plus,
@@ -620,19 +658,41 @@ def logout():
 # -----------------S3 STUFF (TEMPLATES THAT I USE IN A SECOND)--------------------
 # All are called within handleError
 
+@app.route("/defaultAvatars")
+def getDefaultAvatars():
+  avatars = listS3DefaultAvatars()
+  avatarKeys = [obj["Key"] for obj in avatars] 
+  return {"success": True, "data": {"keys": avatarKeys}}, 200
+
+
 def s3Upload(fileObj, key):
   s3.upload_fileobj(fileObj, S3_BUCKET_NAME, key)
+
+def getS3File(key):
+  fileObj = s3.get_object(
+    Bucket=S3_BUCKET_NAME,
+    Key=key
+  )
+  return fileObj["Body"]
 
 def getS3Url(key):
   url = s3.generate_presigned_url(
     "get_object", 
-    Params={"Bucket": S3_BUCKET_NAME, "Key", key}, 
-    ExpiresIn=3600)  return
+    Params={"Bucket": S3_BUCKET_NAME, "Key": key}, 
+    ExpiresIn=3600)  
 
   return url
 
 def s3Delete(key):
   s3.delete_object(Bucket=S3_BUCKET_NAME, Key=key)
+
+def listS3DefaultAvatars():
+  items = s3.list_objects_v2(
+    Bucket=S3_BUCKET_NAME, 
+    Prefix="public/avatars/default/"
+  )
+  return items["Contents"]
+  
 
 # -------------------Miscellaneous------
 # returns random 6 digit string. [A-Z]or [0-9]. Letters more likely
