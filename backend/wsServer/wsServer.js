@@ -1,3 +1,4 @@
+import "dotenv/config"
 import http from "http"
 import {WebSocketServer} from "ws"
 import mediasoup from "mediasoup"
@@ -10,7 +11,6 @@ import { draw, linefill as fill, clear, importImage, moveArea} from "../../utils
 import { writeFileSync } from "fs"
 import { buffer } from "stream/consumers"
 
-import "dotenv/config"
 
 const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID
 const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET
@@ -432,7 +432,10 @@ async function sendServerInfo(uuid) {
     })
     roomHistories.push(
       getCanvasSnapshotReq(roomID, token)
-      .then(url => loadImage(url))
+      .then(url => {
+        console.log(url)
+        return loadImage(url)
+      })
       .then(img => {
         cxt.drawImage(img,0,0);
         return canvas

@@ -5,7 +5,7 @@ import MainDisplay from "./MainDisplay"
 import { getUserInfoReq } from "backend/requests"
 import AllProviders from "src/providers/00_AllProviders"
 
-const NODE_PUBLIC_HTTP_BACKEND_URL = process.env.NODE_PUBLIC_HTTP_BACKEND_URL
+const NEXT_PUBLIC_HTTP_BACKEND_URL = process.env.NEXT_PUBLIC_HTTP_BACKEND_URL
 
 async function PlatformLayout({ children }) {
 
@@ -16,12 +16,13 @@ async function PlatformLayout({ children }) {
 
   const initialUserInfo = await getUserInfoReq(session) 
   if (!initialUserInfo){
-    session && redirect(`${NODE_PUBLIC_HTTP_BACKEND_URL}/logout`)
+    session && redirect(`${NEXT_PUBLIC_HTTP_BACKEND_URL}/logout`)
     redirect(`/`) 
   }
 
   initialUserInfo["storedRoomID"] = storedRoomID
   initialUserInfo["storedRoomName"] = storedRoomName
+  initialUserInfo["avatar"] = `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${initialUserInfo["username"]}`
   
   const username = initialUserInfo["username"]
 

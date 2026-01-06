@@ -1,6 +1,8 @@
 const baseurl = typeof window === "undefined" 
-? process.env.FRONTEND_URL
-: import.meta.env.FRONTEND_URL
+? process.env.HTTP_BACKEND_URL
+: process.env.NEXT_PUBLIC_HTTP_BACKEND_URL
+
+console.log(typeof window === "undefined", baseurl, process.env.NEXT_PUBLIC_HTTP_BACKEND_URL)
 
 function handleError(fn){
   return async (...args) => {
@@ -53,7 +55,7 @@ async function assignUsernameReq(username) {
   return data
 }
 async function updateProfilePictureReq(key) {
-  const response = await fetch(baseurl + "/users", {
+  const response = await fetch(baseurl + "/users/images/profile", {
     "method": "PUT",
     "credentials": "include",
     "headers": {"Content-Type": "application/json"},
@@ -189,7 +191,7 @@ async function uploadFilesReq(files) {
   if (!data.success){
     throw new Error(data.message ||"req failed")
   }
-  return data["data"]
+  return data["data"]["fileList"]
 }
 async function storeMessageReq(message, roomID, token=null) {
   let options;

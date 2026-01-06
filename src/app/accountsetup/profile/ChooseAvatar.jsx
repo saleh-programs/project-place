@@ -26,7 +26,7 @@ function ChooseAvatar({initialUserInfo, publicImages}){
   useEffect(()=>{
     setAvailableImages([...publicImages, ...userInfoRef.current["images"]]) 
   },[])
-  
+
   useEffect(()=>{
     if (!isUploadingImage || !pannableImageRef.current) return
     const img = storedImageRef.current
@@ -143,7 +143,7 @@ function ChooseAvatar({initialUserInfo, publicImages}){
           {
             availableImages.map(({url, key})=>{
               return (
-                <div key={url} onClick={()=> url !== selectedAvatar ? setSelectedAvatar({url, key}) : setSelectedAvatar(null)} className={`${styles.imgContainer} ${selectedAvatar === url ? styles.selected : ""}`}>
+                <div key={url} onClick={()=> url !== selectedAvatar ? setSelectedAvatar({url, key}) : setSelectedAvatar(null)} className={`${styles.imgContainer} ${selectedAvatar?.["url"] === url ? styles.selected : ""}`}>
                   <img src={url} alt="nth" /> 
                 </div>
               )

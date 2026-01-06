@@ -26,13 +26,11 @@ S3_BUCKET_NAME = env.get("S3_BUCKET_NAME")
 APP_SECRET_KEY = env.get("APP_SECRET_KEY")
 
 AUTH0_DOMAIN = env.get('AUTH0_DOMAIN')
-AUTH0_CLIENT_ID = env.get("AUTH0_CLIENT_ID"),
+AUTH0_CLIENT_ID = env.get("AUTH0_CLIENT_ID")
 AUTH0_CLIENT_SECRET = env.get("AUTH0_CLIENT_SECRET")
 AUTH0_API_AUDIENCE = env.get("AUTH0_API_AUDIENCE")
 
-
 DB_PASSWORD = env.get("DB_PASSWORD")
-
 FRONTEND_URL = env.get("FRONTEND_URL")
 
 
@@ -134,8 +132,7 @@ with AccessDatabase() as cursor:
       username VARCHAR(70),
       timestamp BIGINT,
       edited BOOLEAN,
-      files JSON,
-      dimensions JSON
+      files JSON
     )
     '''
   )
@@ -200,11 +197,9 @@ def assignUsername():
 
   avatars = listS3DefaultAvatars()
   chosenAvatar = choice(avatars)["Key"]
-  extension = chosenAvatar.split(".")[-1]
-
   fileInfo = getS3File(chosenAvatar)
   
-  key = f"public/avatar/{username}.{extension}"
+  key = f"public/avatars/{username}"
   s3Upload(fileInfo["Body"], key, fileInfo["ContentType"])
 
   with AccessDatabase() as cursor:
@@ -227,7 +222,7 @@ def updateProfilePicture():
 
     fileInfo = getS3File(key)
     extension = key.split(".")[-1]
-    userAvatarKey = f"public/avatars/{username}.{extension}"
+    userAvatarKey = f"public/avatars/{username}"
 
     s3Upload(fileInfo["Body"], userAvatarKey, fileInfo["ContentType"])
   return {"success": True}, 200
@@ -350,7 +345,7 @@ def createRoom():
     canvasImg = Image.new(mode = "RGBA", size=(1000,1000), color=(0,0,0,0))
     buffer = io.BytesIO()
     canvasImg.save(buffer, format="PNG")
-
+    buffer.seek(0)
     key = f"canvases/{str(uuid.uuid4())}.png"
     s3Upload(buffer, key, "image/png")
     cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (key, "[]", roomID))
@@ -361,29 +356,34 @@ def createRoom():
 @authenticateClient
 def uploadFiles():
   files = request.files.getlist("files")
-  urls = []
-  dimensions = []
+  fileList = []
   for file in files:
     extension = file.filename.split(".")[-1].lower()
     allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
     if extension not in allowedExtensions or len(extension) == len(file.filename):
       return {"success": False}, 500
 
+    data = file.read()
     key = f"chats/{str(uuid.uuid4())}.{extension}"
-    s3Upload(file, key, file.mimetype)
-    url = getS3Url(key)
-    urls.append(url)
 
-    fileType = file.mimetype.split("/")[0]
-    if (fileType == "image"):
-      file.seek(0)
-      with Image.open(file) as img:
+    s3Upload(io.BytesIO(data), key, file.mimetype)
+    url = getS3Url(key)
+    dimensions = None
+
+    if (file.mimetype.split("/")[0] == "image"):
+      with Image.open(io.BytesIO(data)) as img:
         w,h = img.size
-        dimensions.append([w, h])
-    else:
-      dimensions.append(None)
+        dimensions = [w, h]
+    fileList.append({
+      "path": url,
+      "key": key,
+      "mimeType": file.mimetype,
+      "dimensions": dimensions
+    })
     
-  return jsonify({"success":True, "data": {"paths": urls, "dimensions": dimensions}}),200
+  
+
+  return jsonify({"success":True, "data": {"fileList": fileList}}),200
 
 # @app.route("/rooms/files/<fileID>", methods=["GET"])
 # @handleError("failed to get file")
@@ -465,8 +465,8 @@ def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
   with AccessDatabase() as cursor:  
-    cursor.execute("INSERT INTO messages (username, text, files, dimensions, messageID, timestamp, roomID) VALUES (%s, %s, %s, %s,%s, %s, %s)", 
-    (message["username"], message["text"], json.dumps(message["files"]),json.dumps(message["metadata"]["dimensions"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
+    cursor.execute("INSERT INTO messages (username, text, files, messageID, timestamp, roomID) VALUES (%s, %s, %s,%s, %s, %s)", 
+    (message["username"], message["text"], json.dumps(message["files"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
 
   return jsonify({"success":True}),200
 
@@ -495,7 +495,7 @@ def deleteMessage(roomID):
     if (files):
       files = json.loads(files[0])
       for f in files:
-        s3Delete(f)
+        s3Delete(f["key"])
     cursor.execute("DELETE FROM messages WHERE messageID = %s", (messageID,))
     
   return jsonify({"success":True}),200
@@ -505,25 +505,23 @@ def deleteMessage(roomID):
 @authenticateServer
 def getMessages(roomID):
   with AccessDatabase() as cursor:
-    cursor.execute("SELECT username, text, files, dimensions, timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
+    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s ORDER BY id DESC LIMIT 100", (roomID,))
     messages = cursor.fetchall()
     jsonMessages = []
     for i in range(len(messages)-1,-1,-1):
       tpl = messages[i]
       files = json.loads(tpl[2])
-      urls = []
       for f in files:
-        url = getS3Url(f)
-        urls.append(url)
+        url = getS3Url(f["key"])
+        f["path"] = url
 
       jsonMessages.append({
         "username": tpl[0],
         "text": tpl[1],
-        "files": urls,
+        "files": files,
         "metadata": {
-          "dimensions": json.loads(tpl[3]),
-          "timestamp": tpl[4],
-          "messageID": tpl[5],
+          "timestamp": tpl[3],
+          "messageID": tpl[4],
         }
       })
   return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
@@ -537,25 +535,23 @@ def getMoreMessages(roomID):
 
     cursor.execute("SELECT id FROM messages WHERE messageID = %s", (messageID,))
     lastID = cursor.fetchone()[0]
-    cursor.execute("SELECT username, text, files, dimensions, timestamp, messageID FROM messages WHERE roomID = %s AND id < %s ORDER BY id DESC LIMIT 100", (roomID, lastID))
+    cursor.execute("SELECT username, text, files, timestamp, messageID FROM messages WHERE roomID = %s AND id < %s ORDER BY id DESC LIMIT 100", (roomID, lastID))
     messages = cursor.fetchall()
 
     jsonMessages = []
     for i in range(len(messages)-1,-1,-1):
       tpl = messages[i]
       files = json.loads(tpl[2])
-      urls = []
       for f in files:
-        url = getS3Url(f)
-        urls.append(url)
+        url = getS3Url(f["key"])
+        f["path"] = url
       jsonMessages.append({
         "username": tpl[0],
         "text": tpl[1],
-        "files": urls,
+        "files": files,
         "metadata": {
-          "dimensions": json.loads(tpl[3]),
-          "timestamp": tpl[4],
-          "messageID": tpl[5] 
+          "timestamp": tpl[3],
+          "messageID": tpl[4] 
         }
       })
   return jsonify({"success": True, "data": {"messages": jsonMessages} }), 200
@@ -694,7 +690,8 @@ def listS3DefaultAvatars():
     Bucket=S3_BUCKET_NAME, 
     Prefix="public/avatars/default/"
   )
-  return items["Contents"]
+
+  return [item for item in items["Contents"] if not item["Key"] == "public/avatars/default/"]
   
 
 # -------------------Miscellaneous------

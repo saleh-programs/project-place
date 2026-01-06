@@ -1,11 +1,12 @@
 import { memo, useContext, useEffect, useRef, useState } from "react"
 
-import { UserContext, WebSocketContext } from "src/providers/contexts"
+import { PeersContext, UserContext, WebSocketContext } from "src/providers/contexts"
 import styles from "styles/components/ChooseImage.module.css"
 import { uploadNewImageReq, getDefaultAvatars, updateProfilePictureReq } from "backend/requests"
 
 function ChooseImage({setIsChangingImage}){
   const {userInfo, setUserInfo} = useContext(UserContext)
+  const {setUserStates} = useContext(PeersContext)
   const {sendJsonMessage} = useContext(WebSocketContext)
 
   const [availableImages, setAvailableImages] = useState([])
@@ -25,7 +26,7 @@ function ChooseImage({setIsChangingImage}){
   const publicImagesRef = useRef([])
 
   useEffect(()=>{
-    getDefaultAvatars
+    getDefaultAvatars()
     .then(imgs => {
       publicImagesRef.current = imgs
       setAvailableImages([...publicImagesRef.current, ...userInfo["images"]])
@@ -53,16 +54,33 @@ function ChooseImage({setIsChangingImage}){
     if (!result){
       return
     }
+    const newURL = `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${userInfo["username"]}?r=${Date.now()}`
     setUserInfo(prev => {
-      return {...prev}
+      return {
+        ...prev,
+        "avatar": newURL
+      }
     })
+
     sendJsonMessage({
       "origin": "user",
       "type": "userInfo",
       "username": userInfo["username"], 
-      "data": {}
+      "data": {
+        "avatar": newURL
+      }
     })
+    setUserStates(prev => {
 
+      if (JSON.stringify(prev) === "{}") return prev
+      return {
+        ...prev,
+        [userInfo["username"]]: {
+          ...prev[userInfo["username"]],
+          "avatar": newURL
+        }
+      }
+    })
     setIsChangingImage(false)
   }
 

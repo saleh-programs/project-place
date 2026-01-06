@@ -96,7 +96,7 @@ function BallContainer({userList}){
             let exists = false
             
             for (let ball of ballGroup.current){
-                if (ball.metadata === user["username"]){
+                if (ball.metadata === user["avatar"]){
                     exists = true
                     newBallGroup.push(ball)
                     break
@@ -106,7 +106,7 @@ function BallContainer({userList}){
                 continue
             } 
             const origin = {x: Math.floor(Math.random() * canvasRef.current.width),y: Math.floor(Math.random() * canvasRef.current.height)}
-            const ball = new Ball(origin, ballGroup, canvasRef.current.width, canvasRef.current.height, null, user["username"], BALL_RADIUS)
+            const ball = new Ball(origin, ballGroup, canvasRef.current.width, canvasRef.current.height, null, user["avatar"], BALL_RADIUS)
 
             const img = new Image()
             img.src = user["avatar"]

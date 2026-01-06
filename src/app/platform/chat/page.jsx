@@ -62,7 +62,6 @@ function Chat(){
       "messageID": string,
       "edited": boolean,
       "status": string,
-      "dimensions": []
       },
   }
   Grouped Message Structure:
@@ -344,7 +343,6 @@ function Chat(){
         "timestamp": currTime,
         "messageID": messageID,
         "edited": false,
-        "dimensions": []
       }
     }
     sendJsonMessage({
@@ -387,12 +385,11 @@ function Chat(){
     const msg = {
       "username": username,
       "text": "",
-      "files": filePaths["paths"],
+      "files": filePaths,
       "metadata":{
         "timestamp": currTime,
         "messageID": messageID,
         "edited": false,
-        "dimensions": filePaths["dimensions"]
       }
     }
     sendJsonMessage({
@@ -601,8 +598,9 @@ function Chat(){
     if (msg["username"] !== username){
       return (
         <div key={msgID} id={msgID} className={styles.message}>
-          {msg["files"].map((filePath, i) => {
-            return <FileViewer key={filePath} url={filePath} dimensions={msg["metadata"]["dimensions"][i]}/>
+          {msg["files"].map(fileInfo => {
+            const {path, dimensions, mimeType} = fileInfo
+            return <FileViewer key={path} url={path} dimensions={dimensions} type={mimeType}/>
           })}
           {msg["text"]}
           {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}
@@ -611,8 +609,9 @@ function Chat(){
     }
     return (
       <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
-        {msg["files"].map((filePath, i) => {
-          return <FileViewer key={filePath} url={filePath} dimensions={msg["metadata"]["dimensions"][i]}/>
+        {msg["files"].map(fileInfo => {
+          const {path, dimensions, mimeType} = fileInfo
+          return <FileViewer key={path} url={path} dimensions={dimensions} type={mimeType}/>
         })}
         {selectedID === msgID && isEditing
           ?
@@ -717,7 +716,7 @@ function Chat(){
             <section className={styles.miniFileView}>
               {filePreviews.map(f => {
                 const url = URL.createObjectURL(f);
-                return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} manualMimeType={f.type}/> <button onClick={()=>setFilePreviews(filePreviews.filter(file=>f!==file))}>X</button></span>
+                return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} type={f.type}/> <button onClick={()=>setFilePreviews(filePreviews.filter(file=>f!==file))}>X</button></span>
               })}
             </section>
             <section className={styles.chatHubMain}>

@@ -37,11 +37,11 @@ const extensionToMimeType = {
     
 }
 
-function FileViewer({url, dimensions, manualMimeType = null}){
+function FileViewer({url, dimensions, type = null}){
     function getFile(){
         let mimeType = "application/octet-stream"
         let extension;
-        if (!manualMimeType){
+        if (!type){
             extension = url.split(".").at(-1).toLowerCase()
             if (extension.length === url.length){
                 return
@@ -50,7 +50,7 @@ function FileViewer({url, dimensions, manualMimeType = null}){
                 mimeType = extensionToMimeType[extension]
             }
         }else{
-            mimeType = manualMimeType;
+            mimeType = type;
         }
 
         const [fileCategory, fileKind] = mimeType.split("/")
