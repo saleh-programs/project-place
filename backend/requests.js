@@ -52,6 +52,19 @@ async function assignUsernameReq(username) {
 
   return data
 }
+async function updateProfilePictureReq(key) {
+  const response = await fetch(baseurl + "/users", {
+    "method": "PUT",
+    "credentials": "include",
+    "headers": {"Content-Type": "application/json"},
+    "body": JSON.stringify({"key": key})
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
+  }
+  return data
+}
 async function validateUsernameReq(username) {
   const response = await fetch(baseurl + `/users/${username}`, {
     "method": "GET",
@@ -75,7 +88,7 @@ async function uploadNewImageReq(imageFile) {
   if (!data.success){
     throw new Error(data.message || "req failed")
   }
-  return data["data"]["path"]
+  return data["data"]["image"]
 }
 
 
@@ -93,7 +106,6 @@ async function createRoomReq(roomName, password=null) {
   }
   return data["data"]["roomID"]
 }
-
 async function checkRoomExistsReq(roomID) {
   const response = await fetch(baseurl + `/rooms/${roomID}/exists`,{
     "method": "GET",
@@ -161,6 +173,7 @@ async function validateRoomUserReq(roomID, username, token=null) {
 
   return data["data"]?.["username"]
 }
+
 
 async function uploadFilesReq(files) {
   const fileInfo = new FormData()
@@ -335,7 +348,6 @@ async function getCanvasSnapshotReq(roomID, token=null){
   }
   return data["data"]["url"]
 }
-
 async function updateCanvasInstructionsReq(instructions, roomID, token=null) {
   let options;
   if (token){
@@ -383,11 +395,27 @@ async function getCanvasInstructionsReq(roomID, token=null){
   return data["data"]["instructions"]
 }
 
+async function getDefaultAvatars() {
+  const response = await fetch(baseurl + "/defaultAvatars")
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
+  }
+  const publicImages = data["data"]["keys"].map(key => {
+    return ({
+      key,
+      url: `https://project-place-assets.s3.us-east-2.amazonaws.com/${key}`
+    })
+  })
+  return publicImages
+}
+
 getUserInfoReq = handleError(getUserInfoReq)
 assignUsernameReq = handleError(assignUsernameReq)
 validateUsernameReq = handleError(validateUsernameReq)
 getUserInfoReq = handleError(getUserInfoReq)
 uploadNewImageReq = handleError(uploadNewImageReq)
+updateProfilePictureReq = handleError(updateProfilePictureReq)
 
 createRoomReq = handleError(createRoomReq)
 checkRoomExistsReq = handleError(checkRoomExistsReq)
@@ -408,6 +436,7 @@ getCanvasSnapshotReq = handleError(getCanvasSnapshotReq)
 updateCanvasInstructionsReq = handleError(updateCanvasInstructionsReq)
 getCanvasInstructionsReq = handleError(getCanvasInstructionsReq)
 
+getDefaultAvatars = handleError(getDefaultAvatars)
 
 
 function getUniqueMessageID(){
@@ -421,5 +450,7 @@ function getUniqueMessageID(){
 
 export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, validateRoomUserReq, updateCanvasInstructionsReq, getCanvasInstructionsReq,
   createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
-  getUserInfoReq, assignUsernameReq, getUserRoomsReq, validateUsernameReq,
-  uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq}
+  getUserInfoReq, assignUsernameReq, getUserRoomsReq, validateUsernameReq, updateProfilePictureReq,
+  uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq,
+  getDefaultAvatars
+}
