@@ -2,7 +2,7 @@ import { memo, useContext, useEffect, useRef, useState } from "react"
 
 import { UserContext, WebSocketContext } from "src/providers/contexts"
 import styles from "styles/components/ChooseImage.module.css"
-import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
+import { uploadNewImageReq, getDefaultAvatars, updateProfilePictureReq } from "backend/requests"
 
 function ChooseImage({setIsChangingImage}){
   const {userInfo, setUserInfo} = useContext(UserContext)
@@ -22,14 +22,15 @@ function ChooseImage({setIsChangingImage}){
 
   const VIEWPORT_DIAMETER = 150
   
-  const publicImages = [
-      "http://localhost:5000/users/images/public/willow.png",
-      "http://localhost:5000/users/images/public/man.png",
-      "http://localhost:5000/users/images/public/dude.png",
-    ]
+  const publicImagesRef = useRef([])
 
   useEffect(()=>{
-    setAvailableImages([...publicImages, ...userInfo["images"]]) 
+    getDefaultAvatars
+    .then(imgs => {
+      publicImagesRef.current = imgs
+      setAvailableImages([...publicImagesRef.current, ...userInfo["images"]])
+    })
+    setAvailableImages([...userInfo["images"]])
   },[])
   
   useEffect(()=>{
@@ -47,24 +48,19 @@ function ChooseImage({setIsChangingImage}){
     panImageInfo.current["translateY"] = 0
   },[isUploadingImage])
 
-  async function setNewUserImage(imageURL){
-    const result = await updateUserInfoReq({"avatar": imageURL})
+  async function setNewUserImage(key){
+    const result = await updateProfilePictureReq(key)
     if (!result){
       return
     }
     setUserInfo(prev => {
-      return {
-        ...prev,
-        "avatar": imageURL
-      }
+      return {...prev}
     })
     sendJsonMessage({
       "origin": "user",
       "type": "userInfo",
       "username": userInfo["username"], 
-      "data": {
-        "avatar": imageURL
-      }
+      "data": {}
     })
 
     setIsChangingImage(false)
@@ -91,6 +87,7 @@ function ChooseImage({setIsChangingImage}){
     })
     return new File([blob], "temp.png", {"type": "image/png"})
   }
+
   async function uploadNewImage(e){ 
     const croppedUpload = document.createElement("canvas")
     croppedUpload.width = VIEWPORT_DIAMETER
@@ -102,19 +99,16 @@ function ChooseImage({setIsChangingImage}){
       return
     }
     setIsUploadingImage(false)
-
     let newImagesList = [...userInfo["images"], newPath]
-    const result = await updateUserInfoReq({"images": JSON.stringify(newImagesList)})
-    if (!result){
-      return 
-    }
+
     setUserInfo((prev) => {
       return {
         ...prev,
         "images": newImagesList
       }
     })
-    setAvailableImages([...publicImages, ...newImagesList])
+
+    setAvailableImages([...publicImagesRef.current, ...newImagesList])
     e.target.value = ""
   }
 
@@ -134,7 +128,6 @@ function ChooseImage({setIsChangingImage}){
       let newShiftX = panImageInfo.current["translateX"]
       let newShiftY = panImageInfo.current["translateY"]
 
-      console.log(viewportRect.width, viewportRect.right - viewportRect.left)
       const withinHorizontalBounds = 
       (canvasRect.left + offset[0] <= viewportRect.left) && 
       (canvasRect.right + offset[0] >= viewportRect.right)
@@ -171,10 +164,10 @@ function ChooseImage({setIsChangingImage}){
       <h1>Choose Your Avatar</h1>
       <section className={styles.scrollableImages}>
         {
-          availableImages.map((imageURL)=>{
+          availableImages.map(({url, key})=>{
             return (
-              <div key={imageURL} onClick={()=>setNewUserImage(imageURL)} className={styles.imgContainer}>
-                <img src={imageURL} alt="nth" /> 
+              <div key={url} onClick={()=>setNewUserImage(key)} className={styles.imgContainer}>
+                <img src={url} alt="nth" /> 
               </div>
             )
           })

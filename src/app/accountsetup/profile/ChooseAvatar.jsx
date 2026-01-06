@@ -1,11 +1,11 @@
 "use client"
 
 import styles from "styles/accountsetup/ChooseAvatar.module.css"
-import { updateUserInfoReq, uploadNewImageReq } from "backend/requests"
+import { uploadNewImageReq, updateProfilePictureReq } from "backend/requests"
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 
-function ChooseAvatar({initialUserInfo}){
+function ChooseAvatar({initialUserInfo, publicImages}){
   const router = useRouter()
   const [availableImages, setAvailableImages] = useState([])
   const [isUploadingImage, setIsUploadingImage] = useState(false)
@@ -22,11 +22,6 @@ function ChooseAvatar({initialUserInfo}){
   const userInfoRef = useRef({...initialUserInfo})
 
   const VIEWPORT_DIAMETER = 150
-  const publicImages = [
-      "http://localhost:5000/users/images/public/willow.png",
-      "http://localhost:5000/users/images/public/man.png",
-      "http://localhost:5000/users/images/public/dude.png",
-    ]
 
   useEffect(()=>{
     setAvailableImages([...publicImages, ...userInfoRef.current["images"]]) 
@@ -48,10 +43,8 @@ function ChooseAvatar({initialUserInfo}){
 
   async function setNewUserImage(){
     if (!selectedAvatar) return
-    const result = await updateUserInfoReq({"avatar": selectedAvatar})
-    if (!result){
-      return
-    }
+    const result = await updateProfilePictureReq(selectedAvatar["key"])
+    if (!result) return
     router.push("/platform")
   }
 
@@ -76,23 +69,20 @@ function ChooseAvatar({initialUserInfo}){
     })
     return new File([blob], "temp.png", {"type": "image/png"})
   }
+
   async function uploadNewImage(e){ 
     const croppedUpload = document.createElement("canvas")
     croppedUpload.width = VIEWPORT_DIAMETER
     croppedUpload.height = VIEWPORT_DIAMETER
     croppedUpload.getContext("2d").drawImage(pannableImageRef.current, -1 * panImageInfo.current["translateX"], -1 * panImageInfo.current["translateY"], VIEWPORT_DIAMETER, VIEWPORT_DIAMETER, 0, 0, VIEWPORT_DIAMETER, VIEWPORT_DIAMETER)
     const file = await convertCanvasToFile(croppedUpload)
-    const newPath = await uploadNewImageReq(file)
-    if (!newPath){
+    const newImg = await uploadNewImageReq(file)
+    if (!newImg){
       return
     }
     setIsUploadingImage(false)
 
-    let newImagesList = [...userInfoRef.current["images"], newPath]
-    const result = await updateUserInfoReq({"images": JSON.stringify(newImagesList)})
-    if (!result){
-      return
-    }
+    let newImagesList = [...userInfoRef.current["images"], newImg]
     userInfoRef.current["images"] = newImagesList
     setAvailableImages([...publicImages, ...newImagesList])
     e.target.value = ""
@@ -151,10 +141,10 @@ function ChooseAvatar({initialUserInfo}){
         <h1>Choose Your Avatar</h1>
         <section className={styles.scrollableImages}>
           {
-            availableImages.map((imageURL)=>{
+            availableImages.map(({url, key})=>{
               return (
-                <div key={imageURL} onClick={()=> imageURL !== selectedAvatar ? setSelectedAvatar(imageURL) : setSelectedAvatar(null)} className={`${styles.imgContainer} ${selectedAvatar === imageURL ? styles.selected : ""}`}>
-                  <img src={imageURL} alt="nth" /> 
+                <div key={url} onClick={()=> url !== selectedAvatar ? setSelectedAvatar({url, key}) : setSelectedAvatar(null)} className={`${styles.imgContainer} ${selectedAvatar === url ? styles.selected : ""}`}>
+                  <img src={url} alt="nth" /> 
                 </div>
               )
             })

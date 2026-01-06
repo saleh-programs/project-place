@@ -6,50 +6,56 @@ function PeersProvider({children}){
     const {siteHistoryRef} = useContext(RoomContext)
     const [userStates, setUserStates] = useState({})
     
-    function updateUserStates(data){
-        switch (data.type){
+    function updateUserStates(data) {
+        switch (data.type) {
             case "newUser":
-            setUserStates(prev => {
-                return ({
-                ...prev, 
-                [data["username"]]: {
-                    "avatar": `http://localhost:5000/users/images/${data["username"]}`,
-                    "status": "idle",
-                    "location": "chat"
-                }})
-            })
-            break
+                setUserStates(prev => {
+                    return {
+                        ...prev,
+                        [data["username"]]: {
+                            avatar: `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${data["username"]}`,
+                            status: "idle",
+                            location: "chat"
+                        }
+                    };
+                });
+                break;
+
             case "userInfo":
-            setUserStates(prev => {
-                console.log(prev)
-                return ({
-                ...prev, 
-                [data["username"]]: {
-                    ...prev[data["username"]],
-                    ...data["data"]
-                }})
-            })
-            break
+                setUserStates(prev => {
+                    return {
+                        ...prev,
+                        [data["username"]]: {
+                            ...prev[data["username"]],
+                            ...data["data"]
+                        }
+                    };
+                });
+                break;
             case "getUsers":
-            const users = {
-                [username]: {
-                "avatar": userInfo["avatar"],
-                "status": "idle",
-                "location": "chat"
-                }
-            }
-            data["data"].forEach(user => {
-                users[user] = {
-                "avatar": `http://localhost:5000/users/images/${user}`,
-                "status": "idle",
-                "location": "chat"          
-                }
-            })
-            setUserStates(users)
-            siteHistoryRef.current["userHistoryReceived"] = true;
-            break
+                const users = {
+                    [username]: {
+                        avatar: userInfo["avatar"],
+                        status: "idle",
+                        location: "chat"
+                    }
+                };
+
+                data["data"].forEach(user => {
+                    users[user] = {
+                        avatar: `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${user}`,
+                        status: "idle",
+                        location: "chat"
+                    };
+                });
+
+                setUserStates(users);
+                siteHistoryRef.current["userHistoryReceived"] = true;
+                break;
         }
     }
+
+    
     const value = useMemo(() => ({userStates, setUserStates, updateUserStates}), [userStates])
 
     return(
