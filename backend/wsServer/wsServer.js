@@ -8,8 +8,6 @@ import {v4 as uuidv4} from "uuid"
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
 import { draw, linefill as fill, clear, importImage, moveArea} from "../../utils/canvasArt.js"
-import { writeFileSync } from "fs"
-import { buffer } from "stream/consumers"
 
 
 const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID
@@ -433,7 +431,6 @@ async function sendServerInfo(uuid) {
     roomHistories.push(
       getCanvasSnapshotReq(roomID, token)
       .then(url => {
-        console.log(url)
         return loadImage(url)
       })
       .then(img => {
@@ -597,6 +594,6 @@ async function updateServerCanvas(data, roomID){
 
 
 
-httpServer.listen(8000,()=>{
+httpServer.listen(8001, "0.0.0.0", ()=>{
   console.log("started main server")
 })

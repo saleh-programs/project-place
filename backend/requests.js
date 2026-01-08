@@ -2,8 +2,6 @@ const baseurl = typeof window === "undefined"
 ? process.env.HTTP_BACKEND_URL
 : process.env.NEXT_PUBLIC_HTTP_BACKEND_URL
 
-console.log(typeof window === "undefined", baseurl, process.env.NEXT_PUBLIC_HTTP_BACKEND_URL)
-
 function handleError(fn){
   return async (...args) => {
     try{
@@ -16,11 +14,11 @@ function handleError(fn){
 }
 
 
-async function getUserInfoReq(session) {
+async function getUserInfoReq(storedCookies) {
   const response = await fetch(baseurl + "/users",{
       "method": "GET",
       "headers": {
-        "cookie": `session=${session}`
+        "cookie": storedCookies
       }
   })
   const data = await response.json()

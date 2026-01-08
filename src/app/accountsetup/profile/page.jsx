@@ -6,10 +6,10 @@ const NEXT_PUBLIC_HTTP_BACKEND_URL = process.env.NEXT_PUBLIC_HTTP_BACKEND_URL
 
 async function Profile(){
     const allCookies = await cookies()
-    const session = allCookies.get("session")?.value
 
-    const [initialUserInfo, publicImages] = await Promise.all([getUserInfoReq(session), getDefaultAvatars()])
+    const [initialUserInfo, publicImages] = await Promise.all([getUserInfoReq(allCookies.toString()), getDefaultAvatars()])
     if (!initialUserInfo){
+        const session = allCookies.get("session")?.value
         session && redirect(`${NEXT_PUBLIC_HTTP_BACKEND_URL}/logout`)
         redirect(`/`) 
     }

@@ -15,6 +15,8 @@ import requests
 from flask import Flask, Response, request, jsonify, redirect, render_template, session, url_for, send_file
 from flask_cors import CORS
 import uuid
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env")
 
@@ -31,6 +33,7 @@ AUTH0_CLIENT_SECRET = env.get("AUTH0_CLIENT_SECRET")
 AUTH0_API_AUDIENCE = env.get("AUTH0_API_AUDIENCE")
 
 DB_PASSWORD = env.get("DB_PASSWORD")
+HTTP_BACKEND_URL = env.get("HTTP_BACKEND_URL")
 FRONTEND_URL = env.get("FRONTEND_URL")
 
 
@@ -45,6 +48,12 @@ s3 = boto3.client(
 # create flask app and register with the Auth0 service
 app = Flask(__name__)
 app.secret_key = APP_SECRET_KEY
+app.config.update(
+    SESSION_COOKIE_SAMESITE="None",
+    SESSION_COOKIE_SECURE=True,
+)
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
 
 jwt = JsonWebToken(["RS256"])
@@ -97,6 +106,8 @@ def handleError(errorMessage):
 def authenticateClient(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
+    print("SESSION:", dict(session))
+
     decodedToken = jwt.decode(session["user"]["access_token"], key=JWKS)
     decodedToken.validate()
     return func(*args, **kwargs)
@@ -165,6 +176,7 @@ with AccessDatabase() as cursor:
 @authenticateClient
 def getUserInfo():
   with AccessDatabase() as cursor:
+    print("here")
     cursor.execute("SELECT username, images FROM users WHERE userID = %s", (session["userID"],))
     values = cursor.fetchone()
     if values is None:
@@ -172,6 +184,7 @@ def getUserInfo():
 
     images = json.loads(values[1])
     imageObjects = []
+    print("before loop")
     for i in range(len(images)):
       imgKey = images[i]
       url = getS3Url(imgKey)
@@ -180,7 +193,7 @@ def getUserInfo():
         "url": url,
         "key": imgKey
       })
-    
+    print("after loop")
     userInfo = {
       "username": values[0],
       "images": imageObjects
@@ -619,15 +632,18 @@ def createUser():
 # Redirects user to auth0 login page
 @app.route("/login")
 def login():
+  print("LOGIN session before redirect:", dict(session))
   # HARDCODE THE URL FOR REDIRECT_URI IF YOU WANT TO TEST MOBILE MURAD
   return oauth.auth0.authorize_redirect(
-    redirect_uri = url_for("callback",_external=True),
+    redirect_uri = url_for("callback", _external=True),
     audience= AUTH0_API_AUDIENCE
   )
  
 # Redirects user to home page (or page after authentication)
 @app.route("/callback", methods=["GET", "POST"])
 def callback():
+  print("CALLBACK cookies:", request.cookies)
+  print("CALLBACK session:", dict(session))
   token = oauth.auth0.authorize_access_token()
   
   session["user"] = token
@@ -708,4 +724,4 @@ def generateRoomCode():
 
 
 if __name__ == "__main__":
-  app.run(host="0.0.0.0",port=5000,debug=True)
+  app.run(host="0.0.0.0",port=5001,debug=False)
