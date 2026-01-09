@@ -15,6 +15,8 @@ function WebSocketProvider({children}){
     const {callOffersRef, setCallOffers, device, stunCandidates} = useContext(VideoChatContext)
 
     const connectedRoomRef = useRef(null)
+    const heartbeatIntervalRef = useRef(null)
+
     const {sendJsonMessage} = useWebSocket(NEXT_PUBLIC_WS_BACKEND_URL, {
         queryParams:{
             "username": username,
@@ -94,6 +96,13 @@ function WebSocketProvider({children}){
         },
         onOpen: () => {
             connectedRoomRef.current = roomID
+            clearInterval(heartbeatIntervalRef.current)
+            heartbeatIntervalRef.current = setInterval(() => {
+                sendJsonMessage({
+                    "origin": "server",
+                    "type": "heartbeat",
+                }) 
+            }, 2000)
         },
         shouldReconnect: () => {
             if (roomIDRef.current === connectedRoomRef.current){
@@ -109,6 +118,7 @@ function WebSocketProvider({children}){
         setRoomName("")
         setUserStates({})
         connectedRoomRef.current = null
+        clearInterval(heartbeatIntervalRef.current)
     }
     
 

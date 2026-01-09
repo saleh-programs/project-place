@@ -104,6 +104,15 @@ wsServer.on("connection", async (connection, request)=>{
 
   const uuid = uuidv4()
   connections[uuid] = connection
+
+  const pingUserTimer = setInterval(()=>{
+    if (!users[uuid]?.["keepAlive"]){
+      connection.close()
+      return
+    }
+    users[uuid]["keepAlive"] = false
+  }, 6000)
+
   users[uuid] = {
     "username": username,
     "roomID": roomID,
@@ -114,11 +123,12 @@ wsServer.on("connection", async (connection, request)=>{
       "producers": [],
       "consumers": [],
       "rtpCapabilities": null
-    }
+    },
+    "keepAlive": true,
+    "pingUserTimer": pingUserTimer
   }
-
+  
   sendServerInfo(uuid);
-
   connection.on("message",(data)=>handleMessage(data, uuid));
   connection.on("close",()=>handleClose(uuid));
 })
@@ -130,8 +140,9 @@ function handleClose(uuid){
     "type": "userLeft",
     "username": users[uuid]["username"],
   })
-  const roomID = users[uuid]["roomID"]
 
+  const roomID = users[uuid]["roomID"]
+  clearInterval(users[uuid]["pingUserTimer"])
   delete connections[uuid]
   delete users[uuid]
   rooms[roomID]["users"] = rooms[roomID]["users"].filter(id => id !== uuid)
@@ -165,6 +176,11 @@ function handleMessage(data, uuid){
       break
     case "user":
       processUser(parsedData, uuid)
+      break
+    case "server":
+      if (parsedData.type === "heartbeat"){
+        users[uuid]["keepAlive"] = true
+      }
       break
   }
 }
