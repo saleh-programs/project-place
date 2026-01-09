@@ -17,10 +17,27 @@ function WebSocketProvider({children}){
     const connectedRoomRef = useRef(null)
     const heartbeatIntervalRef = useRef(null)
 
+    function getLocationSnapshot(){
+        if (locationRef.current || roomID === "") return locationRef.current
+        if (typeof window === "undefined") return "chat"
+        const locations = ["videochat", "chat", "whiteboard"]
+        let currLocation = "chat"
+        for (let i = 0; i < locations.length; i++){
+            if (window.location.pathname.includes(locations[i])){
+                currLocation = locations[i]
+                break
+            }
+        }
+        locationRef.current = currLocation
+        return currLocation
+    }
+    const locationRef = useRef(null)
+
     const {sendJsonMessage} = useWebSocket(NEXT_PUBLIC_WS_BACKEND_URL, {
         queryParams:{
             "username": username,
-            "roomID": roomID
+            "roomID": roomID,
+            "location": getLocationSnapshot()
         }, 
         onMessage:(event)=>{
             if (event.data instanceof Blob){
@@ -103,11 +120,14 @@ function WebSocketProvider({children}){
                     "type": "heartbeat",
                 }) 
             }, 2000)
+            console.log("connect")
         },
         shouldReconnect: () => {
             if (roomIDRef.current === connectedRoomRef.current){
                 exitRoom()
             }
+            console.log("disconnect")
+
             return false
         }
     }, roomID !== "")
@@ -119,6 +139,7 @@ function WebSocketProvider({children}){
         setUserStates({})
         connectedRoomRef.current = null
         clearInterval(heartbeatIntervalRef.current)
+        locationRef.current = null
     }
     
 

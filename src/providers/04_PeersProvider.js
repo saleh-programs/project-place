@@ -15,28 +15,10 @@ function PeersProvider({children}){
                         [data["username"]]: {
                             avatar: `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${data["username"]}`,
                             status: "idle",
-                            location: "chat"
+                            location: data["data"]["location"]
                         }
                     };
                 });
-                const locations = ["videochat", "chat", "whiteboard",]
-                let currLocation = "chat"
-                for (let i = 0; i < locations.length; i++){
-                    if (window.location.pathname.includes(locations[i])){
-                        currLocation = locations[i]
-                        break
-                    }
-                }
-                if (currLocation !== "chat"){
-                    sendJsonMessage({
-                        "toPeer": data["username"],
-                        "origin": "user",
-                        "username": username,
-                        "type": "userInfo",
-                        "data": {"location": currLocation}
-                    })
-                }
-                
                 break;
             }case "userLeft":
                 setUserStates(prev => {
@@ -59,7 +41,7 @@ function PeersProvider({children}){
                 });
                 break;
             case "getUsers":
-                const locations = ["videochat", "chat", "whiteboard",]
+                const locations = ["videochat", "chat", "whiteboard"]
                 let currLocation = "chat"
                 for (let i = 0; i < locations.length; i++){
                     if (window.location.pathname.includes(locations[i])){
@@ -74,23 +56,14 @@ function PeersProvider({children}){
                         location: currLocation
                     }
                 };
-
+                console.log(data["data"])
                 data["data"].forEach(user => {
-                    users[user] = {
-                        avatar: `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${user}`,
+                    users[user["username"]] = {
+                        avatar: `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${user["username"]}`,
                         status: "idle",
-                        location: "chat"
+                        location: user["location"]
                     };
                 });
-                if (currLocation !== "chat"){
-                    sendJsonMessage({
-                        "origin": "user",
-                        "username": username,
-                        "type": "userInfo",
-                        "data": {"location": currLocation}
-                    })
-                }
-
                 setUserStates(users);
                 siteHistoryRef.current["userHistoryReceived"] = true;
                 break;

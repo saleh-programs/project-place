@@ -95,6 +95,8 @@ async function getToken() {
 wsServer.on("connection", async (connection, request)=>{
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
+  const location = url.parse(request.url, true).query.location
+
   const isMember = await validateRoomUserReq(roomID, username, token)
 
   if (!isMember){
@@ -125,7 +127,8 @@ wsServer.on("connection", async (connection, request)=>{
       "rtpCapabilities": null
     },
     "keepAlive": true,
-    "pingUserTimer": pingUserTimer
+    "pingUserTimer": pingUserTimer,
+    "location": location
   }
   
   sendServerInfo(uuid);
@@ -160,6 +163,7 @@ function handleClose(uuid){
 
 function handleMessage(data, uuid){
   const parsedData = JSON.parse(data.toString())
+  console.log(parsedData.origin)
 
   switch (parsedData.origin){
     case "chat":
@@ -408,9 +412,8 @@ async function processPeercall(data, uuid){
 }
 
 function processUser(data, uuid){
-  if (data.hasOwnProperty("toPeer")){
-    broadcastOne(uuid, data, data["toPeer"])
-    return
+  if (data.data?.location){
+    users[uuid]["location"] = data.data.location
   }
   broadcastAll(uuid, data, true)
 }
@@ -428,12 +431,15 @@ async function sendServerInfo(uuid) {
     connection.send(JSON.stringify({
       "origin": "user",
       "type": "getUsers",
-      "data": rooms[roomID]["users"].map(id => users[id]["username"])
+      "data": rooms[roomID]["users"].map(id => {
+        return {"username": users[id]["username"], "location": users[id]["location"]}
+      }),
     }))
     broadcastAll(uuid, {
       "origin": "user",
       "type": "newUser",
-      "username": users[uuid]["username"] 
+      "username": users[uuid]["username"],
+      "data": {"location": users[uuid]["location"]}
     })
 
     rooms[roomID]["users"].push(uuid)

@@ -133,7 +133,8 @@ function Whiteboard(){
   }
 
   async function rebuildCanvas(updateSnapshot = false) {
-    if (!savedCanvasInfoRef.current["snapshot"]){
+    console.log("jere")
+    if (!savedCanvasInfoRef.current["snapshot"] || !canvasRef.current){
       return
     }
 

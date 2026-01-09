@@ -554,7 +554,7 @@ function Chat(){
               clearTimeout(newPeers[i]["timer"])
               newPeers[i]["timer"] = setTimeout(()=>{
                 setPeersTyping(prev2 => prev2.filter(p => p["username"] !== data["username"]))
-              }, 100000) 
+              }, 1000) 
               return newPeers
             }
           }
@@ -562,7 +562,7 @@ function Chat(){
             "username": data["username"],
             "timer":  setTimeout(()=>{
               setPeersTyping(prev2 => prev2.filter(p => p["username"] !== data["username"]))
-            }, 100000) 
+            }, 1000) 
           })
           return newPeers
         })
@@ -588,7 +588,7 @@ function Chat(){
       })
       justTypedTimer.current = setTimeout(()=>{
         justTypedTimer.current = null
-      },100)
+      },500)
     }
   }
   let lastSeenDay = null

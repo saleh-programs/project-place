@@ -20,7 +20,7 @@ function MainDisplay({children}){
       sendJsonMessage({
       "username": username, 
       "origin": "peercall",
-      "type": "callResponse",
+      "type": "callResponse", 
       "data": {"status": "rejected", "peer": peerName}
       })
       delete callOffersRef.current[peerName]
