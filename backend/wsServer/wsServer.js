@@ -86,7 +86,7 @@ async function getToken() {
 {
   "origin" : chat/whiteboard/documents, 
   "type" :  erase/newMessage/fill (specific type)
-  "user": username,  
+  "username": username,  
   "data": draw commands/fill instructions/newest chat, 
   "metadata": user's color/ stroke size/ draw status(isDraw/doneDraw)
 }
@@ -125,6 +125,11 @@ wsServer.on("connection", async (connection, request)=>{
 
 // Handle new messages / close
 function handleClose(uuid){
+  broadcastAll(uuid,{
+    "origin": "user",
+    "type": "userLeft",
+    "username": users[uuid]["username"],
+  })
   const roomID = users[uuid]["roomID"]
 
   delete connections[uuid]

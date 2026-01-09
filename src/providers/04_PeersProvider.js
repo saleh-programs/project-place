@@ -21,6 +21,15 @@ function PeersProvider({children}){
                 });
                 break;
 
+            case "userLeft":
+                setUserStates(prev => {
+                    const newUserStates = {...prev}
+                    if (newUserStates.hasOwnProperty(data["username"])){
+                        delete newUserStates[data["username"]]
+                    }
+                    return newUserStates
+                });
+                break;
             case "userInfo":
                 setUserStates(prev => {
                     return {
