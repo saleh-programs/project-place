@@ -680,7 +680,7 @@ function Chat(){
                 <span className={styles.timestamp}>
                   {timestamp}
                 </span>
-                <img src={userStates[group["username"]]?.["avatar"]} alt="nth" />
+                <img src={`https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${group["username"]}`} alt="pfp />
               </section>
               <section className={styles.groupRight}>
                 <div className={styles.username}>

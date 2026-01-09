@@ -1,5 +1,5 @@
 import mysql.connector
-import json, os
+import json
 from os import environ as env
 from urllib.parse import quote_plus, urlencode
 from random import randint, choice
@@ -47,11 +47,14 @@ s3 = boto3.client(
 
 # create flask app and register with the Auth0 service
 app = Flask(__name__)
-app.secret_key = APP_SECRET_KEY
 app.config.update(
+    SESSION_COOKIE_DOMAIN=".projectplace.space",
     SESSION_COOKIE_SAMESITE="None",
     SESSION_COOKIE_SECURE=True,
+    PREFERRED_URL_SCHEME="https",
 )
+
+app.secret_key = APP_SECRET_KEY
 
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 CORS(app, supports_credentials=True, origins=[FRONTEND_URL])
@@ -106,8 +109,6 @@ def handleError(errorMessage):
 def authenticateClient(func):
   @wraps(func)
   def wrapper(*args, **kwargs):
-    print("SESSION:", dict(session))
-
     decodedToken = jwt.decode(session["user"]["access_token"], key=JWKS)
     decodedToken.validate()
     return func(*args, **kwargs)
@@ -176,7 +177,6 @@ with AccessDatabase() as cursor:
 @authenticateClient
 def getUserInfo():
   with AccessDatabase() as cursor:
-    print("here")
     cursor.execute("SELECT username, images FROM users WHERE userID = %s", (session["userID"],))
     values = cursor.fetchone()
     if values is None:
@@ -184,7 +184,6 @@ def getUserInfo():
 
     images = json.loads(values[1])
     imageObjects = []
-    print("before loop")
     for i in range(len(images)):
       imgKey = images[i]
       url = getS3Url(imgKey)
@@ -193,7 +192,6 @@ def getUserInfo():
         "url": url,
         "key": imgKey
       })
-    print("after loop")
     userInfo = {
       "username": values[0],
       "images": imageObjects
@@ -299,38 +297,6 @@ def validateUsername(username):
 
   return jsonify({"success":True, "data": {"username": username}}), 200
 
-
-# @app.route("/users/images/public/<imageID>", methods=["GET"])
-# @handleError("failed to get public image")
-# @authenticateClient
-# def getPublicImage(imageID):
-#   if not os.path.exists(f"images/public/{imageID}"):
-#     return {"success": False}, 500
-#   return send_file(f"images/public/{imageID}"), 200
-
-# @app.route("/users/images/<imageID>", methods=["GET"])
-# @handleError("failed to get image")
-# @authenticateClient
-# def getImage(imageID):
-#   relativeURL = None
-#   with AccessDatabase() as cursor:
-#     cursor.execute("SELECT avatar FROM users WHERE username = %s", (imageID,))
-#     relativeURL = cursor.fetchone()
-
-#     #in case frontend makes imageID the username
-#     if (relativeURL is not None):
-#       relativeURL = relativeURL[0][relativeURL[0].find("images/"):]
-#     else:
-#       relativeURL = f"images/{imageID}"
-  
-#   print(relativeURL)
-#   if not os.path.exists(relativeURL):
-#     return {"success": False}, 500
-  
-#   return send_file(relativeURL), 200
-
-
-
 #----------- Room Resources (include messages, canvases)
 @app.route("/rooms", methods=["POST"])
 @handleError("failed to create room")
@@ -397,14 +363,6 @@ def uploadFiles():
   
 
   return jsonify({"success":True, "data": {"fileList": fileList}}),200
-
-# @app.route("/rooms/files/<fileID>", methods=["GET"])
-# @handleError("failed to get file")
-# @authenticateClient
-# def getFile(fileID):
-#   if not os.path.exists(f"files/{fileID}"):
-#     return {"success": False}, 500
-#   return send_file(f"files/{fileID}")
 
 @app.route("/rooms/<roomID>/exists", methods=["GET"])
 @handleError("failed to validate room")
@@ -632,7 +590,6 @@ def createUser():
 # Redirects user to auth0 login page
 @app.route("/login")
 def login():
-  print("LOGIN session before redirect:", dict(session))
   # HARDCODE THE URL FOR REDIRECT_URI IF YOU WANT TO TEST MOBILE MURAD
   return oauth.auth0.authorize_redirect(
     redirect_uri = url_for("callback", _external=True),
@@ -642,15 +599,14 @@ def login():
 # Redirects user to home page (or page after authentication)
 @app.route("/callback", methods=["GET", "POST"])
 def callback():
-  print("CALLBACK cookies:", request.cookies)
-  print("CALLBACK session:", dict(session))
   token = oauth.auth0.authorize_access_token()
   
   session["user"] = token
   session["userID"] = jwt.decode(token["id_token"], key=JWKS)["sub"]
-  createUser()
 
-  return redirect(f"{FRONTEND_URL}/platform")
+  createUser()
+  resp = redirect(f"{FRONTEND_URL}/platform")
+  return resp
 
 # Ends the user's session, and redirects them to home page.
 @app.route("/logout")

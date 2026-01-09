@@ -13,12 +13,9 @@ async function PlatformLayout({ children }) {
   const storedRoomID = allCookies.get("roomID")?.value
   const storedRoomName = allCookies.get("roomName")?.value
 
-  console.log("All Cookies: ", allCookies)
-  console.log("AllCookiesString: ", allCookies.toString())
   const initialUserInfo = await getUserInfoReq(allCookies.toString()) 
   if (!initialUserInfo){
     const session = allCookies.get("session")?.value
-    console.log("Session: ", session)
     session && redirect(`${NEXT_PUBLIC_HTTP_BACKEND_URL}/logout`)
     redirect(`/`) 
   }

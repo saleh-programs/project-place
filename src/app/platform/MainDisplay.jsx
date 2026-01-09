@@ -10,10 +10,9 @@ import Sidebar from "src/components/sidebar/Sidebar"
 function MainDisplay({children}){
   const {username} = useContext(UserContext)
   const {darkMode} = useContext(AppearanceContext)
-  const {roomID, setRoomID, roomName, setRoomName} = useContext(RoomContext)
-  const {setUserStates} = useContext(PeersContext)
+  const {roomID, roomName} = useContext(RoomContext)
   const {callOffers, setCallOffers, callOffersRef} = useContext(VideoChatContext)
-  const {sendJsonMessage} = useContext(WebSocketContext)
+  const {sendJsonMessage, exitRoom} = useContext(WebSocketContext)
 
   const router = useRouter()
 
@@ -34,7 +33,7 @@ function MainDisplay({children}){
           <h1 className={darkMode ? styles.darkMode : ""}>
             <span>{roomID}</span>
             <span>"{roomName}"</span>
-            <button onClick={()=>{setRoomID("");setRoomName("");setUserStates({});}}>Leave Room</button>
+            <button onClick={exitRoom}>Leave Room</button>
           </h1>
         }
         <div className={styles.siteWrapper}>
