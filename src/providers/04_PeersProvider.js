@@ -8,7 +8,7 @@ function PeersProvider({children}){
     
     function updateUserStates(data) {
         switch (data.type) {
-            case "newUser":
+            case "newUser":{
                 setUserStates(prev => {
                     return {
                         ...prev,
@@ -19,9 +19,26 @@ function PeersProvider({children}){
                         }
                     };
                 });
+                const locations = ["videochat", "chat", "whiteboard",]
+                let currLocation = "chat"
+                for (let i = 0; i < locations.length; i++){
+                    if (window.location.pathname.includes(locations[i])){
+                        currLocation = locations[i]
+                        break
+                    }
+                }
+                if (currLocation !== "chat"){
+                    sendJsonMessage({
+                        "toPeer": data["username"],
+                        "origin": "user",
+                        "username": username,
+                        "type": "userInfo",
+                        "data": {"location": currLocation}
+                    })
+                }
+                
                 break;
-
-            case "userLeft":
+            }case "userLeft":
                 setUserStates(prev => {
                     const newUserStates = {...prev}
                     if (newUserStates.hasOwnProperty(data["username"])){
@@ -42,11 +59,19 @@ function PeersProvider({children}){
                 });
                 break;
             case "getUsers":
+                const locations = ["videochat", "chat", "whiteboard",]
+                let currLocation = "chat"
+                for (let i = 0; i < locations.length; i++){
+                    if (window.location.pathname.includes(locations[i])){
+                        currLocation = locations[i]
+                        break
+                    }
+                }
                 const users = {
                     [username]: {
                         avatar: userInfo["avatar"],
                         status: "idle",
-                        location: "chat"
+                        location: currLocation
                     }
                 };
 
@@ -57,6 +82,14 @@ function PeersProvider({children}){
                         location: "chat"
                     };
                 });
+                if (currLocation !== "chat"){
+                    sendJsonMessage({
+                        "origin": "user",
+                        "username": username,
+                        "type": "userInfo",
+                        "data": {"location": currLocation}
+                    })
+                }
 
                 setUserStates(users);
                 siteHistoryRef.current["userHistoryReceived"] = true;

@@ -408,6 +408,10 @@ async function processPeercall(data, uuid){
 }
 
 function processUser(data, uuid){
+  if (data.hasOwnProperty("toPeer")){
+    broadcastOne(uuid, data, data["toPeer"])
+    return
+  }
   broadcastAll(uuid, data, true)
 }
 
