@@ -10,21 +10,38 @@ import Sidebar from "src/components/sidebar/Sidebar"
 function MainDisplay({children}){
   const {username} = useContext(UserContext)
   const {darkMode} = useContext(AppearanceContext)
-  const {roomID, roomName} = useContext(RoomContext)
+  const {roomID, roomName, externalPeercallRef} = useContext(RoomContext)
   const {callOffers, setCallOffers, callOffersRef} = useContext(VideoChatContext)
   const {sendJsonMessage, exitRoom} = useContext(WebSocketContext)
 
   const router = useRouter()
 
   function rejectCall(peerName) {
-      sendJsonMessage({
-      "username": username, 
-      "origin": "peercall",
-      "type": "callResponse", 
-      "data": {"status": "rejected", "peer": peerName}
+    sendJsonMessage({
+    "username": username, 
+    "origin": "peercall",
+    "type": "callResponse", 
+    "data": {"status": "rejected", "peer": peerName}
+    })
+    delete callOffersRef.current[peerName]
+    setCallOffers({...callOffersRef.current})
+  }
+  function acceptCall(peerName){
+    console.log(window.location.pathname)
+    if (window.location.pathname === "/platform/videochat/peercall"){
+      externalPeercallRef.current({
+        "type": "answerCall",
+        "peer": peerName
       })
-      delete callOffersRef.current[peerName]
-      setCallOffers({...callOffersRef.current})
+      return
+    }
+    router.push(`/platform/videochat/peercall?peer=${encodeURI(peerName)}`)
+    sendJsonMessage({
+      "origin": "user",
+      "username": username,
+      "type": "userInfo",
+      "data": {"location": "videochat"}
+    })
   }
 
   return(
@@ -44,7 +61,7 @@ function MainDisplay({children}){
               return (
               <div key={name} className={styles.callNotification}>
                 New call offer from <strong>{name}</strong>!
-                <button onClick={()=>router.push(`/platform/videochat/peercall?peer=${encodeURI(name)}`)}>Accept</button>
+                <button onClick={()=>acceptCall(name)}>Accept</button>
                 <button onClick={()=>rejectCall(name)}>Reject</button>
               </div>
               )

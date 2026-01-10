@@ -52,25 +52,25 @@ function WebSocketProvider({children}){
                 break
             case "chat":
                 if (data.type === "chatHistory"){
-                messagesRef.current = data.data
-                siteHistoryRef.current["chatHistoryReceived"] = true;
+                    messagesRef.current = data.data
+                    siteHistoryRef.current["chatHistoryReceived"] = true;
                 }else if (data.type === "newMessage"){ 
-                messagesRef.current.push(data.data)
+                    messagesRef.current.push(data.data)
                 }else if(data.type === "edit"){
-                messagesRef.current = messagesRef.current.map(msg => {
+                    messagesRef.current = messagesRef.current.map(msg => {
                     if (msg["metadata"]["messageID"] === data.data["messageID"]){
-                    return {
-                        ...msg,
-                        "content": data.data["content"],
-                        "metadata": {...msg["metadata"], "edited": true}
-                    }
+                        return {
+                            ...msg,
+                            "content": data.data["content"],
+                            "metadata": {...msg["metadata"], "edited": true}
+                        }
                     }
                     return msg
                 })
                 }else if (data.type === "delete"){
-                messagesRef.current = messagesRef.current.filter(msg => {
-                    return msg["metadata"]["messageID"] !== data.data["messageID"]
-                })
+                    messagesRef.current = messagesRef.current.filter(msg => {
+                        return msg["metadata"]["messageID"] !== data.data["messageID"]
+                    })
                 }
                 externalChatRef.current(data)
                 break
@@ -79,28 +79,29 @@ function WebSocketProvider({children}){
                 break
             case "groupcall":
                 if (data.type === "setup"){
-                const {routerRtpCapabilities} = data.data
-                device.current = new mediasoupClient.Device()
-                device.current.load({routerRtpCapabilities})
-                break
+                    const {routerRtpCapabilities} = data.data
+                    device.current = new mediasoupClient.Device()
+                    device.current.load({routerRtpCapabilities})
+                    break
                 }
                 externalGroupcallRef.current(data)
                 break
             case "peercall":
                 if (data.type === "callRequest"){
-                callOffersRef.current[data["username"]] = data.data["offer"]
-                setCallOffers({...callOffersRef.current})
+                    callOffersRef.current[data["username"]] = data.data["offer"]
+                    setCallOffers({...callOffersRef.current})
                 }
                 if (data.type === "disconnect" && callOffersRef.current.hasOwnProperty(data["username"])){
-                delete callOffersRef.current[data["username"]]
-                setCallOffers({...callOffersRef.current})
+                    delete callOffersRef.current[data["username"]]
+                    setCallOffers({...callOffersRef.current})
 
-                if (stunCandidates.current.hasOwnProperty(data["username"])){
-                    delete stunCandidates.current[data["username"]]
-                }
+                    if (stunCandidates.current.hasOwnProperty(data["username"])){
+                        delete stunCandidates.current[data["username"]]
+                    }
                 }
 
                 if (data.type === "stunCandidate"){
+                    console.log("getting stun")
                     if (!stunCandidates.current.hasOwnProperty(data["username"])){
                     stunCandidates.current[data["username"]] = [data.data["candidate"]]
                     }else{

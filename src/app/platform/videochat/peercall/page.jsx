@@ -27,15 +27,16 @@ function PeerCall(){
         localStream: null,
         remoteStream: null,
         negotiating: false,
-        acceptingCandidates: false
+        acceptingCandidates: false,
+
+        peerCalling: null,
+        connectionState: "disconnected"
     })
     const localCam = useRef(null)
     const remoteCam = useRef(null)
 
-    const connectionStateRef = useRef("disconnected")
     const callTimer = useRef(null)
 
-    const peerCallingRef = useRef(null)
     const [peerCalling, setPeerCalling] = useState(null)
 
     const [videoAdded, setVideoAdded] = useState(false)
@@ -52,12 +53,13 @@ function PeerCall(){
         externalPeercallRef.current = externalPeercall
         window.addEventListener("beforeunload", disconnect)
 
+        let fixConnectionIntervalID = null
         const setup = async ()=>{
-            await startWebcam()
-            disconnect()
-
+            connectionInfo.current["localStream"] = new MediaStream()
+            startWebcam()
+            
             //to renegotiate if a producer disconnects
-            setInterval(()=>{
+            fixConnectionIntervalID = setInterval(()=>{
                 if (!connectionInfo.current["pc"] || connectionInfo.current["pc"].connectionState === "closed"){
                     return
                 }
@@ -90,8 +92,6 @@ function PeerCall(){
 
         const timerID = setInterval(() => {
             console.log("Connection Info: ", connectionInfo.current)
-            console.log("Connection State: ", connectionStateRef.current)
-            console.log("Peer Calling: ", peerCallingRef.current)
             console.log("Local Cam: ", localCam.current)
             console.log("Remote Cam: ", remoteCam.current)
         }, 5000)
@@ -99,52 +99,57 @@ function PeerCall(){
         return ()=>{
             externalPeercallRef.current = (param1) => {}
             clearInterval(timerID)
-            window.removeEventListener("beforeunload", disconnect)
+            clearInterval(fixConnectionIntervalID)
             disconnect()
+            clearConnection()
+            window.removeEventListener("beforeunload", disconnect)
         }
     },[])
 
     useEffect(()=>{
         const peer = searchParams.get("peer")
+        console.log(peer)
         if (peer && connectionInfo.current["localStream"]){
+            console.log("accepted")
             acceptCall(peer)
+            router.push("/platform/videochat/peercall")
         }
     },[searchParams])
 
     function clearConnection(){
-        connectionInfo.current["pc"]?.close()
-        connectionInfo.current["negotiating"] = false
-        connectionInfo.current["acceptingCandidates"] = false
-
-        connectionStateRef.current = "disconnected"
-        peerCallingRef.current = null
-        setPeerCalling(null)
-        if (remoteCam.current){
+        if (remoteCam.current?.srcObject){
+            const stream = remoteCam.current.srcObject
+            stream.getTracks().forEach(t => t.stop())
             remoteCam.current.srcObject = null
         }
-        
-
-        callTimer.current && clearTimeout(callTimer.current)
-
-        // router.push("/platform/videochat/peercall")
+        connectionInfo.current["pc"]?.close()
+        connectionInfo.current["pc"] = null
+        connectionInfo.current["negotiating"] = false
+        connectionInfo.current["acceptingCandidates"] = false
+        connectionInfo.current["connectionState"] = "disconnected"
+        connectionInfo.current["peerCalling"] = null
+        setPeerCalling(null)
+        clearTimeout(callTimer.current)
     }
+
     function disconnect(){
-        if (peerCallingRef.current){
+        if (stunCandidates.current.hasOwnProperty(connectionInfo.current["peerCalling"])){
+            delete stunCandidates.current[connectionInfo.current["peerCalling"]]
+        }
+        if (connectionInfo.current["peerCalling"]){
             sendJsonMessage({
                 "origin": "peercall",
                 "username": username,
                 "type": "disconnect",
-                "data": {"peer": peerCallingRef.current}
+                "data": {"peer": connectionInfo.current["peerCalling"]}
             })
-            if (stunCandidates.current.hasOwnProperty(peerCallingRef.current)){
-                delete stunCandidates.current[peerCallingRef.current]
-            }
         }
-        clearConnection()
     }
+
     async function startWebcam(){
         let tempStream;
-        let stream = new MediaStream()
+        let stream = connectionInfo.current["localStream"]
+        localCam.current.srcObject = stream
         try{
             tempStream = await navigator.mediaDevices.getUserMedia({video: true})
             setVideoAdded(true)
@@ -159,13 +164,10 @@ function PeerCall(){
         }catch(err){
             console.log("audio permission denied")
         }
-
-        connectionInfo.current["localStream"] = stream
-        localCam.current.srcObject = stream
     }
 
     async function callPeer(name) {
-        if (peerCallingRef.current === name){
+        if (connectionInfo.current["peerCalling"] === name){
             return
         }
         if (callOffersRef.current.hasOwnProperty(name)){
@@ -173,27 +175,27 @@ function PeerCall(){
             return
         }
         disconnect()
-        
-        peerCallingRef.current = name
-        setPeerCalling(name)
-
-        connectionInfo.current["negotiating"] = true
-        connectionStateRef.current = "waiting"
-
-        const remoteStream = new MediaStream()
-        connectionInfo.current["remoteStream"] = remoteStream
-        remoteCam.current.srcObject = remoteStream
+        clearConnection()
 
         const pc = new RTCPeerConnection(servers)
+        const remoteStream = new MediaStream()
+        remoteCam.current.srcObject = remoteStream
+
+        connectionInfo.current["peerCalling"] = name
+        connectionInfo.current["negotiating"] = true
+        connectionInfo.current["connectionState"] = "waiting"
+        connectionInfo.current["remoteStream"] = remoteStream
         connectionInfo.current["pc"] = pc
         connectionInfo.current["localStream"].getTracks().forEach(track => {
             pc.addTrack(track, connectionInfo.current["localStream"])
         })
+        setPeerCalling(name)
+
         pc.ontrack = event => {
             event.streams[0].getTracks().forEach(track=>{
                 remoteStream.addTrack(track)
-                track.onmute = (e) => {
-                    console.log("peer's muted")
+                track.onmute = () => {
+                    console.log("'muted' or whatever that means")
                     remoteStream.removeTrack(track)
                 }
             })
@@ -217,7 +219,7 @@ function PeerCall(){
             if (pc.connectionState === "connected"){
                 connectionInfo.current["negotiating"] = false
                 connectionInfo.current["acceptingCandidates"] = false
-                connectionStateRef.current = "connected"
+                connectionInfo.current["connectionState"] = "connected"
             }
         }
 
@@ -225,9 +227,11 @@ function PeerCall(){
         await pc.setLocalDescription(offerDescription)
 
         callTimer.current = setTimeout(()=>{
-            if (connectionStateRef.current !== "connected" || peerCallingRef.current !== name ){
+            if (connectionInfo.current["connectionState"] !== "connected" || connectionInfo.current["peerCalling"] !== name ){
                 disconnect()
+                clearConnection()
             }
+            clearTimeout(callTimer.current)
             callTimer.current = null
         },10000)
 
@@ -244,33 +248,36 @@ function PeerCall(){
         })
     }
     async function acceptCall(name) {
-        if (peerCallingRef.current === name || !callOffersRef.current.hasOwnProperty(name)){
+        console.log("start", connectionInfo, callOffersRef)
+        if (connectionInfo.current["peerCalling"] === name || !callOffersRef.current.hasOwnProperty(name)){
             return
         }
+        console.log("after")
         disconnect()
-
-        connectionInfo.current["negotiating"] = true
-
-        connectionStateRef.current = "answering"
-        peerCallingRef.current = name
-        setPeerCalling(name)
-
-        const offer = callOffersRef.current[name]
-
-        const remoteStream = new MediaStream()
-        connectionInfo.current["remoteStream"] = remoteStream
-        remoteCam.current.srcObject = remoteStream
+        clearConnection()
 
         const pc = new RTCPeerConnection(servers)
+        const remoteStream = new MediaStream()
+        remoteCam.current.srcObject = remoteStream
+
+        connectionInfo.current["negotiating"] = true
+        connectionInfo.current["connectionState"] = "answering"
+        connectionInfo.current["remoteStream"] = remoteStream
         connectionInfo.current["pc"] = pc
-    
+        connectionInfo.current["peerCalling"] = name
+        setPeerCalling(name)
+
         connectionInfo.current["localStream"].getTracks().forEach(track => {
             pc.addTrack(track, connectionInfo.current["localStream"])
         })
+        const offer = callOffersRef.current[name]
+    
+
         pc.ontrack = event => {
             event.streams[0].getTracks().forEach(track=>{
                 connectionInfo.current["remoteStream"].addTrack(track)
                 track.onmute = (e) => {
+                    console.log("muted track for some reason (in person accepted)")
                     remoteStream.removeTrack(track)
                 }
             })
@@ -293,7 +300,7 @@ function PeerCall(){
             if (pc.connectionState === "connected"){
                 connectionInfo.current["negotiating"] = false
                 connectionInfo.current["acceptingCandidates"] = false
-                connectionStateRef.current = "connected"
+                connectionInfo.current["connectionState"]= "connected"
             }
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer))
@@ -325,13 +332,16 @@ function PeerCall(){
 
     
     function recollectSTUN(){
-        if (!peerCallingRef.current.hasOwnProperty(peerCallingRef.current)){
+        const peer = connectionInfo.current["peerCalling"]
+        console.log(stunCandidates.current, peer)
+        if (!stunCandidates.current.hasOwnProperty(peer)){
             return
         }
-        stunCandidates.current[peerCallingRef.current].forEach(c => {
+        console.log("got stun", stunCandidates.current[peer])
+        stunCandidates.current[peer].forEach(c => {
             connectionInfo.current["pc"].addIceCandidate(new RTCIceCandidate(c))
         })
-        stunCandidates.current[peerCallingRef.current] = []
+        stunCandidates.current[peer] = []
     }
 
     async function requestMedia(type){
@@ -380,7 +390,7 @@ function PeerCall(){
         }
     }
     async function renegotiate() {
-        if (connectionStateRef.current !== "connected" || connectionInfo.current["negotiating"]){
+        if (connectionInfo.current["connectionState"] !== "connected" || connectionInfo.current["negotiating"]){
             return
         }
         const pc = connectionInfo.current["pc"]
@@ -394,7 +404,7 @@ function PeerCall(){
             "origin": "peercall",
             "type": "renegotiationRequest",
             "data": {
-                "peer": peerCallingRef.current,
+                "peer": connectionInfo.current["peerCalling"],
                 "offer": {
                     sdp: offerDescription.sdp, 
                     type: offerDescription.type
@@ -404,12 +414,12 @@ function PeerCall(){
     }
 
     async function externalPeercall(data){
-        const pc = connectionInfo.current["pc"]
+        const {pc, peerCalling, connectionState} = connectionInfo.current
 
         switch (data.type){
             case "callRequest":
                 //=== waiting is a pretty rare case (when users call at exact same time). I just compare usernames to settle it
-                const isRaceCollision = peerCallingRef.current === data["username"] && connectionStateRef.current === "waiting"
+                const isRaceCollision = peerCalling === data["username"] && connectionState === "waiting"
                 if (isRaceCollision){
                     if (data["username"] <  username){
                         clearConnection()
@@ -421,13 +431,13 @@ function PeerCall(){
                 }
                 break
             case "callResponse":
-                const notCalling = !peerCallingRef.current || peerCallingRef.current !== data["username"]
-                const answered = peerCallingRef.current === data["username"] && connectionStateRef.current !== "waiting"
+                const notCalling = !peerCalling || peerCalling !== data["username"]
+                const answered = peerCalling === data["username"] && connectionState !== "waiting"
                 if (notCalling || answered){
                     break
                 }
                 
-                if (data.data["status"] === "accepted"){                    
+                if (data.data["status"] === "accepted"){        
                     await pc.setRemoteDescription(new RTCSessionDescription(data.data["answer"]))
                     connectionInfo.current["acceptingCandidates"] = true
                     recollectSTUN()
@@ -435,13 +445,15 @@ function PeerCall(){
                     clearConnection()
                 }
                 break
+            case "answerCall":
+                acceptCall(data["peer"])
+                break
             case "renegotiationRequest":
-                if (connectionStateRef.current !== "connected" || peerCallingRef.current !== data["username"]){
+                if (connectionState !== "connected" || peerCalling !== data["username"]){
                     break
                 }
 
                 await pc.setRemoteDescription(data.data["offer"])
-
                 const answerDescription = await pc.createAnswer()
                 await pc.setLocalDescription(answerDescription)
                 
@@ -452,7 +464,7 @@ function PeerCall(){
                     "username": username,
                     "type": "renegotiationResponse",
                     "data": {
-                        "peer": peerCallingRef.current,
+                        "peer": peerCalling,
                         "answer": {
                             type: answerDescription.type,
                             sdp: answerDescription.sdp 
@@ -461,7 +473,7 @@ function PeerCall(){
                 })
                 break
             case "renegotiationResponse":
-                if (connectionStateRef.current !== "connected" || peerCallingRef.current !== data["username"]){
+                if (connectionState !== "connected" || peerCalling !== data["username"]){
                     break
                 }
                 connectionInfo.current["remoteStream"].getTracks().forEach(t => {
@@ -475,13 +487,13 @@ function PeerCall(){
 
                 break
             case "stunCandidate":
-                if (peerCallingRef.current === data["username"] && connectionInfo.current["acceptingCandidates"]){
+                if (peerCalling === data["username"] && connectionInfo.current["acceptingCandidates"]){
                     pc.addIceCandidate(new RTCIceCandidate(data.data["candidate"]))
                     delete stunCandidates.current[data["username"]]
                 }
                 break
             case "disconnect":
-                if (peerCallingRef.current === data["username"]){
+                if (peerCalling === data["username"]){
                     clearConnection()
                 }
                 break
@@ -523,7 +535,7 @@ function PeerCall(){
                     </section>
                     <section className={styles.disconnect}>
                         {
-                            peerCalling && <button onClick={disconnect}>End Call</button>            
+                            peerCalling && <button onClick={()=>{disconnect(); clearConnection()}}>End Call</button>            
                         }
                     </section>
                 </section>
