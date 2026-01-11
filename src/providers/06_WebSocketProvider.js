@@ -16,10 +16,19 @@ function WebSocketProvider({children}){
 
     const connectedRoomRef = useRef(null)
     const heartbeatIntervalRef = useRef(null)
-
+    
+    const locationRef = useRef(null)
+    const previousRoomID = useRef(null)
     function getLocationSnapshot(){
-        if (locationRef.current || roomID === "") return locationRef.current
-        if (typeof window === "undefined") return "chat"
+        console.log("roomID", roomID),
+        console.log("previousRoomID", previousRoomID.current)
+        
+        if (typeof window === "undefined" || previousRoomID.current === roomID){
+            console.log("(early) loc:",locationRef.current)
+            return locationRef.current
+        }
+        previousRoomID.current = roomID
+        
         const locations = ["videochat", "chat", "whiteboard"]
         let currLocation = "chat"
         for (let i = 0; i < locations.length; i++){
@@ -29,9 +38,10 @@ function WebSocketProvider({children}){
             }
         }
         locationRef.current = currLocation
+        console.log(" loc:",currLocation)
+
         return currLocation
     }
-    const locationRef = useRef(null)
 
     const {sendJsonMessage} = useWebSocket(NEXT_PUBLIC_WS_BACKEND_URL, {
         queryParams:{
