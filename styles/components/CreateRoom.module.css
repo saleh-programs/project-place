@@ -1,3 +1,6 @@
+.darkMode{
+  color: white;
+}
 .createRoom{
   position: fixed;
   top: 50%;
@@ -7,6 +10,7 @@
   background-color: rgb(145, 182, 242);
   padding: 10px;
   border-radius: 10px;
+  color: black;
 
   z-index: 1000;
 

@@ -1,6 +1,6 @@
 import * as mediasoupClient from "mediasoup-client"
-import { useContext, useMemo, useRef, useState } from "react"
-import useWebSocket from "react-use-websocket"
+import { useContext, useEffect, useMemo, useRef, useState } from "react"
+import useWebSocket, { ReadyState } from "react-use-websocket"
 
 import { WebSocketContext, UserContext, RoomContext, PeersContext, ChatContext, WhiteboardContext, VideoChatContext } from "./contexts"
 
@@ -20,11 +20,8 @@ function WebSocketProvider({children}){
     const locationRef = useRef(null)
     const previousRoomID = useRef(null)
     function getLocationSnapshot(){
-        console.log("roomID", roomID),
-        console.log("previousRoomID", previousRoomID.current)
         
         if (typeof window === "undefined" || previousRoomID.current === roomID){
-            console.log("(early) loc:",locationRef.current)
             return locationRef.current
         }
         previousRoomID.current = roomID
@@ -38,12 +35,11 @@ function WebSocketProvider({children}){
             }
         }
         locationRef.current = currLocation
-        console.log(" loc:",currLocation)
 
         return currLocation
     }
-
-    const {sendJsonMessage} = useWebSocket(NEXT_PUBLIC_WS_BACKEND_URL, {
+    
+    const {sendJsonMessage, readyState} = useWebSocket(NEXT_PUBLIC_WS_BACKEND_URL, {
         queryParams:{
             "username": username,
             "roomID": roomID,
@@ -89,6 +85,7 @@ function WebSocketProvider({children}){
                 break
             case "groupcall":
                 if (data.type === "setup"){
+                    console.log("setup ")
                     const {routerRtpCapabilities} = data.data
                     device.current = new mediasoupClient.Device()
                     device.current.load({routerRtpCapabilities})
@@ -111,7 +108,6 @@ function WebSocketProvider({children}){
                 }
 
                 if (data.type === "stunCandidate"){
-                    console.log("getting stun")
                     if (!stunCandidates.current.hasOwnProperty(data["username"])){
                     stunCandidates.current[data["username"]] = [data.data["candidate"]]
                     }else{
@@ -133,16 +129,14 @@ function WebSocketProvider({children}){
             }, 2000)
             console.log("connect")
         },
-        shouldReconnect: () => {
+        onClose: () => {
             if (roomIDRef.current === connectedRoomRef.current){
                 exitRoom()
             }
             console.log("disconnect")
-
-            return false
-        }
+        },
+        shouldReconnect: () => false
     }, roomID !== "")
-
 
     function exitRoom(){
         setRoomID("")

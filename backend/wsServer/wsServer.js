@@ -96,10 +96,12 @@ wsServer.on("connection", async (connection, request)=>{
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
   const location = url.parse(request.url, true).query.location
+  console.log(location, "loc")
 
   const isMember = await validateRoomUserReq(roomID, username, token)
 
   if (!isMember){
+    console.log("non member")
     connection.close()
     return
   }
@@ -138,27 +140,41 @@ wsServer.on("connection", async (connection, request)=>{
 
 // Handle new messages / close
 function handleClose(uuid){
-  broadcastAll(uuid,{
-    "origin": "user",
-    "type": "userLeft",
-    "username": users[uuid]["username"],
-  })
-
   const roomID = users[uuid]["roomID"]
+
+  //room stuff
+  //leave groupchat if joined 
+  if (rooms[roomID]){
+    if (rooms[roomID]["groupcall"]["callParticipants"].includes(uuid)){
+      processGroupcall({
+          "username": users[uuid]["username"],
+          "origin": "groupcall",
+          "type": "disconnect",
+      }, uuid)
+    }
+    broadcastAll(uuid,{
+      "origin": "user",
+      "type": "userLeft",
+      "username": users[uuid]["username"],
+    })
+    rooms[roomID]["users"] = rooms[roomID]["users"].filter(id => id !== uuid)
+
+    //remove room if empty now
+    if (rooms[roomID]["users"].length === 0){
+      const savedCanvasBuffer = rooms[roomID]["whiteboard"]["snapshot"].toBuffer("image/png")
+      updateCanvasSnapshotReq(savedCanvasBuffer, roomID, token)
+      updateCanvasInstructionsReq(rooms[roomID]["whiteboard"]["operations"], roomID, token)
+
+      rooms[roomID]["groupcall"]["router"].close()
+      delete rooms[roomID]
+    }
+  }
+
+  //remove user
   clearInterval(users[uuid]["pingUserTimer"])
   delete connections[uuid]
   delete users[uuid]
-  rooms[roomID]["users"] = rooms[roomID]["users"].filter(id => id !== uuid)
 
-
-  if (rooms[roomID]["users"].length === 0){
-    const savedCanvasBuffer = rooms[roomID]["whiteboard"]["snapshot"].toBuffer("image/png")
-    updateCanvasSnapshotReq(savedCanvasBuffer, roomID, token)
-    updateCanvasInstructionsReq(rooms[roomID]["whiteboard"]["operations"], roomID, token)
-
-    rooms[roomID]["groupcall"]["router"].close()
-    delete rooms[roomID]
-  }
 }
 
 function handleMessage(data, uuid){
@@ -241,18 +257,15 @@ async function processGroupcall(data, uuid){
 
   switch(data.type){
     case "userJoined":
-      userCallInfo["connected"] = true
-      roomCallInfo["callParticipants"].push(uuid)
-      userCallInfo["rtpCapabilities"] = data.data["rtpCapabilities"]
-
       broadcastAll(uuid, data)
-
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "getParticipants",
-        "data": roomCallInfo["callParticipants"].filter(id => id !== uuid).map(id => users[id]["username"])
+        "data": roomCallInfo["callParticipants"].map(id => users[id]["username"])
       }))
-
+      userCallInfo["connected"] = true
+      roomCallInfo["callParticipants"].push(uuid)
+      userCallInfo["rtpCapabilities"] = data.data["rtpCapabilities"]
       break
     case "transportParams":
       const sendTransport = await makeTransport(roomID)
@@ -289,7 +302,7 @@ async function processGroupcall(data, uuid){
       }))
       break
     case "sendProduce":
-      const {kind, rtpParameters} = data.data
+      const {kind, rtpParameters, storedID} = data.data
       const producer = await userCallInfo["sendTransport"].produce({kind, rtpParameters})
       userCallInfo["producers"].push(producer)
       roomCallInfo["producers"][producer.id] = producer
@@ -297,9 +310,27 @@ async function processGroupcall(data, uuid){
       connections[uuid].send(JSON.stringify({
         "origin": "groupcall",
         "type": "sendProduce",
-        "data": producer.id
+        "data": {id: producer.id, storedID}
       }))
       break
+    case "closeProduce":{
+      //Producers need to explicitly be told to close.
+      const {id} = data.data
+      const producer = roomCallInfo["producers"][id]
+      if (producer){
+        producer.close()
+        userCallInfo["producers"] = userCallInfo["producers"].filter(p => p !== producer)
+        delete roomCallInfo["producers"][id]
+        
+        broadcastAll(uuid, {
+          "origin": "groupcall",
+          "username": users[uuid]["username"],
+          "type": "closeConsume",
+          "data": {"producerID": id}
+        })
+      }
+      break
+    }
     case "recvConnect":
       userCallInfo["recvTransport"].connect({dtlsParameters: data.data})
       connections[uuid].send(JSON.stringify({
@@ -308,12 +339,12 @@ async function processGroupcall(data, uuid){
       }))
       break
     case "givePeers":
-      for (let i = 0; i < roomCallInfo["callParticipants"].length; i++){
-        const userID = roomCallInfo["callParticipants"][i]
-        const peerCallInfo = users[userID]["groupcall"]
+      console.log("give peers", JSON.stringify(roomCallInfo["callParticipants"]))
+      for (let userID of roomCallInfo["callParticipants"]){
         if (userID === uuid) {
           continue
         }
+        const peerCallInfo = users[userID]["groupcall"]
         const options = {
           producerId: data.data,
           rtpCapabilities: peerCallInfo["rtpCapabilities"]
@@ -327,6 +358,13 @@ async function processGroupcall(data, uuid){
           producerId: data.data,
           rtpCapabilities: peerCallInfo["rtpCapabilities"],
           paused: true
+        })
+        consumer.on("producerclose", () => {
+          consumer.close()
+          delete roomCallInfo["consumers"][consumer.id]
+          if (users?.[userID]){
+            users[userID]["groupcall"]["consumers"] = users[userID]["groupcall"]["consumers"].filter(c => c.id !== consumer.id)
+          }
         })
 
         peerCallInfo["consumers"].push(consumer)
@@ -346,14 +384,12 @@ async function processGroupcall(data, uuid){
       }
       break
     case "receivePeers":
-      for (let i = 0; i < roomCallInfo["callParticipants"].length; i++){
-        const userID = roomCallInfo["callParticipants"][i]
+      for (let userID of roomCallInfo["callParticipants"]){
         if (userID == uuid) {
           continue
         }
         const peerCallInfo = users[userID]["groupcall"]
-        for (let j = 0; j < peerCallInfo["producers"].length; j++){
-          const producer = peerCallInfo["producers"][j] 
+        for (let producer of peerCallInfo["producers"]){
           const options = {
             producerId: producer.id,
             rtpCapabilities: userCallInfo["rtpCapabilities"]
@@ -366,6 +402,13 @@ async function processGroupcall(data, uuid){
             producerId: producer.id,
             rtpCapabilities: userCallInfo["rtpCapabilities"],
             paused: true
+          })
+          consumer.on("producerclose", () => {
+            consumer.close()
+            delete roomCallInfo["consumers"][consumer.id]
+            if (users?.[uuid]){
+              users[uuid]["groupcall"]["consumers"] = users[uuid]["groupcall"]["consumers"].filter(c => c.id !== consumer.id)
+            }
           })
 
           userCallInfo["consumers"].push(consumer)
@@ -394,8 +437,8 @@ async function processGroupcall(data, uuid){
       userCallInfo["producers"].forEach(p => delete roomCallInfo["producers"][p.id])
       userCallInfo["consumers"].forEach(c => delete roomCallInfo["consumers"][c.id])
 
-      userCallInfo["sendTransport"].close()
-      userCallInfo["recvTransport"].close()
+      userCallInfo["sendTransport"]?.close()
+      userCallInfo["recvTransport"]?.close()
       users[uuid]["groupcall"] = {
         "connected": false,
         "sendTransport": null,
@@ -427,7 +470,7 @@ async function sendServerInfo(uuid) {
   const roomHistories = [getMessagesReq(roomID, token)]
   let initializing = false
 
-  if (roomID in rooms){
+  if (rooms.hasOwnProperty(roomID)){
     connection.send(JSON.stringify({
       "origin": "user",
       "type": "getUsers",
@@ -445,6 +488,7 @@ async function sendServerInfo(uuid) {
     rooms[roomID]["users"].push(uuid)
     roomHistories.push(rooms[roomID]["whiteboard"]["canvas"])
     roomHistories.push(rooms[roomID]["whiteboard"]["operations"])
+    roomHistories.push(null)
   }else{
     connection.send(JSON.stringify({
       "origin": "user",
@@ -469,8 +513,12 @@ async function sendServerInfo(uuid) {
         return canvas
       }))
     roomHistories.push(getCanvasInstructionsReq(roomID, token))
+    roomHistories.push(worker.createRouter({mediaCodecs}))
   }
-  const [chatHistory, canvasSnapshot, canvasInstructions] = await Promise.all(roomHistories)
+  const [chatHistory, canvasSnapshot, canvasInstructions, router] = await Promise.all(roomHistories)
+  if (!users.hasOwnProperty(uuid)){
+    return
+  }
 
   if (initializing){
     const snapshotCopy = createCanvas(1000, 1000)
@@ -484,7 +532,7 @@ async function sendServerInfo(uuid) {
         "latestOp": canvasInstructions.length - 1
         },
       "groupcall": {
-        "router": await worker.createRouter({mediaCodecs}),
+        "router": router,
         "callParticipants": [],
         "consumers": {},
         "producers": {}
@@ -519,14 +567,15 @@ async function makeTransport(roomID) {
   const transport = await rooms[roomID]["groupcall"]["router"].createWebRtcTransport({
     listenIps: [
       {
-        ip: '0.0.0.0', 
-        announcedIp: '127.0.0.1',
+        ip: '0.0.0.0',
+        announcedIp: "127.0.0.1"
       }
     ],
     enableUdp: true,
     enableTcp: true,
     preferUdp: true,
   })
+
   return transport
 }
 

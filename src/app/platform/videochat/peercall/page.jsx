@@ -15,7 +15,7 @@ function PeerCall(){
     const {sendJsonMessage} = useContext(WebSocketContext)
 
 
-    const searchParams = useSearchParams()
+    const searchParams = useSearchParams() 
     const router = useRouter()
 
     const servers = {
@@ -24,8 +24,6 @@ function PeerCall(){
     }
     const connectionInfo = useRef({ 
         pc: null,
-        localStream: null,
-        remoteStream: null,
         negotiating: false,
         acceptingCandidates: false,
 
@@ -51,55 +49,25 @@ function PeerCall(){
 
     useEffect(()=>{
         externalPeercallRef.current = externalPeercall
-        window.addEventListener("beforeunload", disconnect)
-
         startWebcam()
-        
-        //to renegotiate if a producer disconnects
-        const needRenegotiationInterval = setInterval(() => {
-            if (!localCam.current?.srcObject || !connectionInfo.current["pc"] || connectionInfo.current["connectionState"] !== "connected"){
-                return
-            }
-            const localTracks = localCam.current.srcObject.getTracks()
-            const sentTracks = connectionInfo.current["pc"].getSenders().filter(s => s.track !==  null)
 
-            if (localTracks.length !== sentTracks.length){
-                console.log(localTracks)
-                console.log(sentTracks)
-                console.log("renego")
-                renegotiate()
-                return
-            }
-            for (const s of sentTracks){
-                if (!localTracks.includes(s.track)){
-                    console.log("renego 2")
-                    renegotiate()
-                    return
-
-                }
-            }
-        },2000)
-            
-            const peer = searchParams.get("peer")
-            if (peer){
-                acceptCall(peer)
-            }
-        
+        const stream = localCam.current?.srcObject
+        window.addEventListener("beforeunload", disconnect)
         return ()=>{
             externalPeercallRef.current = (param1) => {}
-            clearInterval(needRenegotiationInterval)
             disconnect()
             clearConnection()
-            localCam.current?.srcObject?.getTracks().forEach(t => t.stop())
+            stream?.getTracks().forEach(t => {
+                t.stop()
+            })
+
             window.removeEventListener("beforeunload", disconnect)
         }
     },[roomID])
 
     useEffect(()=>{
         const peer = searchParams.get("peer")
-        console.log(peer)
-        if (peer && connectionInfo.current["localStream"]){
-            console.log("accepted")
+        if (peer && localCam.current?.srcObject){
             acceptCall(peer)
             router.push("/platform/videochat/peercall")
         }
@@ -140,7 +108,6 @@ function PeerCall(){
             return
         }
         const stream = new MediaStream()
-        connectionInfo.current["localStream"] = stream
         localCam.current.srcObject = stream
         await requestMedia("video")
         await requestMedia("audio")
@@ -166,20 +133,17 @@ function PeerCall(){
         connectionInfo.current["peerCalling"] = name
         connectionInfo.current["negotiating"] = true
         connectionInfo.current["connectionState"] = "waiting"
-        connectionInfo.current["remoteStream"] = remoteStream
         connectionInfo.current["pc"] = pc
-        connectionInfo.current["localStream"].getTracks().forEach(track => {
-            pc.addTrack(track, connectionInfo.current["localStream"])
+        localCam.current?.srcObject.getTracks().forEach(track => {
+            pc.addTrack(track, localCam.current.srcObject)
         })
         setPeerCalling(name)
 
         pc.ontrack = event => {
-            console.log("caller", event.streams)
             event.streams[0].getTracks().forEach(track=>{
                 remoteCam.current.srcObject.addTrack(track)
                 //remote tracks don't fire "onended" events, but rather onmute events
                 track.onmute = () => {
-                    console.log("ended (muted)")
                     const newStream = new MediaStream(remoteCam.current.srcObject.getTracks().filter(t => t !== track))
                     remoteCam.current.srcObject = newStream
                 }
@@ -200,9 +164,7 @@ function PeerCall(){
                 }
             })
         }
-        console.log(pc.connectionState)
         pc.onconnectionstatechange = () => {
-            console.log(pc.connectionState)
             if (pc.connectionState === "connected"){
                 connectionInfo.current["negotiating"] = false
                 connectionInfo.current["acceptingCandidates"] = false
@@ -214,7 +176,6 @@ function PeerCall(){
         await pc.setLocalDescription(offerDescription)
 
         callTimer.current = setTimeout(()=>{
-            console.log(pc.connectionState)
             if (connectionInfo.current["connectionState"] !== "connected" || connectionInfo.current["peerCalling"] !== name ){
                 disconnect()
                 clearConnection()
@@ -248,23 +209,20 @@ function PeerCall(){
 
         connectionInfo.current["negotiating"] = true
         connectionInfo.current["connectionState"] = "answering"
-        connectionInfo.current["remoteStream"] = remoteStream
         connectionInfo.current["pc"] = pc
         connectionInfo.current["peerCalling"] = name
         setPeerCalling(name)
 
-        connectionInfo.current["localStream"].getTracks().forEach(track => {
-            pc.addTrack(track, connectionInfo.current["localStream"])
+        localCam.current?.srcObject.getTracks().forEach(track => {
+            pc.addTrack(track, localCam.current.srcObject)
         })
         const offer = callOffersRef.current[name]
     
 
         pc.ontrack = event => {
-            console.log("answerer", event.streams)
             event.streams[0].getTracks().forEach(track=>{
                 remoteCam.current.srcObject.addTrack(track)
                 track.onmute = () => {
-                    console.log("ended (muted)")
                     const newStream = new MediaStream(remoteCam.current.srcObject.getTracks().filter(t => t !== track))
                     remoteCam.current.srcObject = newStream
                 }
@@ -345,7 +303,9 @@ function PeerCall(){
                         setVideoAdded(false)
                         const newStream = new MediaStream(localCam.current.srcObject.getTracks().filter(t => t !== track))
                         localCam.current.srcObject = newStream
+                        renegotiate()
                     }
+                    renegotiate()
                 }
             }
             if (type === "audio"){
@@ -358,7 +318,9 @@ function PeerCall(){
                         setAudioAdded(false)
                         const newStream = new MediaStream(localCam.current.srcObject.getTracks().filter(t => t !== track))
                         localCam.current.srcObject = newStream
+                        renegotiate()
                     }
+                    renegotiate()
                 }
             }
         }catch(err){
@@ -385,14 +347,30 @@ function PeerCall(){
     }
 
     async function renegotiate() {
-        if (connectionInfo.current["connectionState"] !== "connected" || connectionInfo.current["negotiating"]){
+        if (connectionInfo.current["connectionState"] !== "connected" || connectionInfo.current["negotiating"] || !localCam.current?.srcObject){
             return
         }
-        const pc = connectionInfo.current["pc"]
-        connectionInfo.current["negotiating"] = true
 
         let localTracks = localCam.current.srcObject.getTracks()
-        const sentTracks = pc.getSenders().filter(s => s.track !== null)
+        const sentTracks = connectionInfo.current["pc"].getSenders().filter(s => s.track !==  null)
+        const pc = connectionInfo.current["pc"]
+
+        const needsRenegotiation = () => {
+            if (localTracks.length !== sentTracks.length){
+                return true
+            }
+            for (const s of sentTracks){
+                if (!localTracks.includes(s.track)){
+                    return true
+
+                }
+            }
+            return false
+        }
+        if (!needsRenegotiation()){
+            return
+        }
+
         for (let s of sentTracks){
             if (!localTracks.includes(s.track)){
                 pc.removeTrack(s)
@@ -404,6 +382,9 @@ function PeerCall(){
             pc.addTrack(t, localCam.current.srcObject)
         })
 
+
+
+        connectionInfo.current["negotiating"] = true  
 
         const offerDescription = await pc.createOffer()
         await pc.setLocalDescription(offerDescription)
@@ -544,8 +525,6 @@ function PeerCall(){
                         }
                     </section>
                 </section>
-                <button onClick={()=>{console.log(connectionInfo.current["pc"]?.getSenders(), localCam.current?.srcObject?.getTracks())}}>check PC connection and local stream</button>
-                <button onClick={()=>{console.log(remoteCam.current?.srcObject?.getTracks())}}>check remote stream</button>
                 <section className={styles.activePeers} onClick={()=>setToggleActivePeers(prev=>!prev)}>
                     <h2>Currently Active Members</h2>
                     <hr />
