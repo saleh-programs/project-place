@@ -15,6 +15,8 @@ const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN
 const AUTH0_API_AUDIENCE = process.env.AUTH0_API_AUDIENCE
 
+const TRANSPORT_ANNOUNCED_IP = process.env.TRANSPORT_ANNOUNCED_IP
+
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -568,7 +570,7 @@ async function makeTransport(roomID) {
     listenIps: [
       {
         ip: '0.0.0.0',
-        announcedIp: "127.0.0.1"
+        announcedIp: TRANSPORT_ANNOUNCED_IP
       }
     ],
     enableUdp: true,

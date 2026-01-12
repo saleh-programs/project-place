@@ -49,9 +49,7 @@ s3 = boto3.client(
 app = Flask(__name__)
 app.config.update(
     SESSION_COOKIE_DOMAIN=".projectplace.space",
-    SESSION_COOKIE_SAMESITE="None",
     SESSION_COOKIE_SECURE=True,
-    PREFERRED_URL_SCHEME="https",
 )
 
 app.secret_key = APP_SECRET_KEY
