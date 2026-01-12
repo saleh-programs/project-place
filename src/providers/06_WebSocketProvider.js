@@ -130,7 +130,7 @@ function WebSocketProvider({children}){
             console.log("connect")
         },
         onClose: () => {
-            if (roomIDRef.current === connectedRoomRef.current){
+            if (roomIDRef.current === connectedRoomRef.current || !connectedRoomRef.current){
                 exitRoom()
             }
             console.log("disconnect")

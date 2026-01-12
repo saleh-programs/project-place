@@ -300,7 +300,7 @@ function GroupCall(){
                 }
             }
             if (type === "audio"){
-                stream = await navigator.mediaDevices.getUserMedia({audio: true})
+                stream = await navigator.mediaDevices.getUserMedia({audio: {"echoCancellation": true, "noiseSuppression": true, "autoGainControl": true}})
                 const track = stream.getAudioTracks()?.[0]
                 if (track){
                     setAudioAdded(true)
