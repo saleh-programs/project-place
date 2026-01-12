@@ -15,7 +15,8 @@ const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN
 const AUTH0_API_AUDIENCE = process.env.AUTH0_API_AUDIENCE
 
-const TRANSPORT_ANNOUNCED_IP = process.env.TRANSPORT_ANNOUNCED_IP
+const TRANSPORT_ANNOUNCED_IP1 = process.env.TRANSPORT_ANNOUNCED_IP1
+const TRANSPORT_ANNOUNCED_IP2 = process.env.TRANSPORT_ANNOUNCED_IP2
 
 
 const httpServer = http.createServer()
@@ -43,7 +44,10 @@ const mediaCodecs = [
 ]
 
 let worker;
-mediasoup.createWorker()
+mediasoup.createWorker({
+  rtcMinPort: 40000,
+  rtcMaxPort: 49999,
+})
 .then(w => {
   worker = w;
 })
@@ -570,7 +574,11 @@ async function makeTransport(roomID) {
     listenIps: [
       {
         ip: '0.0.0.0',
-        announcedIp: TRANSPORT_ANNOUNCED_IP
+        announcedIp: TRANSPORT_ANNOUNCED_IP1
+      },
+      {
+        ip: '0.0.0.0',
+        announcedIp: TRANSPORT_ANNOUNCED_IP2
       }
     ],
     enableUdp: true,

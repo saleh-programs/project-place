@@ -72,6 +72,7 @@
   border: 1px dotted;
   pointer-events: none;
   opacity: .5;
+  background-color: #00b8f05e;
 
   &.fixed{
     pointer-events: auto;

@@ -839,7 +839,7 @@ function Whiteboard(){
             <button className={selectedTool === "fill" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "fill";setSelectedTool("fill")}}><img src="/tool_icons/fill.png" alt="fill" /></button>
             <button className={selectedTool === "colorpick" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "colorpick";setSelectedTool("colorpick")}}><img src="/tool_icons/colorpicker.png" alt="color picker" /></button>
             <button className={selectedTool === "navigate" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "navigate";setSelectedTool("navigate")}}><img src="/tool_icons/navigate.png" alt="draw" /></button>
-            <button className={selectedTool === "select" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "select";setSelectedTool("select")}}>select</button>
+            <button className={selectedTool === "select" ? styles.selected : ""} onClick={()=>{canvasInfo.current["type"] = "select";setSelectedTool("select")}}><img src="/tool_icons/select.png" alt="select" /></button>
 
           </section>
           <section ref={pixelInputsRef} className={styles.pixelInput}>
