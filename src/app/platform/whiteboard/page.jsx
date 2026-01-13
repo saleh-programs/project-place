@@ -701,9 +701,53 @@ function Whiteboard(){
     setPreviewURL(url)
     setTimeout(()=>{
       URL.revokeObjectURL(url)
-      setPreviewURL(null)
+      setPreviewURL(prev => prev === url ? null : prev)
     },5000)
     
+  }
+  async function captureSelectionPNG() {
+    if (canvasInfo.current["type"] !== "select" || !selectAreaRef.current) return
+    console.log(selectAreaRef.current)
+    let blob
+    if (selectingState !== "full"){
+      const canvasRect = canvasRef.current.getBoundingClientRect()
+      const selectRect = selectAreaRef.current.getBoundingClientRect()
+      
+      const currentTop = Math.round((selectRect.top - canvasRect.top) / canvasInfo.current["scale"])
+      const currentLeft = Math.round((selectRect.left - canvasRect.left) / canvasInfo.current["scale"])
+      const currentWidth = Math.round(selectRect.width / canvasInfo.current["scale"])
+      const currentHeight = Math.round(selectRect.height / canvasInfo.current["scale"])
+      const newCanvas = document.createElement("canvas")
+      newCanvas.width = currentWidth
+      newCanvas.height = currentHeight
+      newCanvas.getContext("2d").drawImage(canvasRef.current, 
+        currentLeft, currentTop, currentWidth, currentHeight,
+        0, 0, currentWidth, currentHeight,
+      )
+      blob = await new Promise(resolve=>{
+        newCanvas.toBlob(b=>resolve(b), "image/png")
+      })
+    }else{
+      blob = await new Promise(resolve=>{
+        selectAreaRef.current.toBlob(b=>resolve(b), "image/png")
+      })
+    }
+
+  
+    const url = URL.createObjectURL(blob)
+    const tempLink = document.createElement("a")
+    tempLink.href = url
+    const formattedDate = new Date().toISOString().split(":")
+    tempLink.download = `${roomName} ${formattedDate[0]}:${formattedDate[1]}.png`
+    document.body.appendChild(tempLink)
+    tempLink.click()
+    document.body.removeChild(tempLink)
+
+    setPreviewURL(url)
+    setTimeout(()=>{
+      URL.revokeObjectURL(url)
+      setPreviewURL(prev => prev === url ? null : prev)
+    },5000)
   }
 
   function changeLineWidth(e){
@@ -824,7 +868,8 @@ function Whiteboard(){
             <img src="/wb_handle/0.png" alt="handle" />
           </span>
           <section className={`${styles.modesContainer} ${styles.specialTools}`}>
-            <button onClick={()=>{capturePNG()}}><img src="/tool_icons/camera.png" alt="snapshot" /></button>
+            <button onClick={capturePNG}><img src="/tool_icons/camera.png" alt="canvas_snapshot" /></button>
+            <button onClick={captureSelectionPNG}><img src="/tool_icons/camera.png" alt="select_snapshot" /></button>
             <button onClick={()=>{}}>
                 <label className={styles.fileInput}>
                   <img src="/tool_icons/import.png" alt="import" />
@@ -900,7 +945,7 @@ function Whiteboard(){
         </section>
         }
         {importErrorMsg && <span className={styles.importErrorMsg}>{importErrorMsg}</span>}
-        {previewURL && <span className={styles.screenshotPreview} ><img src={previewURL} alt="preview"/></span>}
+        {previewURL && <span className={styles.screenshotPreview} ><div><img src={previewURL} alt="preview"/></div></span>}
       </div>
       }
     </div>
