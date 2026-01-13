@@ -5,10 +5,12 @@
   top: 30%;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgb(145, 182, 242);
+  background: linear-gradient(rgba(217, 232, 255), rgb(147, 186, 245));
   padding: 10px;
-  color: black;
+  border: 2px solid;
   border-radius: 10px;
+  color: black;
+
 
   z-index: 1000;
 } 

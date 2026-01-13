@@ -6,11 +6,18 @@
 .sidePanel{
   display: flex;
   position: relative;
+  border-right:1px solid gray;
+  background: linear-gradient(rgb(228, 228, 228), rgb(190, 194, 185));
+}
+.sidePanel.darkMode{
+  background: linear-gradient(rgb(2, 24, 5), rgb(52, 58, 53));
 }
 .sidePanelMain{
   flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 5px;
+  width: 300px;
 }
 .sidePanelHandle{
   position: absolute;
@@ -32,11 +39,10 @@
   flex: 1;
   font-size: 2.2rem;
   background-color: rgb(247, 247, 237);
-  
   position: relative;
-  border: 1px solid rgba(0, 0, 0, 0.268);
+  border: 2px solid gray;
   border-radius: 10px;
-  box-shadow: 10px 0 30px 5px inset rgba(21, 5, 71, 0.149);
+  box-shadow: 10px 0 30px 5px inset rgba(21, 5, 71, 0.249);
   margin: 5px;
 
   text-overflow: ellipsis;
@@ -46,7 +52,9 @@
   font-weight: bold;
 
   &:hover{
-    box-shadow: 10px 0 30px 8px inset rgba(21, 5, 71, 0.2);
+    box-shadow: 10px 0 30px 18px inset rgba(21, 5, 71, 0.2);
+    background-color: rgb(214, 214, 207);
+
   }
   &:active{
     box-shadow: 10px 0 30px 8px inset rgba(21, 5, 71, 0.3);
