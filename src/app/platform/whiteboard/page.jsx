@@ -75,6 +75,7 @@ function Whiteboard(){
         return
       }
     }
+    
     document.addEventListener("mousedown", exitPicker)
   return ()=>{
     externalWhiteboardRef.current = (param1) => {}
@@ -104,14 +105,50 @@ function Whiteboard(){
     Object.assign(canvasRef.current.getContext("2d"), customizations)
     Object.assign(hiddenCanvasRef.current.getContext("2d"), customizations)
 
+    const whiteboardScrollableElem = document.querySelector(`.${styles.whiteboardScrollable}`)
+    let called = false
+    function onScrollOrZoom(e){
+      e.preventDefault()
+      if (called) return
+      called = true
+      requestAnimationFrame(() => {
+        if (e.ctrlKey){
+          zoom(e.deltaY < 0 ? -.05 : .05)
+          called = false
+          return
+        }
+        const containerRect = whiteboardScrollableElem.getBoundingClientRect()
+        let canvasRect = canvasRef.current.getBoundingClientRect()
+
+        const shiftX = -e.deltaX / 2
+        const shiftY = -e.deltaY / 2
+
+        const withinHorizontalBounds = canvasRect.right + shiftX >= containerRect.left + 10 && canvasRect.left + shiftX <= containerRect.right - 10
+        const withinVerticalBounds = canvasRect.top + shiftY <= containerRect.bottom - 10 && canvasRect.bottom + shiftY >= containerRect.top + 10
+
+        if (withinHorizontalBounds){
+          canvasInfo.current["translateX"] = canvasInfo.current["translateX"] + shiftX
+        }
+        if (withinVerticalBounds){
+          canvasInfo.current["translateY"] = canvasInfo.current["translateY"] + shiftY
+        }
+        transformedCanvasViewRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
+        called = false
+      })
+    }
+    const preventWindowZoom = e => e.preventDefault()
+    whiteboardScrollableElem.addEventListener("wheel", onScrollOrZoom, {passive: false})
+    window.addEventListener("keydown", preventWindowZoom, {passive: false})
     return () => {
       savedCanvasInfoRef.current["snapshot"] = null
+      whiteboardScrollableElem.removeEventListener("wheel", onScrollOrZoom)
+      window.removeEventListener("keydown", preventWindowZoom)
     }
     
   },[roomID])
 
   useLayoutEffect(()=>{
-    canvasRef.current && zoom("out")
+    canvasRef.current && zoom(-.2)
   },[roomID])  
 
   useEffect(()=>{
@@ -646,9 +683,10 @@ function Whiteboard(){
     document.addEventListener("mousemove", onMoveNavigate)
     document.addEventListener("mouseup", onReleaseNavigate)
   }
-  function zoom(type){
-    const increment = type === "in" ? 0.2 :  -0.2
-    canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + increment,1.5))
+  function zoom(delta){
+    canvasInfo.current["translateX"] = -500
+    canvasInfo.current["translateY"] = -500
+    canvasInfo.current["scale"] = Math.max(0.5, Math.min(canvasInfo.current["scale"] + delta, 2))
     transformedCanvasViewRef.current.style.transform = `translate(${canvasInfo.current["translateX"]}px, ${canvasInfo.current["translateY"]}px) scale(${canvasInfo.current["scale"]})`;
   }
   async function undo(){
@@ -833,8 +871,8 @@ function Whiteboard(){
             <span className={styles.reverseButtons}>
               <button className={styles.undoButton} onClick={undo}><img src="/tool_icons/undo.png" alt="undo" /></button>
               <button className={styles.redoButton} onClick={redo}><img src="/tool_icons/redo.png" alt="redo" /></button>
-              <button onClick={()=>zoom("in")}><img src="/tool_icons/zoomin.png" alt="zoom in" /></button>
-              <button onClick={()=>zoom("out")}><img src="/tool_icons/zoomout.png" alt="zoom out" /></button>
+              <button onClick={()=>zoom(.2)}><img src="/tool_icons/zoomin.png" alt="zoom in" /></button>
+              <button onClick={()=>zoom(-.2)}><img src="/tool_icons/zoomout.png" alt="zoom out" /></button>
             </span>
             <button className={styles.clearButton} onClick={()=>{
               const update = {

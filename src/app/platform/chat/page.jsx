@@ -751,7 +751,7 @@ function Chat(){
                 }}
                 />
                 </label>
-                <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={handleKeyPress}/>
+                <textarea className={styles.chatInput} placeholder="Type new message..." value={newMessage} onChange={(e)=>setNewMessage(e.target.value)} onKeyDown={handleKeyPress} spellCheck={false}/>
                 <button onClick={handleMessage} className={`${isClicked ? styles.clicked : ""}`}>    
                   <img src={"/submit_icon.png"} />
                 </button>
