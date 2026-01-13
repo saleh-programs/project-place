@@ -42,21 +42,22 @@ function PeersProvider({children}){
                 break;
             case "getUsers":
                 const locations = ["videochat", "chat", "whiteboard"]
-                let currLocation = "chat"
-                for (let i = 0; i < locations.length; i++){
-                    if (window.location.pathname.includes(locations[i])){
-                        currLocation = locations[i]
-                        break
+                const getLocation = () => {
+                    let currLocation = "chat"
+                    for (let i = 0; i < locations.length; i++){
+                        if (window.location.pathname.includes(locations[i])){
+                            return locations[i]
+                        }
                     }
+                    return currLocation
                 }
                 const users = {
                     [username]: {
                         avatar: userInfo["avatar"],
                         status: "idle",
-                        location: currLocation
+                        location: getLocation()
                     }
                 };
-                console.log(data["data"])
                 data["data"].forEach(user => {
                     users[user["username"]] = {
                         avatar: `https://project-place-assets.s3.us-east-2.amazonaws.com/public/avatars/${user["username"]}`,
@@ -65,6 +66,18 @@ function PeersProvider({children}){
                     };
                 });
                 setUserStates(users);
+
+                const id = setInterval(() => {
+                    setUserStates(prev => {
+                        if (JSON.stringify(prev) === "{}"){
+                            clearInterval(id)
+                            return prev
+                        }
+                        if (prev[username]["location"] === getLocation()) return prev
+                        window.location.reload()
+                        return prev
+                    })
+                }, 3000)
                 siteHistoryRef.current["userHistoryReceived"] = true;
                 break;
         }

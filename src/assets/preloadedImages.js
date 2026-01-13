@@ -27,9 +27,7 @@ function preloadAll(){
             }))
         }
     }
-    const loadingImages = Promise.all(allImages).then(()=>{
-        console.log("All images loaded! at ", Date.now())
-    })
+    const loadingImages = Promise.all(allImages)
     return [animations, loadingImages]
 }
 
@@ -50,9 +48,7 @@ function preload(path){
             frame.onload = resolve
         }))
     }
-    const loadingImages = Promise.all(allImages).then(()=>{
-        console.log("All images loaded! at ", Date.now())
-    })
+    const loadingImages = Promise.all(allImages)
     return [animations[path], loadingImages]
 }
 

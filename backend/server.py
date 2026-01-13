@@ -47,10 +47,10 @@ s3 = boto3.client(
 
 # create flask app and register with the Auth0 service
 app = Flask(__name__)
-app.config.update(
-    SESSION_COOKIE_DOMAIN=".projectplace.space",
-    SESSION_COOKIE_SECURE=True,
-)
+# app.config.update(
+#     SESSION_COOKIE_DOMAIN=".projectplace.space",
+#     SESSION_COOKIE_SECURE=True,
+# )
 
 app.secret_key = APP_SECRET_KEY
 
@@ -635,7 +635,10 @@ def getDefaultAvatars():
 
 def s3Upload(fileObj, key, contentType):
   s3.upload_fileobj(fileObj, S3_BUCKET_NAME, key,
-  ExtraArgs={"ContentType": contentType})
+  ExtraArgs={
+    "ContentType": contentType,
+    "CacheControl": "no-cache, must-revalidate"
+    })
 
 def getS3File(key):
   fileObj = s3.get_object(
