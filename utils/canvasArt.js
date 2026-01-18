@@ -1,4 +1,12 @@
+import createModule from "./fill.js";
 import Queue from "./Queue.js"
+
+let Module = null
+let wasmReady = false;
+createModule().then(m => {
+  Module = m
+  wasmReady = true;
+})
 
 function draw(commands, canvas, options){
     const context = canvas.getContext("2d")
@@ -28,7 +36,6 @@ function draw(commands, canvas, options){
     context.lineTo(...commands.at(-1))
     context.stroke()
 }
-
 
 function floodFill([X,Y], canvas, color){
   const cxt = canvas.getContext('2d')
@@ -91,7 +98,8 @@ function floodFill([X,Y], canvas, color){
   cxt.putImageData(canvasImage,0,0)
 }
 
-function linefill([X,Y], canvas, color){
+function lineFill([X,Y], canvas, color){
+  const t0 = performance.now()
   const cxt = canvas.getContext('2d', {willReadFrequently: true})
   const startImage = cxt.getImageData(X, Y,1,1)
   const startColor = startImage.data
@@ -181,11 +189,57 @@ function linefill([X,Y], canvas, color){
   }
 
   cxt.putImageData(canvasImage,0,0)
+  const t1 = performance.now()
+  console.log(t1 - t0)
+}
+
+function wasmLineFill([X,Y], canvas, color){
+  if (!wasmReady){
+    console.log("wasm not ready")
+    lineFill([X,Y], canvas, color)
+    return
+  }
+  console.log("going to use wasm")
+  const t0 = performance.now()
+  const cxt = canvas.getContext('2d', {willReadFrequently: true})
+  const startImage = cxt.getImageData(X, Y,1,1)
+  const startColor = startImage.data
+
+  cxt.fillStyle = color
+  cxt.fillRect(X,Y,1,1)
+  const fillColor = cxt.getImageData(X,Y,1,1).data
+  cxt.putImageData(startImage,X,Y)
+
+  const canvasImage = cxt.getImageData(0,0,canvas.width,canvas.height)
+  const canvasData = canvasImage.data
+
+  const startColorPtr = Module._malloc(startColor.length)
+  Module.HEAPU8.set(startColor, startColorPtr)
+
+  const fillColorPtr = Module._malloc(fillColor.length)
+  Module.HEAPU8.set(fillColor, fillColorPtr)
+
+  const canvasDataPtr = Module._malloc(canvasData.length)
+  Module.HEAPU8.set(canvasData, canvasDataPtr)
+
+  //--wasm area
+  Module._lineFill(X, Y, canvas.width, canvas.height, startColorPtr, fillColorPtr, canvasDataPtr)
+  //--
+
+  canvasData.set(Module.HEAPU8.subarray(canvasDataPtr, canvasDataPtr + canvasData.length))
+  Module._free(startColorPtr)
+  Module._free(fillColorPtr)
+  Module._free(canvasDataPtr)
+
+
+  cxt.putImageData(canvasImage,0,0)
+  const t1 = performance.now()
+  console.log("wasm fill: ", t1 - t0)
 }
 
 
 function importImage(img, canvas, anchor){
-
+  const t0 = performance.now()
   const row = Math.floor((anchor-1) / 3)
   const col = Math.floor((anchor-1) % 3)
 
@@ -202,6 +256,8 @@ function importImage(img, canvas, anchor){
   const cxt = canvas.getContext("2d")
   cxt.globalCompositeOperation = "source-over"
   cxt.drawImage(img, left, top)
+  const t1 = performance.now()
+  console.log(t1 - t0)
 }
 
 function moveArea(canvas, storedRegion, region1, region2){
@@ -226,4 +282,4 @@ function clear(canvas){
   canvas.getContext("2d").clearRect(0,0,canvas.width, canvas.height)
 }
 
-export {draw, floodFill, linefill, clear, importImage, timeFunction, moveArea}
+export {draw, floodFill, lineFill, wasmLineFill, clear, importImage, timeFunction, moveArea}
