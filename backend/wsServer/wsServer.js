@@ -7,7 +7,7 @@ import {v4 as uuidv4} from "uuid"
 
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
-import { draw, linefill as fill, clear, importImage, moveArea} from "../../utils/canvasArt.js"
+import { draw, wasmLineFill as fill, clear, importImage, moveArea} from "../../utils/canvasArt.js"
 
 
 const AUTH0_CLIENT_ID = process.env.AUTH0_CLIENT_ID
@@ -184,8 +184,8 @@ function handleClose(uuid){
 }
 
 function handleMessage(data, uuid){
+  if (!users[uuid] || !rooms[users[uuid]["roomID"]]) return
   const parsedData = JSON.parse(data.toString())
-  console.log(parsedData.origin)
 
   switch (parsedData.origin){
     case "chat":
@@ -230,7 +230,7 @@ async function processChat(data, uuid){
   broadcastAll(uuid, data, true);
 }
 
-function processWhiteboard(data, uuid){
+async function processWhiteboard(data, uuid){
   if (data["type"] === "getCanvas"){
     const roomCanvasInfo = rooms[users[uuid]["roomID"]]?.["whiteboard"]
     if (!roomCanvasInfo) return
@@ -247,13 +247,26 @@ function processWhiteboard(data, uuid){
     return
   }
 
+  const queue = rooms[users[uuid]["roomID"]]["whiteboard"]["queue"]
+  const previousTask = queue.length > 0 ? queue.at(-1) : Promise.resolve()
 
-  broadcastAll(uuid, data, false)
-  handleCanvasAction(data, users[uuid]["roomID"])
+  const x = uuidv4()
+  //wait for previous tasks and then complete this task
+  const completeTask = async () => {
+    console.log("I have entered", x)
+    await previousTask;
+    console.log("The previous tasks have been completed, I will broadcast", x);
 
-  //debug whitboard
-  // const buffer = rooms[users[uuid]["roomID"]]["whiteboard"]["canvas"].toBuffer("image/png")
-  // writeFileSync("test.png", buffer)
+    ["isDrawing", "isErasing"].includes(data["type"]) ? broadcastAll(uuid, data) : broadcastAll(uuid, data, true);
+
+    await handleCanvasAction(data, users[uuid]["roomID"]);
+    console.log("I have completed my task", x)
+  }
+  const completeTaskPromise = completeTask()
+  rooms[users[uuid]["roomID"]]["whiteboard"]["queue"].push(completeTaskPromise)
+
+  await completeTaskPromise
+  rooms[users[uuid]?.["roomID"]]?.["whiteboard"]["queue"].shift()
 }
 
 async function processGroupcall(data, uuid){
@@ -300,6 +313,7 @@ async function processGroupcall(data, uuid){
       break
     case "sendConnect":
       const {dtlsParameters} = data.data
+      console.log("dtlsparams: ", dtlsParameters)
       await userCallInfo["sendTransport"].connect({dtlsParameters})
 
       connections[uuid].send(JSON.stringify({
@@ -535,7 +549,8 @@ async function sendServerInfo(uuid) {
         "snapshot": snapshotCopy,
         "canvas": canvasSnapshot,
         "operations": canvasInstructions,
-        "latestOp": canvasInstructions.length - 1
+        "latestOp": canvasInstructions.length - 1,
+        "queue": []
         },
       "groupcall": {
         "router": router,
