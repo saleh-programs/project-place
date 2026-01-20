@@ -18,7 +18,7 @@ function AllProviders({children, initialUserInfo}){
     // RoomProvider:           Anything related to the current room
     // PeersProvider:          Anything related to peers within the room.
     // Chat/VideoChat/Whiteboard Provider:           Anything related to Chat, Videochat or Whiteboard (logically equal in hierarchy)
-    // WebSocketProvider:      Anything related to WebSocket connecion for room. Its message event handler uses many values from parent providers.
+    // WebSocketProvider:      Anything related to WebSocket connecion for the room. Its message event handler uses many values from parent providers.
 
     return (
     <UserProvider initialUserInfo={initialUserInfo}>

@@ -4,7 +4,7 @@ import { HexColorPicker } from "react-colorful"
 
 import { UserContext, AppearanceContext, RoomContext, WhiteboardContext, WebSocketContext } from "src/providers/contexts"
 import Animation from "src/components/Animation"
-import { draw, linefill as fill, clear, importImage, moveArea } from "utils/canvasArt.js"
+import { draw, wasmLineFill as fill, clear, importImage, moveArea } from "utils/canvasArt.js"
 import { throttle } from "utils/miscellaneous.js"
 
 import styles from "styles/platform/Whiteboard.module.css"
@@ -161,9 +161,14 @@ function Whiteboard(){
   function externalWhiteboard(data){
     /* when data.type differentiates canvas actions
     from other things we want to do on the whiteboard 
-    page, this function will be much more meaningful*/
+    page, this function could be much more meaningful*/
     if (data === "canvasReceived"){
       savedCanvasInfoRef.current["snapshot"] && rebuildCanvas()
+      return
+    }
+    console.log("received!")
+    if ((data["type"] === "doneDrawing" || data["type"] === "doneErasing") && data["username"] === username){
+      handleCanvasAction(data, true)
       return
     }
     handleCanvasAction(data)
@@ -323,7 +328,6 @@ function Whiteboard(){
       }
     }
     sendJsonMessage(update)
-    await handleCanvasAction(update, true)
     strokes.current["fullStroke"] = []
   }
 
@@ -480,7 +484,6 @@ function Whiteboard(){
       }
     }
     sendJsonMessage(update)
-    await handleCanvasAction(update)
     setSelectingState("off")
   }
 
@@ -554,7 +557,6 @@ function Whiteboard(){
         }
       }
       sendJsonMessage(update)
-      await handleCanvasAction(update)
       return
     }
     if (canvasInfo.current?.["type"] === "colorpick"){
@@ -612,7 +614,6 @@ function Whiteboard(){
       "metadata": {"anchor": selectedAnchor}
     }
     sendJsonMessage(update)
-    await handleCanvasAction(update)
     cancelImport()
   }
 
@@ -703,8 +704,7 @@ function Whiteboard(){
       "username": username,
     }
     sendJsonMessage(update)
-    await handleCanvasAction(update)
-  }
+  } 
   async function redo(){
     if (undoRedoTimer.current || savedCanvasInfoRef.current["latestOp"] >= savedCanvasInfoRef.current["operations"].length-1){
       return
@@ -718,7 +718,6 @@ function Whiteboard(){
       "username": username,
     }  
     sendJsonMessage(update)
-    await handleCanvasAction(update)
   } 
   async function capturePNG(){
     if (!canvasRef.current) return
@@ -881,7 +880,6 @@ function Whiteboard(){
                 "username": username,
               }
               sendJsonMessage(update)
-              handleCanvasAction(update)
             }}>CLEAR
             </button>
             
