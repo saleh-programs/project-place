@@ -328,6 +328,7 @@ def createRoom():
     cursor.execute("INSERT INTO canvases (canvas, instructions, roomID) VALUES (%s,%s,%s)", (key, "[]", roomID))
   return jsonify({"success": True, "data": {"roomID": roomID}}), 200
 
+# rendered useless now that clients can do direct uploads with presigned urls
 @app.route("/rooms/files", methods=["POST"])
 @handleError("failed to upload files")
 @authenticateClient
@@ -355,7 +356,7 @@ def uploadFiles():
       "path": url,
       "key": key,
       "mimeType": file.mimetype,
-      "dimensions": dimensions
+      "dimensions": dimensions,
     })
 
   return jsonify({"success":True, "data": {"fileList": fileList}}),200
@@ -431,6 +432,8 @@ def validateRoomUser(roomID, username):
 def storeMessage(roomID):
   data = request.get_json()
   message = data["message"]
+  for f in message["files"]:
+    f["path"] = ""
   with AccessDatabase() as cursor:  
     cursor.execute("INSERT INTO messages (username, text, files, messageID, timestamp, roomID) VALUES (%s, %s, %s,%s, %s, %s)", 
     (message["username"], message["text"], json.dumps(message["files"]), message["metadata"]["messageID"], message["metadata"]["timestamp"], roomID))
@@ -621,7 +624,7 @@ def logout():
     )
   )
 
-# -----------------S3 STUFF (TEMPLATES THAT I USE IN A SECOND)--------------------
+# -----------------S3 STUFF --------------------
 # All are called within handleError
 
 @app.route("/defaultAvatars")
@@ -646,6 +649,7 @@ def getUploadURL():
   key = f"chats/{str(uuid.uuid4())}.{extension}"
   result = getS3UploadURL(key, mimeType)
   result["downloadURL"] = getS3Url(key) 
+  
   if not result:
     return {"success": False, "message": "Couldn't get upload URL"}, 400
   return {"success": True, "data": {"uploadInfo": result}}, 200
@@ -672,7 +676,13 @@ def getS3Url(key):
 
   return url
 
-  
+def getS3HeadUrl(key):
+  url = s3.generate_presigned_url(
+    "head_object", 
+    Params={"Bucket": S3_BUCKET_NAME, "Key": key}, 
+    ExpiresIn=3600)  
+
+  return url
 
 # AWS provided code mostly
 def getS3UploadURL(key, mimeType="application/octet-stream", expiration=900):
@@ -685,9 +695,9 @@ def getS3UploadURL(key, mimeType="application/octet-stream", expiration=900):
             key,
             Fields={"Content-Type": mimeType},
             Conditions=[
-              ["content-length-range", 0, 5000000],
+              ["content-length-range", 0, 1024 * 1024 * 25], #200MB max (will lower if site grows)
               {"Content-Type": mimeType}
-            ],#5MB max
+            ],
             ExpiresIn=expiration
         )
     except Exception as e:
