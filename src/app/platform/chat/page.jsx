@@ -5,7 +5,7 @@ import { UserContext, AppearanceContext, RoomContext, PeersContext, WebSocketCon
 import Animation from "src/components/Animation"
 import FileViewer from "src/components/FileViewer"
 import styles from "styles/platform/Chat.module.css"
-import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq } from "backend/requests.js"
+import { getUniqueMessageID, uploadFilesReq, getOlderMessagesReq, getUploadURLReq, uploadToS3Req } from "backend/requests.js"
 
 
 function Chat(){
@@ -42,7 +42,7 @@ function Chat(){
   })
   const filesRef = useRef(null)
   const [filePreviews, setFilePreviews] = useState([])
-  const [showOverUploadMsg, setShowOverUploadMsg] = useState(false)
+  const [fileSelectErrMsg, setFileSelectErrMsg] = useState(false)
   const [isClicked, setIsClicked] = useState(false)
 
   const [groupedMessages, setGroupedMessages] = useState([])
@@ -197,6 +197,7 @@ function Chat(){
       }
     }
   },[groupedMessages])
+
   function renderEarlierValues(){
     const rangeRef = lazyLoading.current["displayListRangeRef"]
 
@@ -330,8 +331,9 @@ function Chat(){
     setIsClicked(true)
     setTimeout(()=>setIsClicked(false), 50)
 
+    const currentNewMessage = newMessage
     filePreviews.length > 0 && await handleFileMessage()
-    if (newMessage === "") return
+    if (currentNewMessage === "") return
 
     const currTime = Date.now()
     const messageID = getUniqueMessageID()
@@ -377,10 +379,44 @@ function Chat(){
   }
   async function handleFileMessage() {
     const currTime = Date.now()
-    const filePaths = await uploadFilesReq(filePreviews)
-    if (!filePaths){
-      return
-    }
+    const t0 = performance.now()
+
+    // const filePaths = await uploadFilesReq(filePreviews)
+
+    // asynchronously gets upload urls, uploads to s3, and loads image (for dimensions)
+    let filePaths = await Promise.all(filePreviews.map(async (f) => {
+      let dimensions = null
+      if (f.type?.split("/")?.[0] === "image"){
+        const url = URL.createObjectURL(f)
+        const img = new Image()
+        
+        dimensions = new Promise(resolve => {
+          img.onload = () => {
+            URL.revokeObjectURL(url)
+            resolve([img.naturalWidth, img.naturalHeight])
+          }
+        })
+        img.src = url
+      }
+
+      const uploadInfo = await getUploadURLReq(f.type, f.name)
+      if (!uploadInfo) return null;
+      const success = await uploadToS3Req(uploadInfo, f);
+      if (!success) return null;
+      return {
+        "path": uploadInfo.downloadURL,
+        "key": uploadInfo.fields.key,
+        "mimeType": uploadInfo.fields["Content-Type"],
+        "dimensions": await dimensions
+      }
+    }));
+    filePaths = filePaths.filter(data => data !== null)
+    if (filePaths.length === 0) return 
+
+    const t1 = performance.now()
+    console.log("It took ", t1 - t0, " ms to upload files")
+
+
     const messageID = getUniqueMessageID()
     const msg = {
       "username": username,
@@ -399,7 +435,13 @@ function Chat(){
       "data": msg
     })
     filesRef.current.value = ""
-    setFilePreviews([])
+
+    setFilePreviews(prev => {
+      for (const file of prev){
+        URL.revokeObjectURL(file.url)
+      }
+      return []
+    })
     msg["metadata"]["status"] = "pending"
     setMappedMessages(prev => {return {...prev, [messageID]: msg }})
     setGroupedMessages(prev => appendGroupedMessages(prev, [msg]))
@@ -712,11 +754,18 @@ function Chat(){
               {groupedMessages.slice(displayListRange[0], displayListRange[1]+1).map(group=> getGroupMessageElem(group))}
           </div>
           <div className={styles.chatHub}>
-            <span className={`${styles.overUploadMsg} ${showOverUploadMsg ? styles.show : ""}`}>Please select maximum of 10 files</span>
+            <span className={`${styles.overUploadMsg} ${fileSelectErrMsg ? styles.show : ""}`}>{fileSelectErrMsg}</span>
             <section className={styles.miniFileView}>
               {filePreviews.map(f => {
-                const url = URL.createObjectURL(f);
-                return <span className={styles.preview} key={url} ><FileViewer url={url} dimensions={[50,50]} type={f.type}/> <button onClick={()=>setFilePreviews(filePreviews.filter(file=>f!==file))}>X</button></span>
+                return (
+                <span className={styles.preview} key={f.url} >
+                  <FileViewer url={f.url} dimensions={[50,50]} type={f.type}/> 
+                  <button onClick={()=>setFilePreviews(filePreviews.filter(file => {
+                    if (f === file) URL.revokeObjectURL(f.url);
+                    return f !== file;
+                  }))}>X</button>
+                </span>
+                )
               })}
             </section>
             <section className={styles.chatHubMain}>
@@ -728,7 +777,12 @@ function Chat(){
                   const addedFiles = Array.from(e.target.files)
                   let newFilePreviews =[...filePreviews]
 
-                  addedFiles.forEach((f, i)=>{
+                  let errorMsg = ""
+                  for (const f of addedFiles){
+                    if (f.size > 5000000){
+                      errorMsg += `"${f.name.length > 10 ? `${f.name.slice(0,5)}...${f.name.slice(-5)}` : f.name}" is over 5MB. `
+                      continue
+                    }
                     const addedFileID = `${f["name"]} ${f["lastModified"]}`
                     let j;
                     for (j = 0; j < filePreviews.length; j++){
@@ -738,14 +792,21 @@ function Chat(){
                       }
                     }
                     if (j === filePreviews.length){
+                      f.url = URL.createObjectURL(f);
                       newFilePreviews.push(f);
                     }
-                  })
+                  }
+
                   if (newFilePreviews.length > 10){
-                    setShowOverUploadMsg(true)
-                    setTimeout(()=>setShowOverUploadMsg(false), 3000)
+                    errorMsg += "Please select a maximum of 10 files."
                     newFilePreviews = newFilePreviews.slice(0, 10)
                   }
+                  
+                  if (errorMsg){
+                    setFileSelectErrMsg(errorMsg)
+                    setTimeout(()=>setFileSelectErrMsg(""), 7000)
+                  }
+
                   setFilePreviews(newFilePreviews)
                   filesRef.current.value=""
                 }}
