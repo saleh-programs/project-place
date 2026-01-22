@@ -198,6 +198,10 @@ function Chat(){
     }
   },[groupedMessages])
 
+  useEffect(() => {
+    console.log(filePreviews)
+  },[filePreviews])
+
   function renderEarlierValues(){
     const rangeRef = lazyLoading.current["displayListRangeRef"]
 
@@ -399,17 +403,22 @@ function Chat(){
         img.src = url
       }
 
+      console.log("before start")
       const uploadInfo = await getUploadURLReq(f.type, f.name)
+      console.log(uploadInfo)
       if (!uploadInfo) return null;
-      const success = await uploadToS3Req(uploadInfo, f);
-      if (!success) return null;
+      uploadToS3Req(uploadInfo, f)
+      
+
       return {
         "path": uploadInfo.downloadURL,
         "key": uploadInfo.fields.key,
         "mimeType": uploadInfo.fields["Content-Type"],
-        "dimensions": await dimensions
+        "dimensions": await dimensions,
+        "size": f.size
       }
     }));
+
     filePaths = filePaths.filter(data => data !== null)
     if (filePaths.length === 0) return 
 
@@ -641,8 +650,8 @@ function Chat(){
       return (
         <div key={msgID} id={msgID} className={styles.message}>
           {msg["files"].map(fileInfo => {
-            const {path, dimensions, mimeType} = fileInfo
-            return <FileViewer key={path} url={path} dimensions={dimensions} type={mimeType}/>
+            const {path, dimensions, mimeType, size} = fileInfo
+            return <FileViewer key={path} url={path} dimensions={dimensions} type={mimeType} size={size}/>
           })}
           {msg["text"]}
           {msg["metadata"]["edited"] && <span style={{fontSize:"small"}}> *edited*</span>}
@@ -652,8 +661,8 @@ function Chat(){
     return (
       <div key={msgID} id={msgID} className={`${styles.message} ${selectedID === msgID ? styles.show : ""}`} style={{opacity: msg["metadata"]["status"] !== "delivered" ? ".7": "1"}}>
         {msg["files"].map(fileInfo => {
-          const {path, dimensions, mimeType} = fileInfo
-          return <FileViewer key={path} url={path} dimensions={dimensions} type={mimeType}/>
+          const {path, dimensions, mimeType, size} = fileInfo
+          return <FileViewer key={path} url={path} dimensions={dimensions} type={mimeType} size={size}/>
         })}
         {selectedID === msgID && isEditing
           ?
@@ -759,13 +768,13 @@ function Chat(){
               {filePreviews.map(f => {
                 return (
                 <span className={styles.preview} key={f.url} >
-                  <FileViewer url={f.url} dimensions={[50,50]} type={f.type}/> 
+                  <FileViewer url={f.url} dimensions={[f.width * (100/f.height), 100]} type={f.type} size={f.size}/> 
                   <button onClick={()=>setFilePreviews(filePreviews.filter(file => {
                     if (f === file) URL.revokeObjectURL(f.url);
                     return f !== file;
                   }))}>X</button>
                 </span>
-                )
+                ) 
               })}
             </section>
             <section className={styles.chatHubMain}>
@@ -773,14 +782,14 @@ function Chat(){
                   <img src={"/upload_icon.png"} alt="upload" />
                   <input ref={filesRef} type="file" multiple hidden
                 accept='.png,.jpg,.jpeg,.webp,.docx,.doc,.txt,.csv,.pdf,.odt,.md,.gif,.mp3,.mp4,.html,.zip'
-                onChange={(e)=>{
+                onChange={async (e)=>{
                   const addedFiles = Array.from(e.target.files)
                   let newFilePreviews =[...filePreviews]
 
                   let errorMsg = ""
                   for (const f of addedFiles){
-                    if (f.size > 5000000){
-                      errorMsg += `"${f.name.length > 10 ? `${f.name.slice(0,5)}...${f.name.slice(-5)}` : f.name}" is over 5MB. `
+                    if (f.size > 1024 * 1024 * 25){
+                      errorMsg += `"${f.name.length > 10 ? `${f.name.slice(0,5)}...${f.name.slice(-5)}` : f.name}" is over 25MB. `
                       continue
                     }
                     const addedFileID = `${f["name"]} ${f["lastModified"]}`
@@ -791,8 +800,7 @@ function Chat(){
                         break
                       }
                     }
-                    if (j === filePreviews.length){
-                      f.url = URL.createObjectURL(f);
+                    if (j === filePreviews.length){                    
                       newFilePreviews.push(f);
                     }
                   }
@@ -806,6 +814,23 @@ function Chat(){
                     setFileSelectErrMsg(errorMsg)
                     setTimeout(()=>setFileSelectErrMsg(""), 7000)
                   }
+
+                  const filePromises = []
+                  for (const f of newFilePreviews){
+                    f.url = URL.createObjectURL(f);
+                    if (!f.type.startsWith("image")) continue;
+
+                    filePromises.push(new Promise(resolve => {
+                      const img = new Image()
+                      img.onload = () => {
+                        f.width = img.naturalWidth
+                        f.height = img.naturalHeight
+                        resolve()
+                      }
+                      img.src = f.url
+                    }))
+                  }
+                  await Promise.all(filePromises);
 
                   setFilePreviews(newFilePreviews)
                   filesRef.current.value=""
