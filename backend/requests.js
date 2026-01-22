@@ -175,6 +175,23 @@ async function validateRoomUserReq(roomID, username, token=null) {
 }
 
 
+// async function uploadFilesReq(files) {
+//   const fileInfo = new FormData()
+//   for (const file of files){
+//     fileInfo.append("files", file)
+//   }
+//   const response = await fetch(baseurl + `/rooms/files`,{
+//     "method": "POST",
+//     "credentials": "include",
+//     "body": fileInfo
+//   })
+//   const data = await response.json()
+//   if (!data.success){
+//     throw new Error(data.message ||"req failed")
+//   }
+//   return data["data"]["fileList"]
+// }
+
 async function uploadFilesReq(files) {
   const fileInfo = new FormData()
   for (const file of files){
@@ -191,6 +208,7 @@ async function uploadFilesReq(files) {
   }
   return data["data"]["fileList"]
 }
+
 async function storeMessageReq(message, roomID, token=null) {
   let options;
   if (token){
@@ -410,6 +428,34 @@ async function getDefaultAvatars() {
   return publicImages
 }
 
+async function getUploadURLReq(mimeType, fileName) {
+  const response = await fetch(baseurl + `/uploadURL?mimeType=${mimeType}&fileName=${fileName}`,{
+    "credentials": "include",
+  })
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
+  }
+  return data.data.uploadInfo
+}
+
+async function uploadToS3Req(uploadInfo, file) {
+  const fd = new FormData()
+  for (const [key, val] of Object.entries(uploadInfo.fields)){
+    fd.append(key, val)
+  }
+  fd.append("file", file)
+  const response = await fetch(uploadInfo.url, {
+    method: "POST",
+    body: fd
+  })
+
+  if (!response.ok){
+    throw new Error("Failed to upload to S3")
+  }
+  return response.ok
+}
+
 getUserInfoReq = handleError(getUserInfoReq)
 assignUsernameReq = handleError(assignUsernameReq)
 validateUsernameReq = handleError(validateUsernameReq)
@@ -437,7 +483,8 @@ updateCanvasInstructionsReq = handleError(updateCanvasInstructionsReq)
 getCanvasInstructionsReq = handleError(getCanvasInstructionsReq)
 
 getDefaultAvatars = handleError(getDefaultAvatars)
-
+getUploadURLReq = handleError(getUploadURLReq)
+uploadToS3Req = handleError(uploadToS3Req)
 
 function getUniqueMessageID(){
   const options = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -452,5 +499,5 @@ export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, validateRoomUserReq,
   createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
   getUserInfoReq, assignUsernameReq, getUserRoomsReq, validateUsernameReq, updateProfilePictureReq,
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq,
-  getDefaultAvatars
+  getDefaultAvatars, getUploadURLReq, uploadToS3Req
 }

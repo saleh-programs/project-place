@@ -338,7 +338,7 @@ def uploadFiles():
     extension = file.filename.split(".")[-1].lower()
     allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
     if extension not in allowedExtensions or len(extension) == len(file.filename):
-      return {"success": False}, 500
+      return {"success": False, message: "invalid file type"}, 500
 
     data = file.read()
     key = f"chats/{str(uuid.uuid4())}.{extension}"
@@ -357,8 +357,6 @@ def uploadFiles():
       "mimeType": file.mimetype,
       "dimensions": dimensions
     })
-    
-  
 
   return jsonify({"success":True, "data": {"fileList": fileList}}),200
 
@@ -632,6 +630,25 @@ def getDefaultAvatars():
   avatarKeys = [obj["Key"] for obj in avatars] 
   return {"success": True, "data": {"keys": avatarKeys}}, 200
 
+@app.route("/uploadURL")
+@handleError("failed to create S3 upload URL")
+@authenticateClient
+def getUploadURL():
+  mimeType = request.args.get("mimeType")
+  fileName = request.args.get("fileName")
+
+  extension = fileName.split(".")[-1].lower()
+  allowedExtensions = {"png", "jpg", "jpeg", "webp", "docx", "doc", "txt", "csv", "pdf", "odt", "md","gif","mp3","mp4","html","zip"}
+  if extension not in allowedExtensions or len(extension) == len(fileName):
+    return {"success": False, message: "invalid file type"}, 400
+
+  # Currently only want to upload for chat
+  key = f"chats/{str(uuid.uuid4())}.{extension}"
+  result = getS3UploadURL(key, mimeType)
+  result["downloadURL"] = getS3Url(key) 
+  if not result:
+    return {"success": False, "message": "Couldn't get upload URL"}, 400
+  return {"success": True, "data": {"uploadInfo": result}}, 200
 
 def s3Upload(fileObj, key, contentType):
   s3.upload_fileobj(fileObj, S3_BUCKET_NAME, key,
@@ -654,6 +671,30 @@ def getS3Url(key):
     ExpiresIn=3600)  
 
   return url
+
+  
+
+# AWS provided code mostly
+def getS3UploadURL(key, mimeType="application/octet-stream", expiration=900):
+    routes = key.split("/")
+    if len(routes) != 2 or routes[0] != "chats":
+      return None
+    try:
+        response = s3.generate_presigned_post(
+            S3_BUCKET_NAME,
+            key,
+            Fields={"Content-Type": mimeType},
+            Conditions=[
+              ["content-length-range", 0, 5000000],
+              {"Content-Type": mimeType}
+            ],#5MB max
+            ExpiresIn=expiration
+        )
+    except Exception as e:
+        print(e)
+        return None
+
+    return response
 
 def s3Delete(key):
   s3.delete_object(Bucket=S3_BUCKET_NAME, Key=key)
