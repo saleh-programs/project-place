@@ -65,9 +65,12 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
                     continue
                 }
 
-                const scalar = (BALL_RADIUS * 2) / ball.image.videoWidth
+                const width =  ball.image.tagName === "IMG" ? ball.image.naturalWidth : ball.image.videoWidth
+                const height = ball.image.tagName === "IMG" ? ball.image.naturalHeight : ball.image.videoHeight
+
+                const scalar = (BALL_RADIUS * 2) / width
                 const scaledWidth = BALL_RADIUS * 2
-                const scaledHeight = ball.image.videoHeight * scalar 
+                const scaledHeight = height * scalar 
 
                 cxt.save()
                 cxt.beginPath()
@@ -124,10 +127,11 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
                 
             }else{
                 const img = new Image()
-                img.src = user["avatar"]
                 img.onload = ()=>{
                     ball.image = img
                 }
+                img.src = user["avatar"]
+
             }
             newBallGroup.push(ball)
         }

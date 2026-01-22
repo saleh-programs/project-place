@@ -35,7 +35,7 @@
   overflow-y: auto; 
   scrollbar-width: none;
   padding-top: 5px;
- 
+
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -223,8 +223,6 @@
   flex-direction: column;
   background-color: rgba(209, 218, 226, 0.389);  
   position: relative;
-
-
 }
 .darkMode .chatHub{
   background-color: #8ba38b89;
