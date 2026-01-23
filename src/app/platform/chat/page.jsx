@@ -198,10 +198,6 @@ function Chat(){
     }
   },[groupedMessages])
 
-  useEffect(() => {
-    console.log(filePreviews)
-  },[filePreviews])
-
   function renderEarlierValues(){
     const rangeRef = lazyLoading.current["displayListRangeRef"]
 
@@ -403,12 +399,9 @@ function Chat(){
         img.src = url
       }
 
-      console.log("before start")
       const uploadInfo = await getUploadURLReq(f.type, f.name)
-      console.log(uploadInfo)
       if (!uploadInfo) return null;
       uploadToS3Req(uploadInfo, f)
-      
 
       return {
         "path": uploadInfo.downloadURL,

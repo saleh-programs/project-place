@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react";
+import styles from "styles/components/FileViewer.module.css"
+
 const extensionToMimeType = {
     "jpg": "image/jpg",
     "jpeg": "image/jpeg",
@@ -37,14 +40,75 @@ const extensionToMimeType = {
     
 }
 
-function FileViewer({url, dimensions, type = null}){
+function FileViewer({url, dimensions, type = null, size = 100000}){
+    const [error, setError] = useState(false)
+    const [loading, setLoading] = useState(true)
+
+    const fileElem = useRef(null)
+    const fillElem = useRef(null)
+    const elem = getFile()
+
+
+
+    useEffect(() => {
+        if (error) return;
+
+        // start loading animation
+        let lastDT = Date.now()
+        const estimatedTime = (Math.max(10000,size - 100000) / 1000000) * 1000 //subtract 100KB because upload began some time ago
+        let elapsed = 0
+        let timeoutID = null
+        const increaseLoad = () => {
+            if (!fillElem.current){
+                return
+            }
+            const currTime = Date.now()
+            elapsed += (currTime - lastDT)
+            lastDT  = currTime
+            fillElem.current.style.width = `${Math.round((elapsed / estimatedTime) * 100)}%`
+            if (elapsed >= estimatedTime){
+                fillElem.current.style.width = `100%`
+                timeoutID = setTimeout(() => {
+                    clearInterval(id)
+                    setError(true)
+                },5000)
+                return
+            }
+            requestAnimationFrame(increaseLoad)
+        }
+
+        // check frequently if file is available yet
+        let checking = false
+        const checkAvailability = async () => {
+            if (checking) return
+            checking = true
+            const response = await fetch(url)
+
+            if (response.ok){
+                cancelAnimationFrame(increaseLoad)
+                clearInterval(id)
+                clearTimeout(timeoutID)
+                setLoading(false)
+            }
+            checking = false
+        }
+        const id = setInterval(checkAvailability, 700)
+        requestAnimationFrame(increaseLoad)
+        checkAvailability()
+
+        return () => {
+            cancelAnimationFrame(increaseLoad)
+            clearInterval(id)
+        }
+    }, [])
+
     function getFile(){
         let mimeType = "application/octet-stream"
         let extension;
         if (!type){
             extension = url.split(".").at(-1).toLowerCase()
             if (extension.length === url.length){
-                return
+                return null
             }
             if (Object.hasOwn(extensionToMimeType, extension)){
                 mimeType = extensionToMimeType[extension]
@@ -52,35 +116,99 @@ function FileViewer({url, dimensions, type = null}){
         }else{
             mimeType = type;
         }
-
         const [fileCategory, fileKind] = mimeType.split("/")
-
+        
+        if (!loading){
+            switch (fileCategory){
+                case "image":
+                    return <img ref={fileElem} src={url} alt="file"/>
+                case "video":
+                    return <video ref={fileElem} src={url} onClick={e=>e.preventDefault()} controls/>
+                case "audio":
+                    return <audio ref={fileElem} src={url} controls/>
+                case "application":
+                    if (fileKind === "pdf"){
+                        return <embed ref={fileElem} />
+                    }
+                    if (["zip", "x-tar", "x-rar-compressed", "x-7z-compressed"].includes(fileKind)){
+                        return <img ref={fileElem} src="/compressed_file_icon.png" alt="file" />
+                    }
+                    return <img ref={fileElem} src="/uncommon_file_icon.png" alt="file" />
+                case "text":
+                    return <img ref={fileElem} src="/file_icon.png" alt="file" />
+            }
+            return  <img ref={fileElem} src="/uncommon_file_icon.png" alt="file" />
+        }
         switch (fileCategory){
             case "image":
-                const height = Math.min(200,Math.max(50,dimensions[1]))
-                return <img style={{height: `${height}px`}} src={url} alt="file" />
+                return <img ref={fileElem} alt="file"/>
             case "video":
-                return <video src={url} controls/>
+                return <video ref={fileElem} preload="none" controls/>
             case "audio":
-                return <audio src={url} controls/>
+                return <audio ref={fileElem} controls/>
             case "application":
                 if (fileKind === "pdf"){
-                    return <embed src={url} />
+                    return <embed ref={fileElem} />
                 }
                 if (["zip", "x-tar", "x-rar-compressed", "x-7z-compressed"].includes(fileKind)){
-                    return <img src="/compressed_file_icon.png" alt="file" />
+                    return <img ref={fileElem} src="/compressed_file_icon.png" alt="file" />
                 }
-                return <img src="/uncommon_file_icon.png" alt="file" />
+                return <img ref={fileElem} src="/uncommon_file_icon.png" alt="file" />
             case "text":
-                return <img src="/file_icon.png" alt="file" />
+                return <img ref={fileElem} src="/file_icon.png" alt="file" />
         }
-        return  <img src="/uncommon_file_icon.png" alt="file" />
+        return  <img ref={fileElem} src="/uncommon_file_icon.png" alt="file" />
     }
 
-    const fileElem = getFile()
-    if (fileElem.type === "video"){
-        return fileElem
+    if (error){
+        return (
+            <a className={styles.fileviewer} href={url} target="_blank" style={{border: "1px dotted red", boxShadow: "3px 3px 3px black"}}>
+                <img src="/error.png"/>
+            </a>
+            )
+    }else if (loading){
+        if (dimensions){
+            const height = Math.min(200,Math.max(50,dimensions[1]))
+            const width = Math.round(dimensions[0] * (height / dimensions[1]))
+            return (
+                <a className={styles.fileviewer} href={url} target="_blank" style={{width:`${width}px`, height:`${height}px`}}>
+                    <section className={styles.loadcontainer}>
+                        <span className={styles.loadbar}>
+                            <span className={styles.loadarea} ref={fillElem}>
+                            </span>
+                        </span>
+                    </section>
+                    {elem}
+                </a>
+            )
+        }
+        return (
+            <a className={styles.fileviewer} href={url} target="_blank">
+                <section className={styles.loadcontainer}>
+                    <span className={styles.loadbar}>
+                        <span className={styles.loadarea} ref={fillElem}>
+                        </span>
+                    </span>
+                </section>
+                {elem}
+            </a>
+        )
+    }else{
+        if (dimensions){
+            const height = Math.min(200,Math.max(50,dimensions[1]))
+            const width = Math.round(dimensions[0] * (height / dimensions[1]))
+            return (
+                <a className={styles.fileviewer} href={url} target="_blank" style={{width:`${width}px`, height:`${height}px`}}>
+                    {elem}
+                </a>
+            )
+        }
+        return (
+            <a className={styles.fileviewer} href={url} target="_blank">
+                {elem}
+            </a>
+        )
     }
-    return <a href={url} target="_blank">{fileElem}</a>
 }
+
 export default FileViewer

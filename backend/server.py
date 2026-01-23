@@ -649,7 +649,6 @@ def getUploadURL():
   key = f"chats/{str(uuid.uuid4())}.{extension}"
   result = getS3UploadURL(key, mimeType)
   result["downloadURL"] = getS3Url(key) 
-  
   if not result:
     return {"success": False, "message": "Couldn't get upload URL"}, 400
   return {"success": True, "data": {"uploadInfo": result}}, 200
