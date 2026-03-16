@@ -57,15 +57,17 @@ function MainDisplay({children}){
           <Sidebar/>
           <div className={styles.pageContainer} style={roomID === "" ? {boxShadow: "10px 10px 90px black inset",opacity: ".5"} : {}}>
             {children}
+	    <div className={styles.offersContainer}>
             {Object.keys(callOffers).map((name) => {
               return (
               <div key={name} className={styles.callNotification}>
-                New call offer from <strong>{name}</strong>!
+                <div>New call offer from <br/> "<strong style={{fontSize: "1.2em"}}>{name}</strong>"</div>
                 <button onClick={()=>acceptCall(name)}>Accept</button>
                 <button onClick={()=>rejectCall(name)}>Reject</button>
               </div>
               )
             })}
+            </div>
           </div>
         </div>
       </div>

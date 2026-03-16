@@ -905,7 +905,7 @@ function Whiteboard(){
           </span>
           <section className={`${styles.modesContainer} ${styles.specialTools}`}>
             <button onClick={capturePNG}><img src="/tool_icons/camera.png" alt="canvas_snapshot" /></button>
-            <button onClick={captureSelectionPNG}><img src="/tool_icons/camera.png" alt="select_snapshot" /></button>
+            <button onClick={captureSelectionPNG}><img src="/tool_icons/cameraselect.png" alt="select_snapshot" /></button>
             <button onClick={()=>{}}>
                 <label className={styles.fileInput}>
                   <img src="/tool_icons/import.png" alt="import" />

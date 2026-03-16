@@ -92,9 +92,9 @@ function FileViewer({url, dimensions, type = null, size = 100000}){
             }
             checking = false
         }
-        const id = setInterval(checkAvailability, 700)
-        requestAnimationFrame(increaseLoad)
-        checkAvailability()
+       const id = setInterval(checkAvailability, 700)
+       requestAnimationFrame(increaseLoad)
+       checkAvailability()
 
         return () => {
             cancelAnimationFrame(increaseLoad)

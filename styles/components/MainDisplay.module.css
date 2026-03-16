@@ -56,12 +56,41 @@ h1.darkMode{
   flex: 1;
 }
 
-.callNotification{
+.offersContainer{
   position: fixed;
   top: 0;
   right: 0;
-  border: 2px solid;
-  padding: 10px;
-  background-color: rgb(255, 0, 0);
   z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.callNotification{
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  font-size: 1.5rem;
+  font-weight: bold;
+  font-family: "Exo 2";
+  text-align: center;
+	
+  border: 2px solid; 
+  padding: 10px;
+  background-color: rgba(66, 200, 10, .9);
+
+  & button{
+    border-radius: 10px;
+    background-color: white;
+    padding: 6px;
+    font-size: 1.6rem;
+    font-weight: bold;
+    font-family: "Daruma";
+    transition: transform .05s;
+  }
+ & button:hover{
+   filter: invert();	
+   transform: scale(.95);
+ }
 }
