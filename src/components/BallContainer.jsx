@@ -29,7 +29,7 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
 
         canvasRef.current.width = rect.width
         canvasRef.current.height = rect.height
-
+	cxt.fillStyle = "rgba(0,0,0,.2)"
 
         addBalls()
         
@@ -77,6 +77,9 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
                 cxt.arc(ball.pos.x, ball.pos.y, BALL_RADIUS, 0, 2*Math.PI)
                 cxt.stroke()
                 cxt.clip()
+		        ball.image.tagName !== "IMG" && cxt.fillRect(ball.pos.x - BALL_RADIUS, ball.pos.y - BALL_RADIUS, BALL_RADIUS * 2, BALL_RADIUS * 2);
+                
+
                 cxt.drawImage(ball.image, ball.pos.x - (scaledWidth / 2), ball.pos.y - (scaledHeight / 2), scaledWidth, scaledHeight)
                 cxt.restore()
             }
@@ -90,6 +93,12 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
         }
 
         return ()=>{
+            for (const oldBall of ballGroup.current){
+                if (oldBall?.image?.tagName !== "VIDEO") continue;
+                oldBall.image.pause();
+                oldBall.image.src = "";
+                oldBall.image.load();
+            }
             ballGroup.current = []
             cancelAnimationFrame(rafRef.current)
         }
@@ -98,7 +107,7 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
     async function addBalls(){
         const newBallGroup = []
 
-        for (let user of userList){
+        for (const user of userList){
             let exists = false
             
             for (let ball of ballGroup.current){
@@ -134,6 +143,14 @@ function BallContainer({userList, BALL_RADIUS = 15, ELASTICITY=.7, ACCELERATION=
 
             }
             newBallGroup.push(ball)
+        }
+        for (const oldBall of ballGroup.current){
+            if (oldBall?.image?.tagName !== "VIDEO") continue;
+            if (!newBallGroup.includes(oldBall)){
+                oldBall.image.pause();
+                oldBall.image.src = "";
+                oldBall.image.load();
+            }
         }
         ballGroup.current = newBallGroup
     }

@@ -438,7 +438,6 @@ async function getUploadURLReq(mimeType, fileName) {
   }
   return data.data.uploadInfo
 }
-
 async function uploadToS3Req(uploadInfo, file) {
   const fd = new FormData()
   for (const [key, val] of Object.entries(uploadInfo.fields)){
@@ -454,6 +453,16 @@ async function uploadToS3Req(uploadInfo, file) {
     throw new Error("Failed to upload to S3")
   }
   return response.ok
+}
+
+async function getTempTurnCredsReq() {
+  const response = await fetch(baseurl + "/turncredentials")
+  const data = await response.json()
+  if (!data.success){
+    throw new Error(data.message || "req failed")
+  }
+
+  return data.data
 }
 
 getUserInfoReq = handleError(getUserInfoReq)
@@ -486,6 +495,8 @@ getDefaultAvatars = handleError(getDefaultAvatars)
 getUploadURLReq = handleError(getUploadURLReq)
 uploadToS3Req = handleError(uploadToS3Req)
 
+getTempTurnCredsReq = handleError(getTempTurnCredsReq)
+
 function getUniqueMessageID(){
   const options = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   const messageID = []
@@ -499,5 +510,6 @@ export {getUniqueMessageID,getRoomUsersReq, addRoomUserReq, validateRoomUserReq,
   createRoomReq, checkRoomExistsReq, uploadFilesReq, storeMessageReq, editMessageReq, deleteMessageReq,getMessagesReq, getOlderMessagesReq,
   getUserInfoReq, assignUsernameReq, getUserRoomsReq, validateUsernameReq, updateProfilePictureReq,
   uploadNewImageReq, getCanvasSnapshotReq, updateCanvasSnapshotReq,
-  getDefaultAvatars, getUploadURLReq, uploadToS3Req
+  getDefaultAvatars, getUploadURLReq, uploadToS3Req,
+  getTempTurnCredsReq
 }

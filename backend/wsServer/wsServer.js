@@ -4,6 +4,8 @@ import {WebSocketServer} from "ws"
 import mediasoup from "mediasoup"
 import url from "url"
 import {v4 as uuidv4} from "uuid"
+import crypto from "crypto"
+
 
 import {createCanvas, loadImage} from "canvas"
 import { storeMessageReq, getMessagesReq, validateRoomUserReq, updateCanvasSnapshotReq, updateCanvasInstructionsReq, getCanvasSnapshotReq, getCanvasInstructionsReq, editMessageReq, deleteMessageReq } from "../requests.js"
@@ -15,9 +17,9 @@ const AUTH0_CLIENT_SECRET = process.env.AUTH0_CLIENT_SECRET
 const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN
 const AUTH0_API_AUDIENCE = process.env.AUTH0_API_AUDIENCE
 
-const TRANSPORT_ANNOUNCED_IP1 = process.env.TRANSPORT_ANNOUNCED_IP1
-const TRANSPORT_ANNOUNCED_IP2 = process.env.TRANSPORT_ANNOUNCED_IP2
+const TRANSPORT_ANNOUNCED_IP = process.env.TRANSPORT_ANNOUNCED_IP
 
+const TURN_SECRET = process.env.TURN_SECRET
 
 const httpServer = http.createServer()
 const wsServer = new WebSocketServer({server: httpServer})
@@ -83,8 +85,11 @@ async function getToken() {
   }
 };
 
-
-
+async function generateTempTurnCreds() {
+  const username = `${Math.floor(Date.now() / 1000) + 1200}:webrtc`;
+  const password = crypto.createHmac("sha1", TURN_SECRET).update(username).digest("base64");
+  return {username, password}
+}
 
 
 // any message layout (may not have all fields):
@@ -99,6 +104,7 @@ async function getToken() {
  */
 
 wsServer.on("connection", async (connection, request)=>{
+	console.log("connected");
   const username = url.parse(request.url, true).query.username
   const roomID = url.parse(request.url, true).query.roomID
   const location = url.parse(request.url, true).query.location
@@ -307,7 +313,8 @@ async function processGroupcall(data, uuid){
             "iceParameters": recvTransport.iceParameters,
             "iceCandidates": recvTransport.iceCandidates,
             "dtlsParameters": recvTransport.dtlsParameters
-          }
+          },
+          "tempTurnCreds": generateTempTurnCreds()
         }
       }))
       break
@@ -589,11 +596,7 @@ async function makeTransport(roomID) {
     listenIps: [
       {
         ip: '0.0.0.0',
-        announcedIp: TRANSPORT_ANNOUNCED_IP1
-      },
-      {
-        ip: '0.0.0.0',
-        announcedIp: TRANSPORT_ANNOUNCED_IP2
+        announcedIp: TRANSPORT_ANNOUNCED_IP
       }
     ],
     enableUdp: true,

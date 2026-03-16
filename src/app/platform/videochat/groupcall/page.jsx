@@ -137,11 +137,24 @@ function GroupCall(){
     }
 
 
-    async function createTransports({sendParams, recvParams}) {
-        const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+    async function createTransports({sendParams, recvParams, tempTurnCreds}) {
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+                urls: [
+                    "turn:turn.projectplace.space:3478?transport=udp",
+                    "turn:turn.projectplace.space:3478?transport=tcp",
+                ],
+                username: tempTurnCreds.username,
+                credential: tempTurnCreds.password
+            }
+        ];
 
         //set up send transport
-        const sendTransport = device.current.createSendTransport({...sendParams, iceServers})
+        const sendTransport = device.current.createSendTransport({
+            ...sendParams, 
+            iceServers
+        })
         connectionInfo.current["sendTransport"]["ref"] = sendTransport
         sendTransport.on("connect", ({dtlsParameters}, callback)=>{
             sendJsonMessage({
@@ -169,7 +182,10 @@ function GroupCall(){
         })
 
         //set up recv transport
-        const recvTransport = device.current.createRecvTransport({...recvParams, iceServers})
+        const recvTransport = device.current.createRecvTransport({
+            ...recvParams, 
+            iceServers
+        })
         connectionInfo.current["recvTransport"]["ref"] = recvTransport
 
         recvTransport.on("connect", ({dtlsParameters}, callback) => {

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { UserContext, AppearanceContext, RoomContext, VideoChatContext, WebSocketContext, PeersContext } from "src/providers/contexts"
 import Animation from "src/components/Animation" 
 import styles from "styles/platform/PeerCall.module.css"
+import { getTempTurnCredsReq } from "backend/requests"
 
 function PeerCall(){
     const {username} = useContext(UserContext)
@@ -18,10 +19,7 @@ function PeerCall(){
     const searchParams = useSearchParams() 
     const router = useRouter()
 
-    const servers = {
-        iceServers: [{urls: ["stun:stun.l.google.com:19302", "stun:stun.l.google.com:5349"]}],
-        iceCandidatePoolSize: 10,
-    }
+
     const connectionInfo = useRef({ 
         pc: null,
         negotiating: false,
@@ -124,7 +122,20 @@ function PeerCall(){
         disconnect()
         clearConnection()
 
-
+        const servers = {
+            iceServers: [
+                {urls: "stun:stun.l.google.com:19302"},
+            ],
+            iceCandidatePoolSize: 10,
+        }
+        const turnCreds = await getTempTurnCredsReq();
+        if (turnCreds){
+            servers.iceServers.push({
+                urls: ["turn:turn.projectplace.space:3478?transport=udp", "turn:turn.projectplace.space:3478?transport=tcp"],
+                username: turnCreds.username,
+                credential: turnCreds.password
+            })
+        }
         const pc = new RTCPeerConnection(servers)
         pc.createDataChannel("keepalive") //needed, otherwise calls won't send ICE candidates on 0 tracks
         const remoteStream = new MediaStream()
@@ -203,6 +214,21 @@ function PeerCall(){
         disconnect()
         clearConnection()
 
+
+        const servers = {
+            iceServers: [
+                {urls: "stun:stun.l.google.com:19302"},
+            ],
+            iceCandidatePoolSize: 10,
+        }
+        const turnCreds = await getTempTurnCredsReq();
+        if (turnCreds){
+            servers.iceServers.push({
+                urls: ["turn:turn.projectplace.space:3478?transport=udp", "turn:turn.projectplace.space:3478?transport=tcp"],
+                username: turnCreds.username,
+                credential: turnCreds.password
+            })
+        }
         const pc = new RTCPeerConnection(servers)
         const remoteStream = new MediaStream()
         remoteCam.current.srcObject = remoteStream

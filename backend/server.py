@@ -17,6 +17,8 @@ from flask_cors import CORS
 import uuid
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+import time, hmac, hashlib, base64
+
 from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env")
 
@@ -36,6 +38,8 @@ DB_PASSWORD = env.get("DB_PASSWORD")
 HTTP_BACKEND_URL = env.get("HTTP_BACKEND_URL")
 FRONTEND_URL = env.get("FRONTEND_URL")
 
+TURN_SECRET = env.get("TURN_SECRET")
+
 
 s3 = boto3.client(
     "s3",
@@ -47,10 +51,10 @@ s3 = boto3.client(
 
 # create flask app and register with the Auth0 service
 app = Flask(__name__)
-# app.config.update(
-#     SESSION_COOKIE_DOMAIN=".projectplace.space",
-#     SESSION_COOKIE_SECURE=True,
-# )
+app.config.update(
+    SESSION_COOKIE_DOMAIN=".projectplace.space",
+    SESSION_COOKIE_SECURE=True,
+)
 
 app.secret_key = APP_SECRET_KEY
 
@@ -584,6 +588,15 @@ def createUser():
     if (not exists):
       cursor.execute("INSERT INTO users (userID, username, images, rooms) VALUES (%s, %s, %s, %s)", (session["userID"], None, "[]","[]"))
 
+#-----------------TURN STUFF-------------------
+@app.route("/turncredentials")
+@handleError("Failed to get turn credentials")
+@authenticateClient
+def getTurnCredentials():
+  username = f"{int(time.time()) + 1200}:webrtc"
+  password = base64.b64encode(hmac.new(TURN_SECRET.encode(), username.encode(), hashlib.sha1).digest()).decode()
+  return {"success": True, "data": {"username": username, "password": password}}, 200
+
 #-----------------AUTH0 STUFF------------------
 
 # Redirects user to auth0 login page
@@ -694,7 +707,7 @@ def getS3UploadURL(key, mimeType="application/octet-stream", expiration=900):
             key,
             Fields={"Content-Type": mimeType},
             Conditions=[
-              ["content-length-range", 0, 1024 * 1024 * 25], #200MB max (will lower if site grows)
+              ["content-length-range", 0, 1024 * 1024 * 25], #25MB max (will lower if site grows)
               {"Content-Type": mimeType}
             ],
             ExpiresIn=expiration
