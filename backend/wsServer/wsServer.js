@@ -85,7 +85,7 @@ async function getToken() {
   }
 };
 
-async function generateTempTurnCreds() {
+function generateTempTurnCreds() {
   const username = `${Math.floor(Date.now() / 1000) + 1200}:webrtc`;
   const password = crypto.createHmac("sha1", TURN_SECRET).update(username).digest("base64");
   return {username, password}

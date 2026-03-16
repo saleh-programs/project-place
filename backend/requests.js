@@ -455,13 +455,14 @@ async function uploadToS3Req(uploadInfo, file) {
   return response.ok
 }
 
-async function getTempTurnCredsReq() {
-  const response = await fetch(baseurl + "/turncredentials")
+async function getTempTurnCredsReq(){
+  const response = await fetch(baseurl + `/turncredentials`, {
+    "credentials": "include",
+  })
   const data = await response.json()
   if (!data.success){
-    throw new Error(data.message || "req failed")
+    throw new Error(data.message ||"req failed")
   }
-
   return data.data
 }
 
