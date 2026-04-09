@@ -6,6 +6,8 @@ Teams often need to send messages, share files, hold meetings, and illustrate id
 ## Try it out!
 https://projectplace.space
 
+AVAILABLE 10AM - 12AM (midnight)
+
 ## Major Features
 ### Chat
 - Send / Edit / Delete messages
